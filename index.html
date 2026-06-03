@@ -1,1036 +1,1001 @@
-{\rtf1\ansi\ansicpg1252\cocoartf2639
-\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 AppleColorEmoji;}
-{\colortbl;\red255\green255\blue255;}
-{\*\expandedcolortbl;;}
-\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
-\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Exam Test</title>
+    <style>
+        :root {
+            --primary-color: #1e3a8a;
+            --primary-light: #eff6ff;
+            --accent-color: #d97706;
+            --text-main: #1f2937;
+            --text-muted: #4b5563;
+            --bg-body: #f3f4f6;
+            --bg-card: #ffffff;
+            --border-color: #e5e7eb;
+            --success-color: #10b981;
+            --error-color: #ef4444;
+        }
 
-\f0\fs24 \cf0 <!DOCTYPE html>\
-<html lang="en">\
-<head>\
-    <meta charset="UTF-8">\
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">\
-    <title>Online Exam Test</title>\
-    <style>\
-        :root \{\
-            --primary-color: #1e3a8a;\
-            --primary-light: #eff6ff;\
-            --accent-color: #d97706;\
-            --text-main: #1f2937;\
-            --text-muted: #4b5563;\
-            --bg-body: #f3f4f6;\
-            --bg-card: #ffffff;\
-            --border-color: #e5e7eb;\
-            --success-color: #10b981;\
-            --error-color: #ef4444;\
-        \}\
-\
-        * \{\
-            box-sizing: border-box;\
-            margin: 0;\
-            padding: 0;\
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\
-        \}\
-\
-        body \{\
-            background-color: var(--bg-body);\
-            color: var(--text-main);\
-            line-height: 1.6;\
-            padding-bottom: 60px;\
-        \}\
-\
-        header \{\
-            background-color: var(--primary-color);\
-            color: white;\
-            padding: 15px 30px;\
-            display: flex;\
-            justify-content: space-between;\
-            align-items: center;\
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);\
-            position: sticky;\
-            top: 0;\
-            z-index: 100;\
-        \}\
-\
-        .brand-title h1 \{\
-            font-size: 22px;\
-            font-weight: 700;\
-            letter-spacing: 0.5px;\
-        \}\
-\
-        .brand-title p \{\
-            font-size: 12px;\
-            color: #93c5fd;\
-        \}\
-\
-        .header-controls \{\
-            display: flex;\
-            align-items: center;\
-            gap: 15px;\
-        \}\
-\
-        .exam-timer-box \{\
-            background-color: rgba(255, 255, 255, 0.15);\
-            padding: 8px 16px;\
-            border-radius: 6px;\
-            font-weight: bold;\
-            font-size: 15px;\
-            display: flex;\
-            align-items: center;\
-            gap: 8px;\
-            border: 1px solid rgba(255, 255, 255, 0.25);\
-        \}\
-\
-        /* Loading Screen overlay */\
-        .loading-overlay \{\
-            position: fixed;\
-            top: 0; left: 0; width: 100%; height: 100%;\
-            background: rgba(255,255,255,0.9);\
-            display: flex; flex-direction: column;\
-            justify-content: center; align-items: center;\
-            z-index: 2000; font-weight: bold; font-size: 18px;\
-            color: var(--primary-color);\
-        \}\
-\
-        /* --- Panels & Screens --- */\
-        .panel-view \{\
-            max-width: 600px;\
-            margin: 50px auto;\
-            background: white;\
-            padding: 35px;\
-            border-radius: 8px;\
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);\
-            border: 1px solid var(--border-color);\
-        \}\
-\
-        .panel-view h2 \{\
-            color: var(--primary-color);\
-            margin-bottom: 15px;\
-            text-align: center;\
-        \}\
-\
-        .form-group \{\
-            margin: 18px 0;\
-            text-align: left;\
-        \}\
-\
-        .form-group label \{\
-            display: block;\
-            font-size: 13px;\
-            font-weight: 600;\
-            margin-bottom: 6px;\
-            color: var(--text-main);\
-        \}\
-\
-        .form-group input, .form-group select, .form-group textarea \{\
-            width: 100%;\
-            padding: 10px;\
-            border: 1px solid #cbd5e1;\
-            border-radius: 6px;\
-            font-size: 14px;\
-            outline: none;\
-            background: white;\
-        \}\
-\
-        .form-group textarea \{\
-            resize: vertical;\
-            height: 80px;\
-        \}\
-\
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus \{\
-            border-color: var(--primary-color);\
-        \}\
-\
-        .inline-setup-row \{\
-            display: flex;\
-            gap: 15px;\
-        \}\
-        .inline-setup-row .form-group \{\
-            flex: 1;\
-            margin: 10px 0;\
-        \}\
-\
-        .main-container \{\
-            max-width: 1300px;\
-            margin: 30px auto;\
-            padding: 0 20px;\
-            display: flex;\
-            gap: 25px;\
-        \}\
-\
-        .quiz-section \{ flex: 2.4; \}\
-        .sidebar-section \{\
-            flex: 1.6;\
-            position: sticky;\
-            top: 90px;\
-            height: calc(100vh - 130px);\
-            overflow-y: auto;\
-        \}\
-\
-        .info-card \{\
-            background: var(--bg-card);\
-            padding: 15px;\
-            border-radius: 8px;\
-            border: 1px solid var(--border-color);\
-            margin-bottom: 20px;\
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);\
-        \}\
-\
-        .info-card h3 \{\
-            color: var(--primary-color);\
-            font-size: 14px;\
-            margin-bottom: 8px;\
-            border-bottom: 2px solid var(--primary-light);\
-            padding-bottom: 4px;\
-        \}\
-\
-        /* --- OMR Bubble Sheet Elements --- */\
-        .omr-container \{\
-            display: flex;\
-            flex-direction: column;\
-            background: #ffffff;\
-            border: 1px solid #cbd5e1;\
-            border-radius: 4px;\
-            width: 100%;\
-        \}\
-\
-        .omr-row \{\
-            display: flex;\
-            align-items: center;\
-            padding: 6px 15px; \
-            border-bottom: 1px solid #f1f5f9;\
-            transition: all 0.1s;\
-        \}\
-\
-        .omr-row:last-child \{ border-bottom: none; \}\
-        .omr-row.active-row \{ background-color: var(--primary-light); \}\
-\
-        .omr-q-num \{\
-            font-size: 12px;\
-            font-weight: 700;\
-            width: 45px; \
-            color: var(--text-muted);\
-            user-select: none;\
-        \}\
-\
-        .omr-bubbles \{\
-            display: flex;\
-            flex: 1;\
-            justify-content: space-between; \
-            max-width: 260px;               \
-        \}\
-\
-        .omr-bubble \{\
-            width: 26px; \
-            height: 26px;\
-            border-radius: 50%;\
-            border: 1.5px solid #4b5563;\
-            display: flex;\
-            align-items: center;\
-            justify-content: center;\
-            font-size: 12px;\
-            font-weight: 700;\
-            color: #4b5563;\
-            background: white;\
-            cursor: pointer;\
-            user-select: none;\
-            transition: all 0.1s ease-in-out;\
-        \}\
-\
-        .omr-bubble:hover \{ background-color: #cbd5e1; \}\
-        .omr-bubble.marked \{\
-            background-color: #111827;\
-            border-color: #111827;\
-            color: white;\
-        \}\
-\
-        /* --- Question Card Section --- */\
-        .question-card \{\
-            background: var(--bg-card);\
-            border-radius: 8px;\
-            border: 1px solid var(--border-color);\
-            padding: 30px;\
-            margin-bottom: 25px;\
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);\
-            display: none;\
-        \}\
-\
-        .question-card.active \{ display: block; \}\
-        .q-header \{\
-            display: flex;\
-            justify-content: space-between;\
-            align-items: center;\
-            margin-bottom: 20px;\
-            border-bottom: 1px dashed var(--border-color);\
-            padding-bottom: 12px;\
-        \}\
-\
-        .q-number \{\
-            background-color: var(--primary-color);\
-            color: white;\
-            padding: 4px 12px;\
-            border-radius: 4px;\
-            font-size: 13px;\
-            font-weight: 600;\
-        \}\
-\
-        .q-text \{\
-            font-size: 17px;\
-            font-weight: 600;\
-            color: #111827;\
-            margin-bottom: 20px;\
-            white-space: pre-wrap;\
-        \}\
-\
-        .question-image-container \{\
-            width: 100%;\
-            text-align: center;\
-            margin-bottom: 20px;\
-        \}\
-\
-        .question-image-container img \{\
-            max-width: 100%;\
-            max-height: 280px;\
-            border-radius: 6px;\
-            border: 1px solid var(--border-color);\
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);\
-        \}\
-\
-        .options-container \{\
-            display: flex;\
-            flex-direction: column;\
-            gap: 10px;\
-        \}\
-\
-        .option-display-item \{\
-            display: flex;\
-            align-items: center;\
-            padding: 12px 16px;\
-            background-color: #f9fafb;\
-            border: 1px solid var(--border-color);\
-            border-radius: 6px;\
-            font-size: 14px;\
-            font-weight: 500;\
-            color: var(--text-main);\
-            user-select: none;\
-            cursor: default; \
-        \}\
-\
-        .option-display-item.active-selection \{\
-            background-color: var(--primary-light);\
-            border-color: #93c5fd;\
-            color: #1e40af;\
-            font-weight: 600;\
-        \}\
-\
-        .option-alpha \{\
-            width: 26px;\
-            height: 26px;\
-            border-radius: 50%;\
-            border: 1.5px solid #94a3b8;\
-            display: flex;\
-            align-items: center;\
-            justify-content: center;\
-            margin-right: 15px;\
-            font-weight: bold;\
-            font-size: 12px;\
-            color: #64748b;\
-            background: white;\
-            flex-shrink: 0;\
-        \}\
-\
-        .option-display-item.active-selection .option-alpha \{\
-            background-color: var(--primary-color);\
-            border-color: var(--primary-color);\
-            color: white;\
-        \}\
-\
-        .nav-actions \{\
-            display: flex;\
-            justify-content: space-between;\
-            margin-top: 25px;\
-        \}\
-\
-        .btn \{\
-            padding: 10px 22px;\
-            font-size: 14px;\
-            font-weight: 600;\
-            border-radius: 6px;\
-            cursor: pointer;\
-            border: none;\
-        \}\
-\
-        .btn:disabled \{ opacity: 0.5; cursor: not-allowed; \}\
-        .btn-secondary \{ background-color: #e5e7eb; color: #374151; \}\
-        .btn-primary \{ background-color: var(--primary-color); color: white; \}\
-        .btn-success \{ background-color: var(--success-color); color: white; \}\
-        .btn-dark \{ background-color: #1f2937; color: white; \}\
-        .btn-accent \{ background-color: var(--accent-color); color: white; \}\
-\
-        #result-panel \{\
-            background: white;\
-            border-radius: 8px;\
-            border: 1px solid var(--border-color);\
-            padding: 40px;\
-            text-align: center;\
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);\
-        \}\
-\
-        .score-circle \{\
-            width: 130px;\
-            height: 130px;\
-            border-radius: 50%;\
-            background: var(--primary-light);\
-            color: var(--primary-color);\
-            font-size: 32px;\
-            font-weight: bold;\
-            display: flex;\
-            align-items: center;\
-            justify-content: center;\
-            margin: 20px auto;\
-            border: 4px solid var(--primary-color);\
-        \}\
-\
-        .review-title \{\
-            text-align: left;\
-            margin-top: 40px;\
-            padding-bottom: 10px;\
-            border-bottom: 2px solid var(--border-color);\
-            color: var(--primary-color);\
-        \}\
-\
-        .review-item \{\
-            text-align: left;\
-            padding: 20px;\
-            border-bottom: 1px solid var(--border-color);\
-            margin-top: 15px;\
-            background: #fafafa;\
-            border-radius: 6px;\
-        \}\
-\
-        .review-item.correct-card \{ border-left: 5px solid var(--success-color); \}\
-        .review-item.wrong-card \{ border-left: 5px solid var(--error-color); \}\
-\
-        .badge \{\
-            display: inline-block;\
-            padding: 3px 8px;\
-            font-size: 11px;\
-            font-weight: bold;\
-            border-radius: 4px;\
-            margin-bottom: 8px;\
-            text-transform: uppercase;\
-        \}\
-        .badge-success \{ background: #d1fae5; color: #065f46; \}\
-        .badge-error \{ background: #fee2e2; color: #991b1b; \}\
-\
-        @media (max-width: 900px) \{\
-            .main-container \{ flex-direction: column; \}\
-            .sidebar-section \{ position: relative; top: 0; height: auto; \}\
-        \}\
-    </style>\
-</head>\
-<body>\
-\
-    <!-- Loading Mask Status Indicator Overlay -->\
-    <div id="global-loading-screen" class="loading-overlay">\
-        <div style="margin-bottom: 10px;">
-\f1 \uc0\u9203 
-\f0  Syncing with Live Database Vault...</div>\
-        <div style="font-size:12px; font-weight:normal; color:var(--text-muted);">Please stand by while scripts optimize parameters</div>\
-    </div>\
-\
-    <header>\
-        <div class="brand-title">\
-            <h1>Online Exam Test</h1>\
-            <p id="sub-header-desc">Cloud-Linked Multilingual Examination Portal</p>\
-        </div>\
-        <div class="header-controls">\
-            <button type="button" class="btn btn-dark" id="admin-gate-btn" onclick="toggleAdminLoginView()">
-\f1 \uc0\u9881 \u65039 
-\f0  Admin Portal</button>\
-            <div class="exam-timer-box" id="header-timer" style="display: none;">\
-                <span id="header-category-label" style="margin-right:10px; color:#93c5fd; font-size:13px; font-weight:normal;"></span>\
-                <span>
-\f1 \uc0\u9200 
-\f0  Time Remaining:</span>\
-                <span id="timer-display">--:--</span>\
-            </div>\
-        </div>\
-    </header>\
-\
-    <!-- Admin Authentication -->\
-    <div id="admin-login-container" style="display: none;">\
-        <div class="panel-view">\
-            <h2>Admin Security Gateway</h2>\
-            <div class="form-group">\
-                <label for="admin-pass-field">Enter System Admin Password:</label>\
-                <input type="password" id="admin-pass-field" placeholder="Hint: Security verification required">\
-            </div>\
-            <div style="display: flex; gap: 10px;">\
-                <button type="button" class="btn btn-secondary" style="flex:1;" onclick="exitAdminView()">Cancel</button>\
-                <button type="button" class="btn btn-primary" style="flex:2;" onclick="verifyAdminPassword()">Authenticate</button>\
-            </div>\
-        </div>\
-    </div>\
-\
-    <!-- Admin Command Dashboard -->\
-    <div id="admin-dashboard-container" style="display: none;">\
-        <div class="panel-view" style="max-width: 750px;">\
-            <h2>Manage Cloud Database Records</h2>\
-            \
-            <div style="background: #eff6ff; padding: 20px; border-radius: 8px; border:1px solid #bfdbfe; margin-bottom: 25px;">\
-                <h3 style="font-size:14px; color: var(--primary-color); margin-bottom:12px;">Create New Examination Track Category</h3>\
-                <div style="display:flex; gap:10px;">\
-                    <input type="text" id="adm-new-cat-input" placeholder="e.g., Dzongkha Language Competency" style="flex:2; padding:10px; border:1px solid #cbd5e1; border-radius:6px;">\
-                    <button type="button" class="btn btn-accent" style="flex:1;" onclick="commitNewCategory()">Add Category</button>\
-                </div>\
-            </div>\
-\
-            <div style="background: #f8fafc; padding: 15px; border-radius: 6px; border:1px solid var(--border-color); margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center;">\
-                <div>\
-                    <span style="font-weight: 700; font-size: 13px; color: var(--primary-color);">Total Registries Inside Spreadsheet: </span>\
-                    <span id="pool-counter-badge" style="font-weight:700; background:#ddd; padding: 2px 8px; border-radius:12px; font-size:12px;">0 Questions</span>\
-                </div>\
-            </div>\
-\
-            <div class="form-group">\
-                <label>Target Category Classification Selector:</label>\
-                <select id="adm-q-category-select"></select>\
-            </div>\
-            \
-            <div class="form-group">\
-                <label>Question Prompt / Text (Accepts Unicode / Dzongkha / Symbol mappings):</label>\
-                <textarea id="adm-q-text" placeholder="Paste or type question criteria here..."></textarea>\
-            </div>\
-\
-            <div style="background: #f1f5f9; padding: 15px; border-radius: 6px; border: 1px dashed #cbd5e1; margin: 15px 0;">\
-                <span style="font-size: 12px; font-weight: 700; display:block; margin-bottom: 8px; color: var(--text-main);">
-\f1 \uc0\u55357 \u56568 
-\f0  Attach Image to Question (Choose ONE option below):</span>\
-                \
-                <div class="form-group" style="margin: 5px 0 10px 0;">\
-                    <label style="font-weight:normal; font-size:12px;">Option A: Upload Image File from Local Storage</label>\
-                    <input type="file" id="adm-q-image-file" accept="image/*" onchange="processLocalImageFile(this)">\
-                </div>\
-                <div style="text-align: center; font-size:11px; font-weight:bold; color: var(--text-muted); margin: 4px 0;">- OR -</div>\
-                <div class="form-group" style="margin: 5px 0 0 0;">\
-                    <label style="font-weight:normal; font-size:12px;">Option B: Provide Image Web URL Link</label>\
-                    <input type="text" id="adm-q-image-url" placeholder="https://example.com/image.png" oninput="processWebImageUrl(this.value)">\
-                </div>\
-                \
-                <div id="image-preview-box" style="margin-top:12px; display:none; text-align:center;">\
-                    <span style="font-size:11px; color: var(--text-muted); display:block; margin-bottom:4px;">Image Preview:</span>\
-                    <img id="img-preview-target" src="" style="max-height:120px; border:1px solid #cbd5e1; border-radius:4px;">\
-                    <button type="button" style="display:block; margin: 5px auto 0 auto; font-size:11px; background:#ef4444; color:white; border:none; padding:2px 8px; border-radius:3px; cursor:pointer;" onclick="clearAttachedImageState()">Remove Image</button>\
-                </div>\
-            </div>\
-\
-            <div class="form-group">\
-                <label>Option A Text:</label> <input type="text" id="adm-o-0" placeholder="Option A description">\
-            </div>\
-            <div class="form-group">\
-                <label>Option B Text:</label> <input type="text" id="adm-o-1" placeholder="Option B description">\
-            </div>\
-            <div class="form-group">\
-                <label>Option C Text:</label> <input type="text" id="adm-o-2" placeholder="Option C description">\
-            </div>\
-            <div class="form-group">\
-                <label>Option D Text:</label> <input type="text" id="adm-o-3" placeholder="Option D description">\
-            </div>\
-            <div class="form-group">\
-                <label>Designate True Correct Answer Element Key:</label>\
-                <select id="adm-correct-idx">\
-                    <option value="0">Option A</option>\
-                    <option value="1">Option B</option>\
-                    <option value="2">Option C</option>\
-                    <option value="3">Option D</option>\
-                </select>\
-            </div>\
-            \
-            <div style="display: flex; gap: 10px; margin-top:25px;">\
-                <button type="button" class="btn btn-secondary" style="flex:1;" onclick="exitAdminView()">Return to Menu</button>\
-                <button type="button" class="btn btn-success" id="btn-save-question" style="flex:2;" onclick="commitQuestionToPool()">Append Question to Cloud</button>\
-            </div>\
-        </div>\
-    </div>\
-\
-    <!-- Configuration Setup Landing Page -->\
-    <div id="setup-container">\
-        <div class="panel-view" style="max-width: 550px; margin-top: 80px;">\
-            <h2>Configure Examination Settings</h2>\
-            <p style="color: var(--text-muted); font-size: 14px; text-align:center; margin-bottom: 10px;">Select your exam track. Questions load directly from the live central spreadsheet registry.</p>\
-            \
-            <div class="inline-setup-row">\
-                <div class="form-group">\
-                    <label for="user-timer-input">Exam Duration (Minutes):</label>\
-                    <input type="number" id="user-timer-input" value="25" min="1" max="180">\
-                </div>\
-                \
-                <div class="form-group">\
-                    <label for="user-category-select">Choose Exam Category:</label>\
-                    <select id="user-category-select"><option>Loading track registries...</option></select>\
-                </div>\
-            </div>\
-\
-            <button type="button" class="btn btn-primary" id="start-exam-btn" style="width:100%; padding:14px; margin-top:15px; font-size:15px;" onclick="startExamSession()" disabled>Syncing Data...</button>\
-        </div>\
-    </div>\
-\
-    <!-- Live Testing Workspace Arena -->\
-    <div class="main-container" id="exam-app-container" style="display: none;">\
-        <div class="quiz-section" id="quiz-wrapper">\
-            <form id="examination-form" onsubmit="event.preventDefault();">\
-                <div id="questions-container"></div>\
-            </form>\
-        </div>\
-\
-        <div class="sidebar-section" id="sidebar-wrapper">\
-            <div class="info-card">\
-                <h3>OMR Answer Sheet</h3>\
-                <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.3;">\
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding-bottom: 60px;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand-title h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .brand-title p {
+            font-size: 12px;
+            color: #93c5fd;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .exam-timer-box {
+            background-color: rgba(255, 255, 255, 0.15);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        /* Loading Screen overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 2000; font-weight: bold; font-size: 18px;
+            color: var(--primary-color);
+        }
+
+        /* --- Panels & Screens --- */
+        .panel-view {
+            max-width: 600px;
+            margin: 50px auto;
+            background: white;
+            padding: 35px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            border: 1px solid var(--border-color);
+        }
+
+        .panel-view h2 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin: 18px 0;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-main);
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            background: white;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            height: 80px;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: var(--primary-color);
+        }
+
+        .inline-setup-row {
+            display: flex;
+            gap: 15px;
+        }
+        .inline-setup-row .form-group {
+            flex: 1;
+            margin: 10px 0;
+        }
+
+        .main-container {
+            max-width: 1300px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            gap: 25px;
+        }
+
+        .quiz-section { flex: 2.4; }
+        .sidebar-section {
+            flex: 1.6;
+            position: sticky;
+            top: 90px;
+            height: calc(100vh - 130px);
+            overflow-y: auto;
+        }
+
+        .info-card {
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .info-card h3 {
+            color: var(--primary-color);
+            font-size: 14px;
+            margin-bottom: 8px;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 4px;
+        }
+
+        /* --- OMR Bubble Sheet Elements --- */
+        .omr-container {
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            width: 100%;
+        }
+
+        .omr-row {
+            display: flex;
+            align-items: center;
+            padding: 6px 15px; 
+            border-bottom: 1px solid #f1f5f9;
+            transition: all 0.1s;
+        }
+
+        .omr-row:last-child { border-bottom: none; }
+        .omr-row.active-row { background-color: var(--primary-light); }
+
+        .omr-q-num {
+            font-size: 12px;
+            font-weight: 700;
+            width: 45px; 
+            color: var(--text-muted);
+            user-select: none;
+        }
+
+        .omr-bubbles {
+            display: flex;
+            flex: 1;
+            justify-content: space-between; 
+            max-width: 260px;               
+        }
+
+        .omr-bubble {
+            width: 26px; 
+            height: 26px;
+            border-radius: 50%;
+            border: 1.5px solid #4b5563;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #4b5563;
+            background: white;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.1s ease-in-out;
+        }
+
+        .omr-bubble:hover { background-color: #cbd5e1; }
+        .omr-bubble.marked {
+            background-color: #111827;
+            border-color: #111827;
+            color: white;
+        }
+
+        /* --- Question Card Section --- */
+        .question-card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+            display: none;
+        }
+
+        .question-card.active { display: block; }
+        .q-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .q-number {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .q-text {
+            font-size: 17px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+        }
+
+        .question-image-container {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .question-image-container img {
+            max-width: 100%;
+            max-height: 280px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .option-display-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background-color: #f9fafb;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-main);
+            user-select: none;
+            cursor: default; 
+        }
+
+        .option-display-item.active-selection {
+            background-color: var(--primary-light);
+            border-color: #93c5fd;
+            color: #1e40af;
+            font-weight: 600;
+        }
+
+        .option-alpha {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 1.5px solid #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-weight: bold;
+            font-size: 12px;
+            color: #64748b;
+            background: white;
+            flex-shrink: 0;
+        }
+
+        .option-display-item.active-selection .option-alpha {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .nav-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 25px;
+        }
+
+        .btn {
+            padding: 10px 22px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background-color: #e5e7eb; color: #374151; }
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-success { background-color: var(--success-color); color: white; }
+        .btn-dark { background-color: #1f2937; color: white; }
+        .btn-accent { background-color: var(--accent-color); color: white; }
+
+        #result-panel {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .score-circle {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            color: var(--primary-color);
+            font-size: 32px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px auto;
+            border: 4px solid var(--primary-color);
+        }
+
+        .review-title {
+            text-align: left;
+            margin-top: 40px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+            color: var(--primary-color);
+        }
+
+        .review-item {
+            text-align: left;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-top: 15px;
+            background: #fafafa;
+            border-radius: 6px;
+        }
+
+        .review-item.correct-card { border-left: 5px solid var(--success-color); }
+        .review-item.wrong-card { border-left: 5px solid var(--error-color); }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-error { background: #fee2e2; color: #991b1b; }
+
+        @media (max-width: 900px) {
+            .main-container { flex-direction: column; }
+            .sidebar-section { position: relative; top: 0; height: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="global-loading-screen" class="loading-overlay">
+        <div style="margin-bottom: 10px;">⏳ Syncing with Live Database Vault...</div>
+        <div style="font-size:12px; font-weight:normal; color:var(--text-muted);">Please stand by while scripts optimize parameters</div>
+    </div>
+
+    <header>
+        <div class="brand-title">
+            <h1>Online Exam Test</h1>
+            <p id="sub-header-desc">Cloud-Linked Multilingual Examination Portal</p>
+        </div>
+        <div class="header-controls">
+            <button type="button" class="btn btn-dark" id="admin-gate-btn" onclick="toggleAdminLoginView()">⚙️ Admin Portal</button>
+            <div class="exam-timer-box" id="header-timer" style="display: none;">
+                <span id="header-category-label" style="margin-right:10px; color:#93c5fd; font-size:13px; font-weight:normal;"></span>
+                <span>⏰ Time Remaining:</span>
+                <span id="timer-display">--:--</span>
+            </div>
+        </div>
+    </header>
+
+    <div id="admin-login-container" style="display: none;">
+        <div class="panel-view">
+            <h2>Admin Security Gateway</h2>
+            <div class="form-group">
+                <label for="admin-pass-field">Enter System Admin Password:</label>
+                <input type="password" id="admin-pass-field" placeholder="Hint: Security verification required">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-secondary" style="flex:1;" onclick="exitAdminView()">Cancel</button>
+                <button type="button" class="btn btn-primary" style="flex:2;" onclick="verifyAdminPassword()">Authenticate</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="admin-dashboard-container" style="display: none;">
+        <div class="panel-view" style="max-width: 750px;">
+            <h2>Manage Cloud Database Records</h2>
+            
+            <div style="background: #eff6ff; padding: 20px; border-radius: 8px; border:1px solid #bfdbfe; margin-bottom: 25px;">
+                <h3 style="font-size:14px; color: var(--primary-color); margin-bottom:12px;">Create New Examination Track Category</h3>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="adm-new-cat-input" placeholder="e.g., Dzongkha Language Competency" style="flex:2; padding:10px; border:1px solid #cbd5e1; border-radius:6px;">
+                    <button type="button" class="btn btn-accent" style="flex:1;" onclick="commitNewCategory()">Add Category</button>
+                </div>
+            </div>
+
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px; border:1px solid var(--border-color); margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <span style="font-weight: 700; font-size: 13px; color: var(--primary-color);">Total Registries Inside Spreadsheet: </span>
+                    <span id="pool-counter-badge" style="font-weight:700; background:#ddd; padding: 2px 8px; border-radius:12px; font-size:12px;">0 Questions</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Target Category Classification Selector:</label>
+                <select id="adm-q-category-select"></select>
+            </div>
+            
+            <div class="form-group">
+                <label>Question Prompt / Text (Accepts Unicode / Dzongkha / Symbol mappings):</label>
+                <textarea id="adm-q-text" placeholder="Paste or type question criteria here..."></textarea>
+            </div>
+
+            <div style="background: #f1f5f9; padding: 15px; border-radius: 6px; border: 1px dashed #cbd5e1; margin: 15px 0;">
+                <span style="font-size: 12px; font-weight: 700; display:block; margin-bottom: 8px; color: var(--text-main);">📸 Attach Image to Question (Choose ONE option below):</span>
+                
+                <div class="form-group" style="margin: 5px 0 10px 0;">
+                    <label style="font-weight:normal; font-size:12px;">Option A: Upload Image File from Local Storage</label>
+                    <input type="file" id="adm-q-image-file" accept="image/*" onchange="processLocalImageFile(this)">
+                </div>
+                <div style="text-align: center; font-size:11px; font-weight:bold; color: var(--text-muted); margin: 4px 0;">- OR -</div>
+                <div class="form-group" style="margin: 5px 0 0 0;">
+                    <label style="font-weight:normal; font-size:12px;">Option B: Provide Image Web URL Link</label>
+                    <input type="text" id="adm-q-image-url" placeholder="https://example.com/image.png" oninput="processWebImageUrl(this.value)">
+                </div>
+                
+                <div id="image-preview-box" style="margin-top:12px; display:none; text-align:center;">
+                    <span style="font-size:11px; color: var(--text-muted); display:block; margin-bottom:4px;">Image Preview:</span>
+                    <img id="img-preview-target" src="" style="max-height:120px; border:1px solid #cbd5e1; border-radius:4px;">
+                    <button type="button" style="display:block; margin: 5px auto 0 auto; font-size:11px; background:#ef4444; color:white; border:none; padding:2px 8px; border-radius:3px; cursor:pointer;" onclick="clearAttachedImageState()">Remove Image</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Option A Text:</label> <input type="text" id="adm-o-0" placeholder="Option A description">
+            </div>
+            <div class="form-group">
+                <label>Option B Text:</label> <input type="text" id="adm-o-1" placeholder="Option B description">
+            </div>
+            <div class="form-group">
+                <label>Option C Text:</label> <input type="text" id="adm-o-2" placeholder="Option C description">
+            </div>
+            <div class="form-group">
+                <label>Option D Text:</label> <input type="text" id="adm-o-3" placeholder="Option D description">
+            </div>
+            <div class="form-group">
+                <label>Designate True Correct Answer Element Key:</label>
+                <select id="adm-correct-idx">
+                    <option value="0">Option A</option>
+                    <option value="1">Option B</option>
+                    <option value="2">Option C</option>
+                    <option value="3">Option D</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top:25px;">
+                <button type="button" class="btn btn-secondary" style="flex:1;" onclick="exitAdminView()">Return to Menu</button>
+                <button type="button" class="btn btn-success" id="btn-save-question" style="flex:2;" onclick="commitQuestionToPool()">Append Question to Cloud</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="setup-container">
+        <div class="panel-view" style="max-width: 550px; margin-top: 80px;">
+            <h2>Configure Examination Settings</h2>
+            <p style="color: var(--text-muted); font-size: 14px; text-align:center; margin-bottom: 10px;">Select your exam track. Questions load directly from the live central spreadsheet registry.</p>
+            
+            <div class="inline-setup-row">
+                <div class="form-group">
+                    <label for="user-timer-input">Exam Duration (Minutes):</label>
+                    <input type="number" id="user-timer-input" value="25" min="1" max="180">
+                </div>
+                
+                <div class="form-group">
+                    <label for="user-category-select">Choose Exam Category:</label>
+                    <select id="user-category-select"><option>Loading track registries...</option></select>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-primary" id="start-exam-btn" style="width:100%; padding:14px; margin-top:15px; font-size:15px;" onclick="startExamSession()" disabled>Syncing Data...</button>
+        </div>
+    </div>
+
+    <div class="main-container" id="exam-app-container" style="display: none;">
+        <div class="quiz-section" id="quiz-wrapper">
+            <form id="examination-form" onsubmit="event.preventDefault();">
+                <div id="questions-container"></div>
+            </form>
+        </div>
+
+        <div class="sidebar-section" id="sidebar-wrapper">
+            <div class="info-card">
+                <h3>OMR Answer Sheet</h3>
+                <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.3;">
+                    ⚠️ <strong>Notice:</strong> Selecting answers is done <strong>exclusively by clicking the bubbles below</strong>. Options on the left are read-only references.
+                </p>
+                <div class="omr-container" id="omr-sheet-target"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container" style="display:none;" id="results-wrapper">
+        <div style="width: 100%;">
+            <div id="result-panel">
+                <h2 style="color: var(--primary-color);">Examination Submission Completed</h2>
+                <div class="score-circle" id="score-display">0/0</div>
+                <h3 id="performance-verdict" style="margin-bottom: 20px;"></h3>
+                
+                <button type="button" class="btn btn-primary" style="padding: 12px 30px; font-size:15px;" onclick="prepareRetakeSession()">🔄 Retake Examination</button>
+                
+                <div class="review-title">Detailed Performance Breakdown</div>
+                <div id="review-cards-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 🔗 LINK YOUR GOOGLE SHEET APPS SCRIPT HERE
+        // ==========================================
+        const GOOGLE_APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWO_UoyP702VR9aBAzEAzEILeS2XmscI_mTZDEhd2I7C-uaIuVSdnT28uK8MjolJy2/exec";
+
+        // Global State Pools
+        let categoryDatabase = ["General Awareness", "Bhutanese Constitution Track"]; 
+        let questionPoolRegistry = [];
+        let temporaryUploadedImageBase64 = "";
+        let compiledActiveData = [];
+        let totalQuestions = 0;
+        let currentActiveIdx = 0;
+        let timeRemaining = 0;
+        let timerInterval = null;
+        const alphaArr = ["A", "B", "C", "D"];
+        let responsesState = [];
+
+        // --- Fetch Database From Google Sheet on Launch ---
+        async function fetchLiveSheetDatabase() {
+            showLoading(true);
+            if(GOOGLE_APP_SCRIPT_URL === "PASTE_YOUR_URL_HERE") {
+                alert("Developer Note: Please configure the Web App URL variable inside the script tag.");
+                showLoading(false);
+                return;
+            }
+            try {
+                const response = await fetch(GOOGLE_APP_SCRIPT_URL);
+                const cloudData = await response.json();
+                
+                if (cloudData && cloudData.length > 0) {
+                    questionPoolRegistry = cloudData;
                     
-\f1 \uc0\u9888 \u65039 
-\f0  <strong>Notice:</strong> Selecting answers is done <strong>exclusively by clicking the bubbles below</strong>. Options on the left are read-only references.\
-                </p>\
-                <div class="omr-container" id="omr-sheet-target"></div>\
-            </div>\
-        </div>\
-    </div>\
-\
-    <!-- Performance Assessment Analytics View -->\
-    <div class="main-container" style="display:none;" id="results-wrapper">\
-        <div style="width: 100%;">\
-            <div id="result-panel">\
-                <h2 style="color: var(--primary-color);">Examination Submission Completed</h2>\
-                <div class="score-circle" id="score-display">0/0</div>\
-                <h3 id="performance-verdict" style="margin-bottom: 20px;"></h3>\
-                \
-                <button type="button" class="btn btn-primary" style="padding: 12px 30px; font-size:15px;" onclick="prepareRetakeSession()">
-\f1 \uc0\u55357 \u56580 
-\f0  Retake Examination</button>\
-                \
-                <div class="review-title">Detailed Performance Breakdown</div>\
-                <div id="review-cards-container"></div>\
-            </div>\
-        </div>\
-    </div>\
-\
-    <script>\
-        // ==========================================\
-        // 
-\f1 \uc0\u55357 \u56599 
-\f0  LINK YOUR GOOGLE SHEET APPS SCRIPT HERE\
-        // ==========================================\
-        const GOOGLE_APP_SCRIPT_URL = "PASTE_YOUR_URL_HERE";\
-\
-        // Global State Pools\
-        let categoryDatabase = ["General Awareness", "Bhutanese Constitution Track"]; \
-        let questionPoolRegistry = [];\
-        let temporaryUploadedImageBase64 = "";\
-        let compiledActiveData = [];\
-        let totalQuestions = 0;\
-        let currentActiveIdx = 0;\
-        let timeRemaining = 0;\
-        let timerInterval = null;\
-        const alphaArr = ["A", "B", "C", "D"];\
-        let responsesState = [];\
-\
-        // --- Fetch Database From Google Sheet on Launch ---\
-        async function fetchLiveSheetDatabase() \{\
-            showLoading(true);\
-            if(GOOGLE_APP_SCRIPT_URL === "https://script.google.com/macros/s/AKfycbxWO_UoyP702VR9aBAzEAzEILeS2XmscI_mTZDEhd2I7C-uaIuVSdnT28uK8MjolJy2/exec") \{\
-                alert("Developer Note: Please configure the Web App URL variable inside the script tag line 349.");\
-                showLoading(false);\
-                return;\
-            \}\
-            try \{\
-                const response = await fetch(GOOGLE_APP_SCRIPT_URL);\
-                const cloudData = await response.json();\
-                \
-                if (cloudData && cloudData.length > 0) \{\
-                    questionPoolRegistry = cloudData;\
-                    \
-                    // Automatically compile any custom categories written inside spreadsheet\
-                    cloudData.forEach(item => \{\
-                        if(item.category && !categoryDatabase.includes(item.category)) \{\
-                            categoryDatabase.push(item.category);\
-                        \}\
-                    \});\
-                \}\
-            \} catch (err) \{\
-                console.error("Database connection failure: ", err);\
-                alert("Failed to sync live question database registry. Local backups will remain accessible.");\
-            \} finally \{\
-                synchronizeCategorySelectors();\
-                updatePoolCounterDisplay();\
-                document.getElementById("start-exam-btn").innerText = "Begin Examination";\
-                document.getElementById("start-exam-btn").disabled = false;\
-                showLoading(false);\
-            \}\
-        \}\
-\
-        function showLoading(status) \{\
-            document.getElementById('global-loading-screen').style.display = status ? "flex" : "none";\
-        \}\
-\
-        function synchronizeCategorySelectors() \{\
-            let optionsHTML = "";\
-            categoryDatabase.forEach(cat => \{\
-                optionsHTML += `<option value="$\{cat\}">$\{cat\}</option>`;\
-            \});\
-            document.getElementById('user-category-select').innerHTML = optionsHTML;\
-            document.getElementById('adm-q-category-select').innerHTML = optionsHTML;\
-        \}\
-\
-        function updatePoolCounterDisplay() \{\
-            document.getElementById('pool-counter-badge').innerText = questionPoolRegistry.length + " Questions Total";\
-        \}\
-\
-        // --- Image Attachment Processing Mappings ---\
-        function processLocalImageFile(inputElement) \{\
-            const file = inputElement.files[0];\
-            if (file) \{\
-                const reader = new FileReader();\
-                reader.onload = function(e) \{\
-                    temporaryUploadedImageBase64 = e.target.result;\
-                    document.getElementById('img-preview-target').src = temporaryUploadedImageBase64;\
-                    document.getElementById('image-preview-box').style.display = "block";\
-                    document.getElementById('adm-q-image-url').value = ""; \
-                \};\
-                reader.readAsDataURL(file);\
-            \}\
-        \}\
-\
-        function processWebImageUrl(urlValue) \{\
-            const cleanedUrl = urlValue.trim();\
-            if (cleanedUrl) \{\
-                temporaryUploadedImageBase64 = cleanedUrl;\
-                document.getElementById('img-preview-target').src = cleanedUrl;\
-                document.getElementById('image-preview-box').style.display = "block";\
-                document.getElementById('adm-q-image-file').value = ""; \
-            \}\
-        \}\
-\
-        function clearAttachedImageState() \{\
-            temporaryUploadedImageBase64 = "";\
-            document.getElementById('adm-q-image-file').value = "";\
-            document.getElementById('adm-q-image-url').value = "";\
-            document.getElementById('image-preview-box').style.display = "none";\
-            document.getElementById('img-preview-target').src = "";\
-        \}\
-\
-        // --- Admin Controls Gatekeeping ---\
-        function toggleAdminLoginView() \{\
-            if (timerInterval) \{\
-                alert("Cannot access administration setup while an exam is live.");\
-                return;\
-            \}\
-            document.getElementById('setup-container').style.display = "none";\
-            document.getElementById('results-wrapper').style.display = "none";\
-            document.getElementById('exam-app-container').style.display = "none";\
-            document.getElementById('admin-dashboard-container').style.display = "none";\
-            document.getElementById('admin-pass-field').value = "";\
-            document.getElementById('admin-login-container').style.display = "block";\
-        \}\
-\
-        function verifyAdminPassword() \{\
-            const inputPass = document.getElementById('admin-pass-field').value;\
-            if (inputPass === "kin@123!") \{\
-                document.getElementById('admin-login-container').style.display = "none";\
-                document.getElementById('admin-dashboard-container').style.display = "block";\
-                updatePoolCounterDisplay();\
-                synchronizeCategorySelectors();\
-            \} else \{\
-                alert("Access Denied: Invalid Security Token.");\
-            \}\
-        \}\
-\
-        function commitNewCategory() \{\
-            const newCatValue = document.getElementById('adm-new-cat-input').value.trim();\
-            if (!newCatValue) return;\
-            if (categoryDatabase.map(c => c.toLowerCase()).includes(newCatValue.toLowerCase())) \{\
-                alert("Category track registration database signature already registered.");\
-                return;\
-            \}\
-            categoryDatabase.push(newCatValue);\
-            document.getElementById('adm-new-cat-input').value = "";\
-            synchronizeCategorySelectors();\
-            document.getElementById('adm-q-category-select').value = newCatValue;\
-        \}\
-\
-        // --- Post Data Record Directly into Google Sheet Ecosystem ---\
-        async function commitQuestionToPool() \{\
-            const targetCat = document.getElementById('adm-q-category-select').value;\
-            const qText = document.getElementById('adm-q-text').value; \
-            const o0 = document.getElementById('adm-o-0').value.trim();\
-            const o1 = document.getElementById('adm-o-1').value.trim();\
-            const o2 = document.getElementById('adm-o-2').value.trim();\
-            const o3 = document.getElementById('adm-o-3').value.trim();\
-            const cIdx = parseInt(document.getElementById('adm-correct-idx').value);\
-\
-            if (!qText.trim() || !o0 || !o1 || !o2 || !o3) \{\
-                alert("Validation Error: Please make sure the question and all 4 option keys are specified.");\
-                return;\
-            \}\
-\
-            const payloadPacket = \{\
-                "category": targetCat,\
-                "question": qText,\
-                "options": [o0, o1, o2, o3],\
-                "answer": cIdx,\
-                "image": temporaryUploadedImageBase64 \
-            \};\
-\
-            const saveBtn = document.getElementById('btn-save-question');\
-            saveBtn.innerText = "
-\f1 \uc0\u9889 
-\f0  Uploading To Cloud Sheets...";\
-            saveBtn.disabled = true;\
-\
-            try \{\
-                // Submit raw payload via POST protocol over Apps Script Web App\
-                const pushRequest = await fetch(GOOGLE_APP_SCRIPT_URL, \{\
-                    method: "POST",\
-                    mode: "no-cors", // Bypasses browser CORS restrictions smoothly\
-                    headers: \{ "Content-Type": "application/json" \},\
-                    body: JSON.stringify(payloadPacket)\
-                \});\
-\
-                alert("Success: Question record dispatched safely into live spreadsheet architecture!");\
-                \
-                // Clear inputs\
-                document.getElementById('adm-q-text').value = "";\
-                document.getElementById('adm-o-0').value = "";\
-                document.getElementById('adm-o-1').value = "";\
-                document.getElementById('adm-o-2').value = "";\
-                document.getElementById('adm-o-3').value = "";\
-                clearAttachedImageState();\
-                \
-                // Refresh local model cache from live data\
-                await fetchLiveSheetDatabase();\
-\
-            \} catch(e) \{\
-                console.error(e);\
-                alert("Transmission dropped. Error tracking sync parameters.");\
-            \} finally \{\
-                saveBtn.innerText = "Append Question to Cloud";\
-                saveBtn.disabled = false;\
-            \}\
-        \}\
-\
-        function exitAdminView() \{\
-            document.getElementById('admin-login-container').style.display = "none";\
-            document.getElementById('admin-dashboard-container').style.display = "none";\
-            document.getElementById('setup-container').style.display = "block";\
-        \}\
-\
-        // --- Exam Session Flow Infrastructure ---\
-        function shuffleQuestionsPool(array) \{\
-            let shuffled = JSON.parse(JSON.stringify(array));\
-            for (let i = shuffled.length - 1; i > 0; i--) \{\
-                const j = Math.floor(Math.random() * (i + 1));\
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];\
-            \}\
-            return shuffled;\
-        \}\
-\
-        function startExamSession() \{\
-            const selectedCategory = document.getElementById('user-category-select').value;\
-            const minutesInput = document.getElementById('user-timer-input').value;\
-            let validatedMinutes = parseInt(minutesInput);\
-            \
-            if (isNaN(validatedMinutes) || validatedMinutes <= 0) \{\
-                alert("Please supply a valid duration timeframe context mapping.");\
-                return;\
-            \}\
-\
-            let isolatedFilteredSet = questionPoolRegistry.filter(q => q.category === selectedCategory);\
-            \
-            if (isolatedFilteredSet.length === 0) \{\
-                alert(`The selected category track currently holds 0 active registry cards inside the sheet. Open Admin Portal to append items.`);\
-                return;\
-            \}\
-\
-            timeRemaining = validatedMinutes * 60;\
-            compiledActiveData = shuffleQuestionsPool(isolatedFilteredSet);\
-            totalQuestions = compiledActiveData.length;\
-            responsesState = new Array(totalQuestions).fill(null);\
-            currentActiveIdx = 0;\
-\
-            initQuizLayout();\
-\
-            document.getElementById('header-category-label').innerText = `Track: $\{selectedCategory\}`;\
-            document.getElementById('setup-container').style.display = "none";\
-            document.getElementById('results-wrapper').style.display = "none";\
-            document.getElementById('admin-gate-btn').style.display = "none"; \
-            document.getElementById('header-timer').style.display = "flex";\
-            document.getElementById('exam-app-container').style.display = "flex";\
-\
-            startCountdownTicker();\
-        \}\
-\
-        function initQuizLayout() \{\
-            let qHtml = ""; let omrHtml = "";\
-\
-            compiledActiveData.forEach((q, index) => \{\
-                let activeClass = index === 0 ? "active" : "";\
-                let activeOmrRow = index === 0 ? "active-row" : "";\
-                let imageBlockHtml = q.image ? `<div class="question-image-container"><img src="$\{q.image\}"></div>` : "";\
-\
-                qHtml += `\
-                    <div class="question-card $\{activeClass\}" id="q-card-$\{index\}">\
-                        <div class="q-header"><span class="q-number">Question $\{index + 1\} of $\{totalQuestions\}</span></div>\
-                        <div class="q-text">$\{escapeHtmlEntities(q.question)\}</div>\
-                        $\{imageBlockHtml\}\
-                        <div class="options-container">\
-                `;\
-\
-                q.options.forEach((opt, optIdx) => \{\
-                    qHtml += `\
-                        <div class="option-display-item" id="opt-display-$\{index\}-$\{optIdx\}">\
-                            <span class="option-alpha">$\{alphaArr[optIdx]\}</span>\
-                            <span>$\{escapeHtmlEntities(opt)\}</span>\
-                        </div>\
-                    `;\
-                \});\
-\
-                qHtml += `\
-                        </div>\
-                        <div class="nav-actions">\
-                            $\{index > 0 ? `<button type="button" class="btn btn-secondary" onclick="navigateQuestion($\{index - 1\})">Previous</button>` : '<div></div>'\}\
-                            $\{index < totalQuestions - 1 ? `<button type="button" class="btn btn-primary" onclick="navigateQuestion($\{index + 1\})">Next Question</button>` : `<button type="button" class="btn btn-success" onclick="triggerSubmit()">Final Submit Exam</button>`\}\
-                        </div>\
-                    </div>\
-                `;\
-\
-                omrHtml += `\
-                    <div class="omr-row $\{activeOmrRow\}" id="omr-row-$\{index\}">\
-                        <div class="omr-q-num" style="cursor:pointer;" onclick="navigateQuestion($\{index\})">Q$\{index + 1\} 
-\f1 \uc0\u55357 \u56589 
-\f0 </div>\
-                        <div class="omr-bubbles">\
-                            <div class="omr-bubble" id="omr-bubble-$\{index\}-0" onclick="markOmrBubble($\{index\}, 0)">A</div>\
-                            <div class="omr-bubble" id="omr-bubble-$\{index\}-1" onclick="markOmrBubble($\{index\}, 1)">B</div>\
-                            <div class="omr-bubble" id="omr-bubble-$\{index\}-2" onclick="markOmrBubble($\{index\}, 2)">C</div>\
-                            <div class="omr-bubble" id="omr-bubble-$\{index\}-3" onclick="markOmrBubble($\{index\}, 3)">D</div>\
-                        </div>\
-                    </div>\
-                `;\
-            \});\
-\
-            document.getElementById('questions-container').innerHTML = qHtml;\
-            document.getElementById('omr-sheet-target').innerHTML = omrHtml;\
-            updateTimerDisplay();\
-        \}\
-\
-        function escapeHtmlEntities(text) \{\
-            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");\
-        \}\
-\
-        function startCountdownTicker() \{\
-            if(timerInterval) clearInterval(timerInterval);\
-            timerInterval = setInterval(() => \{\
-                if (timeRemaining <= 0) \{\
-                    clearInterval(timerInterval);\
-                    alert("Time expired! Submitting available responses.");\
-                    triggerSubmit(true);\
-                \} else \{\
-                    timeRemaining--;\
-                    updateTimerDisplay();\
-                \}\
-            \}, 1000);\
-        \}\
-\
-        function updateTimerDisplay() \{\
-            const mins = Math.floor(timeRemaining / 60).toString().padStart(2, '0');\
-            const secs = (timeRemaining % 60).toString().padStart(2, '0');\
-            document.getElementById('timer-display').innerText = mins + ":" + secs;\
-        \}\
-\
-        function navigateQuestion(targetIdx) \{\
-            document.getElementById('q-card-' + currentActiveIdx).classList.remove('active');\
-            document.getElementById('omr-row-' + currentActiveIdx).classList.remove('active-row');\
-            currentActiveIdx = targetIdx;\
-            document.getElementById('q-card-' + currentActiveIdx).classList.add('active');\
-            document.getElementById('omr-row-' + currentActiveIdx).classList.add('active-row');\
-        \}\
-\
-        // --- Exclusive OMR Selection Handler Module Matrix ---\
-        function markOmrBubble(questionIdx, optionIdx) \{\
-            responsesState[questionIdx] = optionIdx;\
-\
-            const row = document.getElementById('omr-row-' + questionIdx);\
-            const bubbles = row.getElementsByClassName('omr-bubble');\
-            for(let j=0; j<bubbles.length; j++) bubbles[j].classList.remove('marked');\
-            document.getElementById(`omr-bubble-$\{questionIdx\}-$\{optionIdx\}`).classList.add('marked');\
-\
-            const card = document.getElementById('q-card-' + questionIdx);\
-            const displayItems = card.getElementsByClassName('option-display-item');\
-            for(let i=0; i<displayItems.length; i++) displayItems[i].classList.remove('active-selection');\
-            document.getElementById(`opt-display-$\{questionIdx\}-$\{optionIdx\}`).classList.add('active-selection');\
-\
-            if(currentActiveIdx !== questionIdx) navigateQuestion(questionIdx);\
-        \}\
-\
-        function triggerSubmit(forced = false) \{\
-            if (!forced && !confirm("Are you sure you want to finalize and submit your responses?")) return;\
-            clearInterval(timerInterval); timerInterval = null; \
-            \
-            let obtainedScore = 0; let evaluationHTML = "";\
-\
-            compiledActiveData.forEach((q, idx) => \{\
-                const selectedAns = responsesState[idx];\
-                const isCorrect = selectedAns !== null && selectedAns === q.answer;\
-                if (isCorrect) obtainedScore++;\
-\
-                const statusBadge = isCorrect ? '<span class="badge badge-success">Correct</span>' : '<span class="badge badge-error">Incorrect / Unanswered</span>';\
-                const cardClass = isCorrect ? 'correct-card' : 'wrong-card';\
-                const chosenLetter = selectedAns !== null ? alphaArr[selectedAns] : "-";\
-                const chosenText = selectedAns !== null ? q.options[selectedAns] : "None (Skipped)";\
-                const correctLetter = alphaArr[q.answer];\
-                const correctText = q.options[q.answer];\
-\
-                let reviewImageBlock = q.image ? `<div class="question-image-container" style="text-align:left; margin:10px 0;"><img src="$\{q.image\}" style="max-height:100px;"></div>` : "";\
-\
-                evaluationHTML += `\
-                    <div class="review-item $\{cardClass\}">\
-                        $\{statusBadge\}\
-                        <div style="font-weight:600; margin-bottom:8px; white-space:pre-wrap;">Q$\{idx + 1\}: $\{escapeHtmlEntities(q.question)\}</div>\
-                        $\{reviewImageBlock\}\
-                        <div>\
-                            <p style="color: $\{isCorrect ? 'var(--success-color)' : 'var(--error-color)'\};"><strong>Your Answer:</strong> [$\{chosenLetter\}] $\{escapeHtmlEntities(chosenText)\}</p>\
-                            $\{!isCorrect ? `<p style="color: var(--success-color);"><strong>Correct Answer:</strong> [$\{correctLetter\}] $\{escapeHtmlEntities(correctText)\}</p>` : ''\}\
-                        </div>\
-                    </div>\
-                `;\
-            \});\
-\
-            document.getElementById('score-display').innerText = obtainedScore + "/" + totalQuestions;\
-            const percentage = (obtainedScore / totalQuestions) * 100;\
-            document.getElementById('performance-verdict').innerText = percentage >= 50 ? "
-\f1 \uc0\u55356 \u57225 
-\f0  CONGRATULATIONS! YOU PASSED." : "
-\f1 \uc0\u10060 
-\f0  ASSESSMENT FAILED. TRY AGAIN.";\
-            document.getElementById('performance-verdict').style.color = percentage >= 50 ? "var(--success-color)" : "var(--error-color)";\
-\
-            document.getElementById('review-cards-container').innerHTML = evaluationHTML;\
-            document.getElementById('exam-app-container').style.display = "none";\
-            document.getElementById('header-timer').style.display = "none";\
-            document.getElementById('results-wrapper').style.display = "block";\
-            window.scrollTo(\{ top: 0, behavior: 'smooth' \});\
-        \}\
-\
-        function prepareRetakeSession() \{\
-            document.getElementById('results-wrapper').style.display = "none";\
-            document.getElementById('admin-gate-btn').style.display = "block"; \
-            document.getElementById('setup-container').style.display = "block";\
-            fetchLiveSheetDatabase(); // Instantly pulls updates if admin made changes while student was finishing testing\
-        \}\
-\
-        window.onload = function() \{\
-            fetchLiveSheetDatabase();\
-        \};\
-    </script>\
-</body>\
-</html>}
+                    // Automatically compile any custom categories written inside spreadsheet
+                    cloudData.forEach(item => {
+                        if(item.category && !categoryDatabase.includes(item.category)) {
+                            categoryDatabase.push(item.category);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Database connection failure: ", err);
+                alert("Failed to sync live question database registry. Local backups will remain accessible.");
+            } finally {
+                synchronizeCategorySelectors();
+                updatePoolCounterDisplay();
+                document.getElementById("start-exam-btn").innerText = "Begin Examination";
+                document.getElementById("start-exam-btn").disabled = false;
+                showLoading(false);
+            }
+        }
+
+        function showLoading(status) {
+            document.getElementById('global-loading-screen').style.display = status ? "flex" : "none";
+        }
+
+        function synchronizeCategorySelectors() {
+            let optionsHTML = "";
+            categoryDatabase.forEach(cat => {
+                optionsHTML += `<option value="${cat}">${cat}</option>`;
+            });
+            document.getElementById('user-category-select').innerHTML = optionsHTML;
+            document.getElementById('adm-q-category-select').innerHTML = optionsHTML;
+        }
+
+        function updatePoolCounterDisplay() {
+            document.getElementById('pool-counter-badge').innerText = questionPoolRegistry.length + " Questions Total";
+        }
+
+        // --- Image Attachment Processing Mappings ---
+        function processLocalImageFile(inputElement) {
+            const file = inputElement.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    temporaryUploadedImageBase64 = e.target.result;
+                    document.getElementById('img-preview-target').src = temporaryUploadedImageBase64;
+                    document.getElementById('image-preview-box').style.display = "block";
+                    document.getElementById('adm-q-image-url').value = ""; 
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function processWebImageUrl(urlValue) {
+            const cleanedUrl = urlValue.trim();
+            if (cleanedUrl) {
+                temporaryUploadedImageBase64 = cleanedUrl;
+                document.getElementById('img-preview-target').src = cleanedUrl;
+                document.getElementById('image-preview-box').style.display = "block";
+                document.getElementById('adm-q-image-file').value = ""; 
+            }
+        }
+
+        function clearAttachedImageState() {
+            temporaryUploadedImageBase64 = "";
+            document.getElementById('adm-q-image-file').value = "";
+            document.getElementById('adm-q-image-url').value = "";
+            document.getElementById('image-preview-box').style.display = "none";
+            document.getElementById('img-preview-target').src = "";
+        }
+
+        // --- Admin Controls Gatekeeping ---
+        function toggleAdminLoginView() {
+            if (timerInterval) {
+                alert("Cannot access administration setup while an exam is live.");
+                return;
+            }
+            document.getElementById('setup-container').style.display = "none";
+            document.getElementById('results-wrapper').style.display = "none";
+            document.getElementById('exam-app-container').style.display = "none";
+            document.getElementById('admin-dashboard-container').style.display = "none";
+            document.getElementById('admin-pass-field').value = "";
+            document.getElementById('admin-login-container').style.display = "block";
+        }
+
+        function verifyAdminPassword() {
+            const inputPass = document.getElementById('admin-pass-field').value;
+            if (inputPass === "kin@123!") {
+                document.getElementById('admin-login-container').style.display = "none";
+                document.getElementById('admin-dashboard-container').style.display = "block";
+                updatePoolCounterDisplay();
+                synchronizeCategorySelectors();
+            } else {
+                alert("Access Denied: Invalid Security Token.");
+            }
+        }
+
+        function commitNewCategory() {
+            const newCatValue = document.getElementById('adm-new-cat-input').value.trim();
+            if (!newCatValue) return;
+            if (categoryDatabase.map(c => c.toLowerCase()).includes(newCatValue.toLowerCase())) {
+                alert("Category track registration database signature already registered.");
+                return;
+            }
+            categoryDatabase.push(newCatValue);
+            document.getElementById('adm-new-cat-input').value = "";
+            synchronizeCategorySelectors();
+            document.getElementById('adm-q-category-select').value = newCatValue;
+        }
+
+        // --- Post Data Record Directly into Google Sheet Ecosystem ---
+        async function commitQuestionToPool() {
+            const targetCat = document.getElementById('adm-q-category-select').value;
+            const qText = document.getElementById('adm-q-text').value; 
+            const o0 = document.getElementById('adm-o-0').value.trim();
+            const o1 = document.getElementById('adm-o-1').value.trim();
+            const o2 = document.getElementById('adm-o-2').value.trim();
+            const o3 = document.getElementById('adm-o-3').value.trim();
+            const cIdx = parseInt(document.getElementById('adm-correct-idx').value);
+
+            if (!qText.trim() || !o0 || !o1 || !o2 || !o3) {
+                alert("Validation Error: Please make sure the question and all 4 option keys are specified.");
+                return;
+            }
+
+            const payloadPacket = {
+                "category": targetCat,
+                "question": qText,
+                "options": [o0, o1, o2, o3],
+                "answer": cIdx,
+                "image": temporaryUploadedImageBase64 
+            };
+
+            const saveBtn = document.getElementById('btn-save-question');
+            saveBtn.innerText = "⚡ Uploading To Cloud Sheets...";
+            saveBtn.disabled = true;
+
+            try {
+                // Submit raw payload via POST protocol over Apps Script Web App
+                const pushRequest = await fetch(GOOGLE_APP_SCRIPT_URL, {
+                    method: "POST",
+                    mode: "no-cors", // Bypasses browser CORS restrictions smoothly
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payloadPacket)
+                });
+
+                alert("Success: Question record dispatched safely into live spreadsheet architecture!");
+                
+                // Clear inputs
+                document.getElementById('adm-q-text').value = "";
+                document.getElementById('adm-o-0').value = "";
+                document.getElementById('adm-o-1').value = "";
+                document.getElementById('adm-o-2').value = "";
+                document.getElementById('adm-o-3').value = "";
+                clearAttachedImageState();
+                
+                // Refresh local model cache from live data
+                await fetchLiveSheetDatabase();
+
+            } catch(e) {
+                console.error(e);
+                alert("Transmission dropped. Error tracking sync parameters.");
+            } finally {
+                saveBtn.innerText = "Append Question to Cloud";
+                saveBtn.disabled = false;
+            }
+        }
+
+        function exitAdminView() {
+            document.getElementById('admin-login-container').style.display = "none";
+            document.getElementById('admin-dashboard-container').style.display = "none";
+            document.getElementById('setup-container').style.display = "block";
+        }
+
+        // --- Exam Session Flow Infrastructure ---
+        function shuffleQuestionsPool(array) {
+            let shuffled = JSON.parse(JSON.stringify(array));
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        function startExamSession() {
+            const selectedCategory = document.getElementById('user-category-select').value;
+            const minutesInput = document.getElementById('user-timer-input').value;
+            let validatedMinutes = parseInt(minutesInput);
+            
+            if (isNaN(validatedMinutes) || validatedMinutes <= 0) {
+                alert("Please supply a valid duration timeframe context mapping.");
+                return;
+            }
+
+            let isolatedFilteredSet = questionPoolRegistry.filter(q => q.category === selectedCategory);
+            
+            if (isolatedFilteredSet.length === 0) {
+                alert(`The selected category track currently holds 0 active registry cards inside the sheet. Open Admin Portal to append items.`);
+                return;
+            }
+
+            timeRemaining = validatedMinutes * 60;
+            compiledActiveData = shuffleQuestionsPool(isolatedFilteredSet);
+            totalQuestions = compiledActiveData.length;
+            responsesState = new Array(totalQuestions).fill(null);
+            currentActiveIdx = 0;
+
+            initQuizLayout();
+
+            document.getElementById('header-category-label').innerText = `Track: ${selectedCategory}`;
+            document.getElementById('setup-container').style.display = "none";
+            document.getElementById('results-wrapper').style.display = "none";
+            document.getElementById('admin-gate-btn').style.display = "none"; 
+            document.getElementById('header-timer').style.display = "flex";
+            document.getElementById('exam-app-container').style.display = "flex";
+
+            startCountdownTicker();
+        }
+
+        function initQuizLayout() {
+            let qHtml = ""; let omrHtml = "";
+
+            compiledActiveData.forEach((q, index) => {
+                let activeClass = index === 0 ? "active" : "";
+                let activeOmrRow = index === 0 ? "active-row" : "";
+                let imageBlockHtml = q.image ? `<div class="question-image-container"><img src="${q.image}"></div>` : "";
+
+                qHtml += `
+                    <div class="question-card ${activeClass}" id="q-card-${index}">
+                        <div class="q-header"><span class="q-number">Question ${index + 1} of ${totalQuestions}</span></div>
+                        <div class="q-text">${escapeHtmlEntities(q.question)}</div>
+                        ${imageBlockHtml}
+                        <div class="options-container">
+                `;
+
+                q.options.forEach((opt, optIdx) => {
+                    qHtml += `
+                        <div class="option-display-item" id="opt-display-${index}-${optIdx}">
+                            <span class="option-alpha">${alphaArr[optIdx]}</span>
+                            <span>${escapeHtmlEntities(opt)}</span>
+                        </div>
+                    `;
+                });
+
+                qHtml += `
+                        </div>
+                        <div class="nav-actions">
+                            ${index > 0 ? `<button type="button" class="btn btn-secondary" onclick="navigateQuestion(${index - 1})">Previous</button>` : '<div></div>'}
+                            ${index < totalQuestions - 1 ? `<button type="button" class="btn btn-primary" onclick="navigateQuestion(${index + 1})">Next Question</button>` : `<button type="button" class="btn btn-success" onclick="triggerSubmit()">Final Submit Exam</button>`}
+                        </div>
+                    </div>
+                `;
+
+                omrHtml += `
+                    <div class="omr-row ${activeOmrRow}" id="omr-row-${index}">
+                        <div class="omr-q-num" style="cursor:pointer;" onclick="navigateQuestion(${index})">Q${index + 1} 🔍</div>
+                        <div class="omr-bubbles">
+                            <div class="omr-bubble" id="omr-bubble-${index}-0" onclick="markOmrBubble(${index}, 0)">A</div>
+                            <div class="omr-bubble" id="omr-bubble-${index}-1" onclick="markOmrBubble(${index}, 1)">B</div>
+                            <div class="omr-bubble" id="omr-bubble-${index}-2" onclick="markOmrBubble(${index}, 2)">C</div>
+                            <div class="omr-bubble" id="omr-bubble-${index}-3" onclick="markOmrBubble(${index}, 3)">D</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('questions-container').innerHTML = qHtml;
+            document.getElementById('omr-sheet-target').innerHTML = omrHtml;
+            updateTimerDisplay();
+        }
+
+        function escapeHtmlEntities(text) {
+            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        function startCountdownTicker() {
+            if(timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    alert("Time expired! Submitting available responses.");
+                    triggerSubmit(true);
+                } else {
+                    timeRemaining--;
+                    updateTimerDisplay();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+            const secs = (timeRemaining % 60).toString().padStart(2, '0');
+            document.getElementById('timer-display').innerText = mins + ":" + secs;
+        }
+
+        function navigateQuestion(targetIdx) {
+            document.getElementById('q-card-' + currentActiveIdx).classList.remove('active');
+            document.getElementById('omr-row-' + currentActiveIdx).classList.remove('active-row');
+            currentActiveIdx = targetIdx;
+            document.getElementById('q-card-' + currentActiveIdx).classList.add('active');
+            document.getElementById('omr-row-' + currentActiveIdx).classList.add('active-row');
+        }
+
+        // --- Exclusive OMR Selection Handler Module Matrix ---
+        function markOmrBubble(questionIdx, optionIdx) {
+            responsesState[questionIdx] = optionIdx;
+
+            const row = document.getElementById('omr-row-' + questionIdx);
+            const bubbles = row.getElementsByClassName('omr-bubble');
+            for(let j=0; j<bubbles.length; j++) bubbles[j].classList.remove('marked');
+            document.getElementById(`omr-bubble-${questionIdx}-${optionIdx}`).classList.add('marked');
+
+            const card = document.getElementById('q-card-' + questionIdx);
+            const displayItems = card.getElementsByClassName('option-display-item');
+            for(let i=0; i<displayItems.length; i++) displayItems[i].classList.remove('active-selection');
+            document.getElementById(`opt-display-${questionIdx}-${optionIdx}`).classList.add('active-selection');
+
+            if(currentActiveIdx !== questionIdx) navigateQuestion(questionIdx);
+        }
+
+        function triggerSubmit(forced = false) {
+            if (!forced && !confirm("Are you sure you want to finalize and submit your responses?")) return;
+            clearInterval(timerInterval); timerInterval = null; 
+            
+            let obtainedScore = 0; let evaluationHTML = "";
+
+            compiledActiveData.forEach((q, idx) => {
+                const selectedAns = responsesState[idx];
+                const isCorrect = selectedAns !== null && selectedAns === q.answer;
+                if (isCorrect) obtainedScore++;
+
+                const statusBadge = isCorrect ? '<span class="badge badge-success">Correct</span>' : '<span class="badge badge-error">Incorrect / Unanswered</span>';
+                const cardClass = isCorrect ? 'correct-card' : 'wrong-card';
+                const chosenLetter = selectedAns !== null ? alphaArr[selectedAns] : "-";
+                const chosenText = selectedAns !== null ? q.options[selectedAns] : "None (Skipped)";
+                const correctLetter = alphaArr[q.answer];
+                const correctText = q.options[q.answer];
+
+                let reviewImageBlock = q.image ? `<div class="question-image-container" style="text-align:left; margin:10px 0;"><img src="${q.image}" style="max-height:100px;"></div>` : "";
+
+                evaluationHTML += `
+                    <div class="review-item ${cardClass}">
+                        ${statusBadge}
+                        <div style="font-weight:600; margin-bottom:8px; white-space:pre-wrap;">Q${idx + 1}: ${escapeHtmlEntities(q.question)}</div>
+                        ${reviewImageBlock}
+                        <div>
+                            <p style="color: ${isCorrect ? 'var(--success-color)' : 'var(--error-color)'};"><strong>Your Answer:</strong> [${chosenLetter}] ${escapeHtmlEntities(chosenText)}</p>
+                            ${!isCorrect ? `<p style="color: var(--success-color);"><strong>Correct Answer:</strong> [${correctLetter}] ${escapeHtmlEntities(correctText)}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('score-display').innerText = obtainedScore + "/" + totalQuestions;
+            const percentage = (obtainedScore / totalQuestions) * 100;
+            document.getElementById('performance-verdict').innerText = percentage >= 50 ? "🎉 CONGRATULATIONS! YOU PASSED." : "❌ ASSESSMENT FAILED. TRY AGAIN.";
+            document.getElementById('performance-verdict').style.color = percentage >= 50 ? "var(--success-color)" : "var(--error-color)";
+
+            document.getElementById('review-cards-container').innerHTML = evaluationHTML;
+            document.getElementById('exam-app-container').style.display = "none";
+            document.getElementById('header-timer').style.display = "none";
+            document.getElementById('results-wrapper').style.display = "block";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function prepareRetakeSession() {
+            document.getElementById('results-wrapper').style.display = "none";
+            document.getElementById('admin-gate-btn').style.display = "block"; 
+            document.getElementById('setup-container').style.display = "block";
+            fetchLiveSheetDatabase(); // Instantly pulls updates if admin made changes while student was finishing testing
+        }
+
+        window.onload = function() {
+            fetchLiveSheetDatabase();
+        };
+    </script>
+</body>
+</html>
