@@ -26,33 +26,53 @@
         }
 
         body {
+            position: relative;
             background-color: var(--bg-body);
             color: var(--text-main);
             line-height: 1.6;
-            padding-bottom: 60px;
+            padding-bottom: 120px;
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background-image: url('images.jpeg');
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: cover;
+            opacity: 0.07;
+            pointer-events: none;
         }
 
         header {
             background-color: var(--primary-color);
             color: white;
-            padding: 15px 30px;
+            padding: 15px 20px;
             display: flex;
+            flex-direction: row;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             position: sticky;
             top: 0;
             z-index: 100;
+            gap: 15px;
         }
 
         .brand-title h1 {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 700;
             letter-spacing: 0.5px;
         }
 
         .brand-title p {
-            font-size: 12px;
+            font-size: 11px;
             color: #93c5fd;
         }
 
@@ -60,50 +80,73 @@
             display: flex;
             align-items: center;
             gap: 15px;
+            flex-wrap: wrap;
         }
 
         .exam-timer-box {
             background-color: rgba(255, 255, 255, 0.15);
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 6px;
             font-weight: bold;
-            font-size: 15px;
+            font-size: 14px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            flex-wrap: wrap;
+            gap: 6px;
             border: 1px solid rgba(255, 255, 255, 0.25);
         }
 
-        /* Loading Screen overlay */
         .loading-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.9);
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            z-index: 2000; font-weight: bold; font-size: 18px;
-            color: var(--primary-color);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            display: flex; 
+            flex-direction: column;
+            justify-content: center; 
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
         }
 
-        /* --- Panels & Screens --- */
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3.5px solid #e5e7eb;
+            border-top: 3.5px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         .panel-view {
+            width: 100%;
             max-width: 600px;
-            margin: 50px auto;
+            margin: 30px auto;
             background: white;
-            padding: 35px;
+            padding: 25px 20px;
             border-radius: 8px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.08);
             border: 1px solid var(--border-color);
+        }
+
+        #setup-container .panel-view {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
 
         .panel-view h2 {
             color: var(--primary-color);
             margin-bottom: 15px;
             text-align: center;
+            font-size: 20px;
         }
 
         .form-group {
-            margin: 18px 0;
+            margin: 15px 0;
             text-align: left;
         }
 
@@ -127,38 +170,27 @@
 
         .form-group textarea {
             resize: vertical;
-            height: 80px;
-        }
-
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            border-color: var(--primary-color);
+            height: 90px;
+            font-family: inherit;
         }
 
         .inline-setup-row {
             display: flex;
-            gap: 15px;
-        }
-        .inline-setup-row .form-group {
-            flex: 1;
-            margin: 10px 0;
+            flex-direction: column;
+            gap: 0;
         }
 
         .main-container {
             max-width: 1300px;
-            margin: 30px auto;
-            padding: 0 20px;
+            margin: 20px auto;
+            padding: 0 15px;
             display: flex;
-            gap: 25px;
+            flex-direction: column;
+            gap: 20px;
         }
 
-        .quiz-section { flex: 2.4; }
-        .sidebar-section {
-            flex: 1.6;
-            position: sticky;
-            top: 90px;
-            height: calc(100vh - 130px);
-            overflow-y: auto;
-        }
+        .quiz-section { flex: 1; width: 100%; }
+        .sidebar-section { width: 100%; }
 
         .info-card {
             background: var(--bg-card);
@@ -177,7 +209,6 @@
             padding-bottom: 4px;
         }
 
-        /* --- OMR Bubble Sheet Elements --- */
         .omr-container {
             display: flex;
             flex-direction: column;
@@ -190,7 +221,7 @@
         .omr-row {
             display: flex;
             align-items: center;
-            padding: 6px 15px; 
+            padding: 10px 12px; 
             border-bottom: 1px solid #f1f5f9;
             transition: all 0.1s;
         }
@@ -199,9 +230,9 @@
         .omr-row.active-row { background-color: var(--primary-light); }
 
         .omr-q-num {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 700;
-            width: 45px; 
+            width: 60px; 
             color: var(--text-muted);
             user-select: none;
         }
@@ -210,18 +241,18 @@
             display: flex;
             flex: 1;
             justify-content: space-between; 
-            max-width: 260px;               
+            max-width: 280px;               
         }
 
         .omr-bubble {
-            width: 26px; 
-            height: 26px;
+            width: 36px; 
+            height: 36px;
             border-radius: 50%;
             border: 1.5px solid #4b5563;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: 700;
             color: #4b5563;
             background: white;
@@ -230,63 +261,88 @@
             transition: all 0.1s ease-in-out;
         }
 
-        .omr-bubble:hover { background-color: #cbd5e1; }
         .omr-bubble.marked {
             background-color: #111827;
             border-color: #111827;
             color: white;
         }
 
-        /* --- Question Card Section --- */
+        .mobile-sticky-omr-dock {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #ffffff;
+            box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.15);
+            border-top: 2px solid var(--primary-color);
+            padding: 12px 20px;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mobile-dock-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         .question-card {
             background: var(--bg-card);
             border-radius: 8px;
             border: 1px solid var(--border-color);
-            padding: 30px;
-            margin-bottom: 25px;
+            padding: 20px;
+            margin-bottom: 5px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
             display: none;
         }
 
         .question-card.active { display: block; }
+        
         .q-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             border-bottom: 1px dashed var(--border-color);
-            padding-bottom: 12px;
+            padding-bottom: 10px;
         }
 
         .q-number {
             background-color: var(--primary-color);
             color: white;
-            padding: 4px 12px;
+            padding: 4px 10px;
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
+        }
+
+        .q-hint {
+            font-size: 11px;
+            color: var(--accent-color);
+            font-weight: 500;
         }
 
         .q-text {
-            font-size: 17px;
+            font-size: 16px;
             font-weight: 600;
             color: #111827;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             white-space: pre-wrap;
         }
 
-        .question-image-container {
-            width: 100%;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .question-image-container img {
+        .q-image-preview {
             max-width: 100%;
-            max-height: 280px;
+            max-height: 255px;
+            object-fit: contain;
+            margin-bottom: 15px;
             border-radius: 6px;
             border: 1px solid var(--border-color);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: block;
         }
 
         .options-container {
@@ -298,15 +354,15 @@
         .option-display-item {
             display: flex;
             align-items: center;
-            padding: 12px 16px;
+            padding: 14px 12px;
             background-color: #f9fafb;
             border: 1px solid var(--border-color);
             border-radius: 6px;
             font-size: 14px;
             font-weight: 500;
             color: var(--text-main);
+            cursor: default;
             user-select: none;
-            cursor: default; 
         }
 
         .option-display-item.active-selection {
@@ -324,7 +380,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 15px;
+            margin-right: 12px;
             font-weight: bold;
             font-size: 12px;
             color: #64748b;
@@ -342,15 +398,17 @@
             display: flex;
             justify-content: space-between;
             margin-top: 25px;
+            gap: 10px;
         }
 
         .btn {
-            padding: 10px 22px;
+            padding: 12px 20px;
             font-size: 14px;
             font-weight: 600;
             border-radius: 6px;
             cursor: pointer;
             border: none;
+            text-align: center;
         }
 
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -358,35 +416,35 @@
         .btn-primary { background-color: var(--primary-color); color: white; }
         .btn-success { background-color: var(--success-color); color: white; }
         .btn-dark { background-color: #1f2937; color: white; }
-        .btn-accent { background-color: var(--accent-color); color: white; }
+        .btn-danger-small { background-color: var(--error-color); color: white; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
 
         #result-panel {
             background: white;
             border-radius: 8px;
             border: 1px solid var(--border-color);
-            padding: 40px;
+            padding: 25px 15px;
             text-align: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
 
         .score-circle {
-            width: 130px;
-            height: 130px;
+            width: 110px;
+            height: 110px;
             border-radius: 50%;
             background: var(--primary-light);
             color: var(--primary-color);
-            font-size: 32px;
+            font-size: 28px;
             font-weight: bold;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 20px auto;
+            margin: 15px auto;
             border: 4px solid var(--primary-color);
         }
 
         .review-title {
             text-align: left;
-            margin-top: 40px;
+            margin-top: 30px;
             padding-bottom: 10px;
             border-bottom: 2px solid var(--border-color);
             color: var(--primary-color);
@@ -394,7 +452,7 @@
 
         .review-item {
             text-align: left;
-            padding: 20px;
+            padding: 15px;
             border-bottom: 1px solid var(--border-color);
             margin-top: 15px;
             background: #fafafa;
@@ -416,29 +474,104 @@
         .badge-success { background: #d1fae5; color: #065f46; }
         .badge-error { background: #fee2e2; color: #991b1b; }
 
-        @media (max-width: 900px) {
-            .main-container { flex-direction: column; }
-            .sidebar-section { position: relative; top: 0; height: auto; }
+        .admin-table-container {
+            margin-top: 12px;
+            max-height: 115px; 
+            overflow-y: auto;  
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: #ffffff;
+        }
+        .admin-table-title {
+            font-size: 14px;
+            color: var(--primary-color);
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        .admin-q-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+        .admin-q-table th {
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .admin-q-table td {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            vertical-align: middle;
+            background: white;
+        }
+
+        .admin-action-bar-layout {
+            padding: 15px 0 5px 0;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+        }
+
+        .sidebar-section { display: none; }
+        #mobile-active-omr-dock-element { display: flex; }
+
+        @media (min-width: 768px) {
+            body { padding-bottom: 40px; }
+            header { padding: 15px 30px; }
+            .brand-title h1 { font-size: 22px; }
+            .brand-title p { font-size: 12px; }
+            
+            .inline-setup-row { flex-direction: row; gap: 15px; }
+            .inline-setup-row .form-group { flex: 1; }
+            
+            .main-container { margin: 30px auto; flex-direction: row; gap: 25px; }
+            .quiz-section { flex: 2.3; }
+            
+            .sidebar-section {
+                display: block;
+                flex: 1.7;
+                position: sticky;
+                top: 90px;
+                height: calc(100vh - 130px);
+                overflow-y: auto;
+            }
+            
+            #mobile-active-omr-dock-element { display: none !important; }
+            .question-card { padding: 30px; margin-bottom: 25px; }
+        }
+
+        @media (max-width: 600px) {
+            header { flex-direction: column; align-items: flex-start; }
+            .header-controls { width: 100%; justify-content: space-between; }
+            .exam-timer-box { width: 100%; justify-content: center; }
         }
     </style>
 </head>
 <body>
 
     <div id="global-loading-screen" class="loading-overlay">
-        <div style="margin-bottom: 10px;">⏳ Syncing with Live Database Vault...</div>
-        <div style="font-size:12px; font-weight:normal; color:var(--text-muted);">Please stand by while scripts optimize parameters</div>
+        <div class="spinner"></div>
+        <div style="font-size: 13px; font-weight: 600; color: #4b5563;">Live data syncing...</div>
     </div>
 
     <header>
         <div class="brand-title">
             <h1>Online Exam Test</h1>
-            <p id="sub-header-desc">Cloud-Linked Multilingual Examination Portal</p>
+            <p id="sub-header-desc">Cloud-Linked Examination Portal</p>
         </div>
         <div class="header-controls">
             <button type="button" class="btn btn-dark" id="admin-gate-btn" onclick="toggleAdminLoginView()">⚙️ Admin Portal</button>
+            <button type="button" class="btn btn-secondary" id="admin-return-top-btn" style="display: none; background-color: #cbd5e1; color: var(--primary-color);" onclick="exitAdminView()">🔙 Return Back</button>
+            
             <div class="exam-timer-box" id="header-timer" style="display: none;">
                 <span id="header-category-label" style="margin-right:10px; color:#93c5fd; font-size:13px; font-weight:normal;"></span>
-                <span>⏰ Time Remaining:</span>
+                <span>⏰ Remaining:</span>
                 <span id="timer-display">--:--</span>
             </div>
         </div>
@@ -449,7 +582,7 @@
             <h2>Admin Security Gateway</h2>
             <div class="form-group">
                 <label for="admin-pass-field">Enter System Admin Password:</label>
-                <input type="password" id="admin-pass-field" placeholder="Hint: Security verification required">
+                <input type="password" id="admin-pass-field" placeholder="Password Entry">
             </div>
             <div style="display: flex; gap: 10px;">
                 <button type="button" class="btn btn-secondary" style="flex:1;" onclick="exitAdminView()">Cancel</button>
@@ -459,101 +592,97 @@
     </div>
 
     <div id="admin-dashboard-container" style="display: none;">
-        <div class="panel-view" style="max-width: 750px;">
-            <h2>Manage Cloud Database Records</h2>
-            
-            <div style="background: #eff6ff; padding: 20px; border-radius: 8px; border:1px solid #bfdbfe; margin-bottom: 25px;">
-                <h3 style="font-size:14px; color: var(--primary-color); margin-bottom:12px;">Create New Examination Track Category</h3>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="adm-new-cat-input" placeholder="e.g., Dzongkha Language Competency" style="flex:2; padding:10px; border:1px solid #cbd5e1; border-radius:6px;">
-                    <button type="button" class="btn btn-accent" style="flex:1;" onclick="commitNewCategory()">Add Category</button>
-                </div>
-            </div>
-
-            <div style="background: #f8fafc; padding: 15px; border-radius: 6px; border:1px solid var(--border-color); margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <span style="font-weight: 700; font-size: 13px; color: var(--primary-color);">Total Registries Inside Spreadsheet: </span>
-                    <span id="pool-counter-badge" style="font-weight:700; background:#ddd; padding: 2px 8px; border-radius:12px; font-size:12px;">0 Questions</span>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>Target Category Classification Selector:</label>
-                <select id="adm-q-category-select"></select>
-            </div>
-            
-            <div class="form-group">
-                <label>Question Prompt / Text (Accepts Unicode / Dzongkha / Symbol mappings):</label>
-                <textarea id="adm-q-text" placeholder="Paste or type question criteria here..."></textarea>
-            </div>
-
-            <div style="background: #f1f5f9; padding: 15px; border-radius: 6px; border: 1px dashed #cbd5e1; margin: 15px 0;">
-                <span style="font-size: 12px; font-weight: 700; display:block; margin-bottom: 8px; color: var(--text-main);">📸 Attach Image to Question (Choose ONE option below):</span>
+        <div class="panel-view" style="max-width: 1100px; margin: 30px auto; padding: 25px; display: flex; flex-direction: column; gap: 10px; max-height: 90vh; overflow-y: auto;">
+            <div>
+                <h2>Manage Cloud Database Records</h2>
                 
-                <div class="form-group" style="margin: 5px 0 10px 0;">
-                    <label style="font-weight:normal; font-size:12px;">Option A: Upload Image File from Local Storage</label>
-                    <input type="file" id="adm-q-image-file" accept="image/*" onchange="processLocalImageFile(this)">
+                <div style="background: #f8fafc; padding: 15px; border: 1px dashed var(--border-color); border-radius: 6px; margin-bottom: 15px;">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--primary-color); margin-bottom: 8px;">Category Management Track Options</div>
+                    <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-group" style="margin:0; flex: 1; min-width: 200px;">
+                            <label>Target Category Classification Selector:</label>
+                            <select id="adm-q-category-select"></select>
+                        </div>
+                        <button type="button" class="btn btn-secondary" style="padding: 10px; font-size: 13px;" onclick="deleteCategoryTrack()">Delete Current Category</button>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: flex-end; margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                        <div class="form-group" style="margin:0; flex: 1; min-width: 200px;">
+                            <label>Create New Class Track Category:</label>
+                            <input type="text" id="adm-new-category-input" placeholder="E.g., Mathematics, Science">
+                        </div>
+                        <button type="button" class="btn btn-dark" style="padding: 10px; font-size: 13px;" onclick="addNewCategoryTrack()">Add New Category</button>
+                    </div>
                 </div>
-                <div style="text-align: center; font-size:11px; font-weight:bold; color: var(--text-muted); margin: 4px 0;">- OR -</div>
-                <div class="form-group" style="margin: 5px 0 0 0;">
-                    <label style="font-weight:normal; font-size:12px;">Option B: Provide Image Web URL Link</label>
-                    <input type="text" id="adm-q-image-url" placeholder="https://example.com/image.png" oninput="processWebImageUrl(this.value)">
+
+                <div class="form-group">
+                    <label>Question Prompt</label>
+                    <textarea id="adm-q-text" placeholder="Type or paste details here..."></textarea>
+                </div>
+
+                <div class="form-group" style="background: #fdfdfd; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px;">
+                    <label>Attach Question Diagram/Illustration (Optional):</label>
+                    <input type="file" id="adm-q-image" accept="image/*" onchange="previewAdminUploadedImage(this)" style="padding: 5px;">
+                    <div id="adm-image-preview-box" style="margin-top: 10px; display: none;">
+                        <img id="adm-image-preview-tag" src="" style="max-width: 100%; max-height: 140px; object-fit: contain; border: 1px solid var(--border-color); border-radius: 4px;">
+                        <br><button type="button" class="btn-danger-small" style="margin-top: 5px;" onclick="clearAdminSelectedImage()">Remove Image</button>
+                    </div>
+                </div>
+
+                <div class="form-group"><label>Option A Text:</label> <input type="text" id="adm-o-0"></div>
+                <div class="form-group"><label>Option B Text:</label> <input type="text" id="adm-o-1"></div>
+                <div class="form-group"><label>Option C Text:</label> <input type="text" id="adm-o-2"></div>
+                <div class="form-group"><label>Option D Text:</label> <input type="text" id="adm-o-3"></div>
+                <div class="form-group">
+                    <label>Designate True Correct Answer Element Key:</label>
+                    <select id="adm-correct-idx">
+                        <option value="0">Option A</option>
+                        <option value="1">Option B</option>
+                        <option value="2">Option C</option>
+                        <option value="3">Option D</option>
+                    </select>
                 </div>
                 
-                <div id="image-preview-box" style="margin-top:12px; display:none; text-align:center;">
-                    <span style="font-size:11px; color: var(--text-muted); display:block; margin-bottom:4px;">Image Preview:</span>
-                    <img id="img-preview-target" src="" style="max-height:120px; border:1px solid #cbd5e1; border-radius:4px;">
-                    <button type="button" style="display:block; margin: 5px auto 0 auto; font-size:11px; background:#ef4444; color:white; border:none; padding:2px 8px; border-radius:3px; cursor:pointer;" onclick="clearAttachedImageState()">Remove Image</button>
+                <div class="admin-action-bar-layout">
+                    <button type="button" class="btn btn-success" id="btn-save-question" style="width: 100%;" onclick="commitQuestionToPool()">Append to Cloud</button>
                 </div>
             </div>
-
-            <div class="form-group">
-                <label>Option A Text:</label> <input type="text" id="adm-o-0" placeholder="Option A description">
-            </div>
-            <div class="form-group">
-                <label>Option B Text:</label> <input type="text" id="adm-o-1" placeholder="Option B description">
-            </div>
-            <div class="form-group">
-                <label>Option C Text:</label> <input type="text" id="adm-o-2" placeholder="Option C description">
-            </div>
-            <div class="form-group">
-                <label>Option D Text:</label> <input type="text" id="adm-o-3" placeholder="Option D description">
-            </div>
-            <div class="form-group">
-                <label>Designate True Correct Answer Element Key:</label>
-                <select id="adm-correct-idx">
-                    <option value="0">Option A</option>
-                    <option value="1">Option B</option>
-                    <option value="2">Option C</option>
-                    <option value="3">Option D</option>
-                </select>
-            </div>
             
-            <div style="display: flex; gap: 10px; margin-top:25px;">
-                <button type="button" class="btn btn-secondary" style="flex:1;" onclick="exitAdminView()">Return to Menu</button>
-                <button type="button" class="btn btn-success" id="btn-save-question" style="flex:2;" onclick="commitQuestionToPool()">Append Question to Cloud</button>
+            <div style="width: 100%; border-top: 2px dashed var(--border-color); padding-top: 5px;">
+                <div class="admin-table-title">Full Database Registry Lookups (<span id="pool-counter-badge">0</span>):</div>
+                <div class="admin-table-container">
+                    <table class="admin-q-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%">#</th>
+                                <th style="width: 60%">Question Content</th>
+                                <th style="width: 25%">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-questions-list-tbody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
     <div id="setup-container">
-        <div class="panel-view" style="max-width: 550px; margin-top: 80px;">
-            <h2>Configure Examination Settings</h2>
-            <p style="color: var(--text-muted); font-size: 14px; text-align:center; margin-bottom: 10px;">Select your exam track. Questions load directly from the live central spreadsheet registry.</p>
-            
+        <div class="panel-view">
+            <h2>Configure Settings</h2>
+            <div class="form-group">
+                <label for="user-full-name">Student Full Name:</label>
+                <input type="text" id="user-full-name" placeholder="Enter your name to register score" required>
+            </div>
             <div class="inline-setup-row">
                 <div class="form-group">
-                    <label for="user-timer-input">Exam Duration (Minutes):</label>
+                    <label for="user-timer-input">Duration (Minutes):</label>
                     <input type="number" id="user-timer-input" value="25" min="1" max="180">
                 </div>
-                
                 <div class="form-group">
-                    <label for="user-category-select">Choose Exam Category:</label>
-                    <select id="user-category-select"><option>Loading track registries...</option></select>
+                    <label for="user-category-select">Choose Category Track:</label>
+                    <select id="user-category-select"><option>Loading datasets...</option></select>
                 </div>
             </div>
-
-            <button type="button" class="btn btn-primary" id="start-exam-btn" style="width:100%; padding:14px; margin-top:15px; font-size:15px;" onclick="startExamSession()" disabled>Syncing Data...</button>
+            <button type="button" class="btn btn-primary" id="start-exam-btn" style="width:100%; padding:14px; margin-top:15px;" onclick="startExamSession()" disabled>Syncing Data...</button>
         </div>
     </div>
 
@@ -567,39 +696,35 @@
         <div class="sidebar-section" id="sidebar-wrapper">
             <div class="info-card">
                 <h3>OMR Answer Sheet</h3>
-                <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.3;">
-                    ⚠️ <strong>Notice:</strong> Selecting answers is done <strong>exclusively by clicking the bubbles below</strong>. Options on the left are read-only references.
-                </p>
-                <div class="omr-container" id="omr-sheet-target"></div>
+                <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">⚠️ Click options below to log responses.</p>
+                <div class="omr-container" id="omr-sheet-target" style="max-height: 60vh; overflow-y: auto;"></div>
             </div>
         </div>
+    </div>
+
+    <div class="mobile-sticky-omr-dock" id="mobile-active-omr-dock-element" style="display: none;">
+        <div class="mobile-dock-title" id="mobile-dock-q-title">Select Answer (Q1)</div>
+        <div class="omr-bubbles" id="mobile-dock-bubbles-container"></div>
     </div>
 
     <div class="main-container" style="display:none;" id="results-wrapper">
         <div style="width: 100%;">
             <div id="result-panel">
-                <h2 style="color: var(--primary-color);">Examination Submission Completed</h2>
+                <h2>Examination Completed</h2>
                 <div class="score-circle" id="score-display">0/0</div>
                 <h3 id="performance-verdict" style="margin-bottom: 20px;"></h3>
-                
-                <button type="button" class="btn btn-primary" style="padding: 12px 30px; font-size:15px;" onclick="prepareRetakeSession()">🔄 Retake Examination</button>
-                
+                <button type="button" class="btn btn-primary" onclick="prepareRetakeSession()">🔄 Retake Examination</button>
                 <div class="review-title">Detailed Performance Breakdown</div>
-                <div id="review-cards-container"></div>
+                <div id="review-cards-container" style="max-height: 50vh; overflow-y: auto; padding-right: 5px;"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // ==========================================
-        // 🔗 LINK YOUR GOOGLE SHEET APPS SCRIPT HERE
-        // ==========================================
         const GOOGLE_APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWO_UoyP702VR9aBAzEAzEILeS2XmscI_mTZDEhd2I7C-uaIuVSdnT28uK8MjolJy2/exec";
 
-        // Global State Pools
-        let categoryDatabase = ["General Awareness", "Bhutanese Constitution Track"]; 
+        let categoryDatabase = []; 
         let questionPoolRegistry = [];
-        let temporaryUploadedImageBase64 = "";
         let compiledActiveData = [];
         let totalQuestions = 0;
         let currentActiveIdx = 0;
@@ -607,37 +732,73 @@
         let timerInterval = null;
         const alphaArr = ["A", "B", "C", "D"];
         let responsesState = [];
+        let encodedBase64Image = "";
+        let usernameSession = "";
 
-        // --- Fetch Database From Google Sheet on Launch ---
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function updateUIVisibilityState(viewName) {
+            localStorage.setItem("active_exam_view_state", viewName);
+            document.getElementById('setup-container').style.display = "none";
+            document.getElementById('admin-login-container').style.display = "none";
+            document.getElementById('admin-dashboard-container').style.display = "none";
+            document.getElementById('exam-app-container').style.display = "none";
+            document.getElementById('mobile-active-omr-dock-element').style.display = "none";
+            document.getElementById('results-wrapper').style.display = "none";
+            document.getElementById('header-timer').style.display = "none";
+            document.getElementById('admin-gate-btn').style.display = "block";
+            document.getElementById('admin-return-top-btn').style.display = "none";
+
+            if (viewName === "ADMIN_DASHBOARD") {
+                document.getElementById('admin-dashboard-container').style.display = "block";
+                document.getElementById('admin-gate-btn').style.display = "none";
+                document.getElementById('admin-return-top-btn').style.display = "block";
+            } else if (viewName === "ADMIN_LOGIN") {
+                document.getElementById('admin-login-container').style.display = "block";
+                document.getElementById('admin-gate-btn').style.display = "none";
+                document.getElementById('admin-return-top-btn').style.display = "block";
+            } else if (viewName === "EXAM_RUNNING") {
+                document.getElementById('exam-app-container').style.display = "flex";
+                document.getElementById('header-timer').style.display = "flex";
+                document.getElementById('admin-gate-btn').style.display = "none";
+                if (window.innerWidth < 768) {
+                    document.getElementById('mobile-active-omr-dock-element').style.display = "flex";
+                }
+            } else if (viewName === "RESULTS") {
+                document.getElementById('results-wrapper').style.display = "block";
+            } else {
+                document.getElementById('setup-container').style.display = "block";
+            }
+        }
+
         async function fetchLiveSheetDatabase() {
             showLoading(true);
-            if(GOOGLE_APP_SCRIPT_URL === "PASTE_YOUR_URL_HERE") {
-                alert("Developer Note: Please configure the Web App URL variable inside the script tag.");
-                showLoading(false);
-                return;
-            }
             try {
                 const response = await fetch(GOOGLE_APP_SCRIPT_URL);
                 const cloudData = await response.json();
-                
+                categoryDatabase = [];
                 if (cloudData && cloudData.length > 0) {
                     questionPoolRegistry = cloudData;
-                    
-                    // Automatically compile any custom categories written inside spreadsheet
                     cloudData.forEach(item => {
                         if(item.category && !categoryDatabase.includes(item.category)) {
                             categoryDatabase.push(item.category);
                         }
                     });
                 }
-            } catch (err) {
-                console.error("Database connection failure: ", err);
-                alert("Failed to sync live question database registry. Local backups will remain accessible.");
-            } finally {
+            } catch (err) { console.error(err); }
+            finally {
                 synchronizeCategorySelectors();
-                updatePoolCounterDisplay();
-                document.getElementById("start-exam-btn").innerText = "Begin Examination";
-                document.getElementById("start-exam-btn").disabled = false;
+                document.getElementById('pool-counter-badge').innerText = questionPoolRegistry.length;
+                populateAdminQuestionsTable();
+                document.getElementById("start-exam-btn").disabled = categoryDatabase.length === 0;
+                document.getElementById("start-exam-btn").innerText = categoryDatabase.length === 0 ? "Empty Registry" : "Begin Examination";
+                updateUIVisibilityState("SETUP");
                 showLoading(false);
             }
         }
@@ -648,272 +809,178 @@
 
         function synchronizeCategorySelectors() {
             let optionsHTML = "";
-            categoryDatabase.forEach(cat => {
-                optionsHTML += `<option value="${cat}">${cat}</option>`;
+            categoryDatabase.forEach(cat => { optionsHTML += `<option value="${cat}">${cat}</option>`; });
+            document.getElementById('user-category-select').innerHTML = optionsHTML || "<option>No categories loaded</option>";
+            document.getElementById('adm-q-category-select').innerHTML = optionsHTML || "<option>No categories loaded</option>";
+        }
+
+        function populateAdminQuestionsTable() {
+            let rowsHtml = "";
+            questionPoolRegistry.forEach((q, idx) => {
+                let textExcerpt = q.question ? q.question.toString().trim() : "";
+                if(textExcerpt === "" || textExcerpt === "?") {
+                    textExcerpt = `<span style="color: var(--text-muted); font-style: italic;">(Empty Text Content)</span>`;
+                }
+                let visualBadge = q.imageCode ? ' <span style="font-size:11px; background:#e0f2fe; color:#0369a1; padding:2px 4px; border-radius:3px;">🖼️ Image Attached</span>' : '';
+                rowsHtml += `<tr><td><strong>${idx + 1}</strong></td><td>[${q.category}] ${textExcerpt}${visualBadge}</td><td><button type="button" class="btn-danger-small" onclick="deleteQuestionFromPool(${idx})">❌</button></td></tr>`;
             });
-            document.getElementById('user-category-select').innerHTML = optionsHTML;
-            document.getElementById('adm-q-category-select').innerHTML = optionsHTML;
+            document.getElementById("admin-questions-list-tbody").innerHTML = rowsHtml || '<tr><td colspan="3">Database clear.</td></tr>';
         }
 
-        function updatePoolCounterDisplay() {
-            document.getElementById('pool-counter-badge').innerText = questionPoolRegistry.length + " Questions Total";
+        function toggleAdminLoginView() { 
+            document.getElementById('admin-pass-field').value = ""; 
+            updateUIVisibilityState("ADMIN_LOGIN"); 
+        }
+        
+        function verifyAdminPassword() {
+            if (document.getElementById('admin-pass-field').value === "kin@123!") {
+                updateUIVisibilityState("ADMIN_DASHBOARD");
+            } else { alert("Authentication Invalid."); }
+        }
+        
+        function exitAdminView() { 
+            document.getElementById('admin-pass-field').value = ""; 
+            updateUIVisibilityState("SETUP"); 
         }
 
-        // --- Image Attachment Processing Mappings ---
-        function processLocalImageFile(inputElement) {
-            const file = inputElement.files[0];
-            if (file) {
+        function addNewCategoryTrack() {
+            const inputVal = document.getElementById('adm-new-category-input').value.trim();
+            if(!inputVal) { alert("Please input a valid track label name."); return; }
+            if(categoryDatabase.includes(inputVal)) { alert("This category track already exists."); return; }
+            categoryDatabase.push(inputVal);
+            synchronizeCategorySelectors();
+            document.getElementById('adm-q-category-select').value = inputVal;
+            document.getElementById('adm-new-category-input').value = "";
+            alert(`Category "${inputVal}" added! Make sure to add a question to preserve it.`);
+        }
+
+        function deleteCategoryTrack() {
+            const activeCat = document.getElementById('adm-q-category-select').value;
+            if(!activeCat) return;
+            if(!confirm(`Delete track "${activeCat}"?`)) return;
+            questionPoolRegistry = questionPoolRegistry.filter(q => q.category !== activeCat);
+            categoryDatabase = categoryDatabase.filter(c => c !== activeCat);
+            synchronizeCategorySelectors();
+            populateAdminQuestionsTable();
+        }
+
+        function previewAdminUploadedImage(input) {
+            if (input.files && input.files[0]) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    temporaryUploadedImageBase64 = e.target.result;
-                    document.getElementById('img-preview-target').src = temporaryUploadedImageBase64;
-                    document.getElementById('image-preview-box').style.display = "block";
-                    document.getElementById('adm-q-image-url').value = ""; 
+                    encodedBase64Image = e.target.result;
+                    document.getElementById('adm-image-preview-tag').src = encodedBase64Image;
+                    document.getElementById('adm-image-preview-box').style.display = "block";
                 };
-                reader.readAsDataURL(file);
+                reader.readAsDataURL(input.files[0]);
             }
         }
 
-        function processWebImageUrl(urlValue) {
-            const cleanedUrl = urlValue.trim();
-            if (cleanedUrl) {
-                temporaryUploadedImageBase64 = cleanedUrl;
-                document.getElementById('img-preview-target').src = cleanedUrl;
-                document.getElementById('image-preview-box').style.display = "block";
-                document.getElementById('adm-q-image-file').value = ""; 
-            }
+        function clearAdminSelectedImage() {
+            document.getElementById('adm-q-image').value = "";
+            encodedBase64Image = "";
+            document.getElementById('adm-image-preview-box').style.display = "none";
         }
 
-        function clearAttachedImageState() {
-            temporaryUploadedImageBase64 = "";
-            document.getElementById('adm-q-image-file').value = "";
-            document.getElementById('adm-q-image-url').value = "";
-            document.getElementById('image-preview-box').style.display = "none";
-            document.getElementById('img-preview-target').src = "";
-        }
-
-        // --- Admin Controls Gatekeeping ---
-        function toggleAdminLoginView() {
-            if (timerInterval) {
-                alert("Cannot access administration setup while an exam is live.");
-                return;
-            }
-            document.getElementById('setup-container').style.display = "none";
-            document.getElementById('results-wrapper').style.display = "none";
-            document.getElementById('exam-app-container').style.display = "none";
-            document.getElementById('admin-dashboard-container').style.display = "none";
-            document.getElementById('admin-pass-field').value = "";
-            document.getElementById('admin-login-container').style.display = "block";
-        }
-
-        function verifyAdminPassword() {
-            const inputPass = document.getElementById('admin-pass-field').value;
-            if (inputPass === "kin@123!") {
-                document.getElementById('admin-login-container').style.display = "none";
-                document.getElementById('admin-dashboard-container').style.display = "block";
-                updatePoolCounterDisplay();
-                synchronizeCategorySelectors();
-            } else {
-                alert("Access Denied: Invalid Security Token.");
-            }
-        }
-
-        function commitNewCategory() {
-            const newCatValue = document.getElementById('adm-new-cat-input').value.trim();
-            if (!newCatValue) return;
-            if (categoryDatabase.map(c => c.toLowerCase()).includes(newCatValue.toLowerCase())) {
-                alert("Category track registration database signature already registered.");
-                return;
-            }
-            categoryDatabase.push(newCatValue);
-            document.getElementById('adm-new-cat-input').value = "";
-            synchronizeCategorySelectors();
-            document.getElementById('adm-q-category-select').value = newCatValue;
-        }
-
-        // --- Post Data Record Directly into Google Sheet Ecosystem ---
         async function commitQuestionToPool() {
-            const targetCat = document.getElementById('adm-q-category-select').value;
-            const qText = document.getElementById('adm-q-text').value; 
-            const o0 = document.getElementById('adm-o-0').value.trim();
-            const o1 = document.getElementById('adm-o-1').value.trim();
-            const o2 = document.getElementById('adm-o-2').value.trim();
-            const o3 = document.getElementById('adm-o-3').value.trim();
-            const cIdx = parseInt(document.getElementById('adm-correct-idx').value);
-
-            if (!qText.trim() || !o0 || !o1 || !o2 || !o3) {
-                alert("Validation Error: Please make sure the question and all 4 option keys are specified.");
-                return;
-            }
-
-            const payloadPacket = {
-                "category": targetCat,
-                "question": qText,
-                "options": [o0, o1, o2, o3],
-                "answer": cIdx,
-                "image": temporaryUploadedImageBase64 
+            const targetCategory = document.getElementById('adm-q-category-select').value;
+            const payload = {
+                "action": "ADD",
+                "category": targetCategory,
+                "question": document.getElementById('adm-q-text').value,
+                "imageCode": encodedBase64Image,
+                "options": [
+                    document.getElementById('adm-o-0').value, document.getElementById('adm-o-1').value,
+                    document.getElementById('adm-o-2').value, document.getElementById('adm-o-3').value
+                ],
+                "answer": parseInt(document.getElementById('adm-correct-idx').value)
             };
-
-            const saveBtn = document.getElementById('btn-save-question');
-            saveBtn.innerText = "⚡ Uploading To Cloud Sheets...";
-            saveBtn.disabled = true;
-
-            try {
-                // Submit raw payload via POST protocol over Apps Script Web App
-                const pushRequest = await fetch(GOOGLE_APP_SCRIPT_URL, {
-                    method: "POST",
-                    mode: "no-cors", // Bypasses browser CORS restrictions smoothly
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payloadPacket)
-                });
-
-                alert("Success: Question record dispatched safely into live spreadsheet architecture!");
-                
-                // Clear inputs
-                document.getElementById('adm-q-text').value = "";
-                document.getElementById('adm-o-0').value = "";
-                document.getElementById('adm-o-1').value = "";
-                document.getElementById('adm-o-2').value = "";
-                document.getElementById('adm-o-3').value = "";
-                clearAttachedImageState();
-                
-                // Refresh local model cache from live data
-                await fetchLiveSheetDatabase();
-
-            } catch(e) {
-                console.error(e);
-                alert("Transmission dropped. Error tracking sync parameters.");
-            } finally {
-                saveBtn.innerText = "Append Question to Cloud";
-                saveBtn.disabled = false;
-            }
+            showLoading(true);
+            await fetch(GOOGLE_APP_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            document.getElementById('adm-q-text').value = "";
+            clearAdminSelectedImage();
+            await fetchLiveSheetDatabase();
         }
 
-        function exitAdminView() {
-            document.getElementById('admin-login-container').style.display = "none";
-            document.getElementById('admin-dashboard-container').style.display = "none";
-            document.getElementById('setup-container').style.display = "block";
-        }
-
-        // --- Exam Session Flow Infrastructure ---
-        function shuffleQuestionsPool(array) {
-            let shuffled = JSON.parse(JSON.stringify(array));
-            for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
-            return shuffled;
+        async function deleteQuestionFromPool(idx) {
+            if(!confirm("Purge index data?")) return;
+            showLoading(true);
+            await fetch(GOOGLE_APP_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ "action": "DELETE", "index": idx }) });
+            await fetchLiveSheetDatabase();
         }
 
         function startExamSession() {
-            const selectedCategory = document.getElementById('user-category-select').value;
-            const minutesInput = document.getElementById('user-timer-input').value;
-            let validatedMinutes = parseInt(minutesInput);
-            
-            if (isNaN(validatedMinutes) || validatedMinutes <= 0) {
-                alert("Please supply a valid duration timeframe context mapping.");
-                return;
-            }
+            const nameInput = document.getElementById('user-full-name').value.trim();
+            if(!nameInput) { alert("Please type your Student Full Name to begin."); return; }
+            usernameSession = nameInput;
 
-            let isolatedFilteredSet = questionPoolRegistry.filter(q => q.category === selectedCategory);
-            
-            if (isolatedFilteredSet.length === 0) {
-                alert(`The selected category track currently holds 0 active registry cards inside the sheet. Open Admin Portal to append items.`);
-                return;
-            }
+            const cat = document.getElementById('user-category-select').value;
+            let isolated = questionPoolRegistry.filter(q => q.category === cat);
+            if(isolated.length === 0) { alert("Track possesses 0 content items."); return; }
 
-            timeRemaining = validatedMinutes * 60;
-            compiledActiveData = shuffleQuestionsPool(isolatedFilteredSet);
+            timeRemaining = parseInt(document.getElementById('user-timer-input').value) * 60;
+            
+            compiledActiveData = shuffleArray([...isolated]);
             totalQuestions = compiledActiveData.length;
             responsesState = new Array(totalQuestions).fill(null);
             currentActiveIdx = 0;
 
             initQuizLayout();
-
-            document.getElementById('header-category-label').innerText = `Track: ${selectedCategory}`;
-            document.getElementById('setup-container').style.display = "none";
-            document.getElementById('results-wrapper').style.display = "none";
-            document.getElementById('admin-gate-btn').style.display = "none"; 
-            document.getElementById('header-timer').style.display = "flex";
-            document.getElementById('exam-app-container').style.display = "flex";
-
-            startCountdownTicker();
+            document.getElementById('header-category-label').innerText = `Track: ${cat}`;
+            updateUIVisibilityState("EXAM_RUNNING");
+            
+            if(timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (timeRemaining <= 0) { triggerSubmit(true); }
+                else { timeRemaining--; updateTimerDisplay(); }
+            }, 1000);
         }
 
         function initQuizLayout() {
             let qHtml = ""; let omrHtml = "";
-
             compiledActiveData.forEach((q, index) => {
                 let activeClass = index === 0 ? "active" : "";
-                let activeOmrRow = index === 0 ? "active-row" : "";
-                let imageBlockHtml = q.image ? `<div class="question-image-container"><img src="${q.image}"></div>` : "";
-
+                let renderImageFrame = q.imageCode ? `<img src="${q.imageCode}" class="q-image-preview" alt="Question Graphic Frame">` : '';
+                
                 qHtml += `
                     <div class="question-card ${activeClass}" id="q-card-${index}">
-                        <div class="q-header"><span class="q-number">Question ${index + 1} of ${totalQuestions}</span></div>
-                        <div class="q-text">${escapeHtmlEntities(q.question)}</div>
-                        ${imageBlockHtml}
-                        <div class="options-container">
-                `;
-
-                q.options.forEach((opt, optIdx) => {
-                    qHtml += `
-                        <div class="option-display-item" id="opt-display-${index}-${optIdx}">
-                            <span class="option-alpha">${alphaArr[optIdx]}</span>
-                            <span>${escapeHtmlEntities(opt)}</span>
+                        <div class="q-header">
+                            <span class="q-number">Question ${index + 1} of ${totalQuestions}</span>
+                            <span class="q-hint">(Tap OMR below to answer)</span>
                         </div>
-                    `;
-                });
-
-                qHtml += `
+                        <div class="q-text">${q.question}</div>
+                        ${renderImageFrame}
+                        <div class="options-container">
+                            ${q.options.map((opt, oIdx) => `
+                                <div class="option-display-item" id="opt-display-${index}-${oIdx}">
+                                    <span class="option-alpha">${alphaArr[oIdx]}</span><span>${opt}</span>
+                                </div>
+                            `).join('')}
                         </div>
                         <div class="nav-actions">
-                            ${index > 0 ? `<button type="button" class="btn btn-secondary" onclick="navigateQuestion(${index - 1})">Previous</button>` : '<div></div>'}
-                            ${index < totalQuestions - 1 ? `<button type="button" class="btn btn-primary" onclick="navigateQuestion(${index + 1})">Next Question</button>` : `<button type="button" class="btn btn-success" onclick="triggerSubmit()">Final Submit Exam</button>`}
+                            ${index > 0 ? `<button type="button" class="btn btn-secondary" onclick="navigateQuestion(${index - 1})">Prev</button>` : '<div></div>'}
+                            ${index < totalQuestions - 1 ? `<button type="button" class="btn btn-primary" onclick="navigateQuestion(${index + 1})">Next</button>` : `<button type="button" class="btn btn-success" onclick="triggerSubmit()">Submit Test</button>`}
                         </div>
-                    </div>
-                `;
+                    </div>`;
 
                 omrHtml += `
-                    <div class="omr-row ${activeOmrRow}" id="omr-row-${index}">
-                        <div class="omr-q-num" style="cursor:pointer;" onclick="navigateQuestion(${index})">Q${index + 1} 🔍</div>
+                    <div class="omr-row ${index === 0 ? 'active-row' : ''}" id="omr-row-${index}">
+                        <div class="omr-q-num" onclick="navigateQuestion(${index})">Q${index + 1} 🔍</div>
                         <div class="omr-bubbles">
-                            <div class="omr-bubble" id="omr-bubble-${index}-0" onclick="markOmrBubble(${index}, 0)">A</div>
-                            <div class="omr-bubble" id="omr-bubble-${index}-1" onclick="markOmrBubble(${index}, 1)">B</div>
-                            <div class="omr-bubble" id="omr-bubble-${index}-2" onclick="markOmrBubble(${index}, 2)">C</div>
-                            <div class="omr-bubble" id="omr-bubble-${index}-3" onclick="markOmrBubble(${index}, 3)">D</div>
+                            ${[0,1,2,3].map(oIdx => `<div class="omr-bubble" id="omr-bubble-${index}-${oIdx}" onclick="markOmrBubble(${index}, ${oIdx})">${alphaArr[oIdx]}</div>`).join('')}
                         </div>
-                    </div>
-                `;
+                    </div>`;
             });
-
             document.getElementById('questions-container').innerHTML = qHtml;
             document.getElementById('omr-sheet-target').innerHTML = omrHtml;
+            syncMobileDockInterface();
             updateTimerDisplay();
-        }
-
-        function escapeHtmlEntities(text) {
-            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-        }
-
-        function startCountdownTicker() {
-            if(timerInterval) clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                if (timeRemaining <= 0) {
-                    clearInterval(timerInterval);
-                    alert("Time expired! Submitting available responses.");
-                    triggerSubmit(true);
-                } else {
-                    timeRemaining--;
-                    updateTimerDisplay();
-                }
-            }, 1000);
         }
 
         function updateTimerDisplay() {
             const mins = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
             const secs = (timeRemaining % 60).toString().padStart(2, '0');
-            document.getElementById('timer-display').innerText = mins + ":" + secs;
+            document.getElementById('timer-display').innerText = `${mins}:${secs}`;
         }
 
         function navigateQuestion(targetIdx) {
@@ -922,79 +989,104 @@
             currentActiveIdx = targetIdx;
             document.getElementById('q-card-' + currentActiveIdx).classList.add('active');
             document.getElementById('omr-row-' + currentActiveIdx).classList.add('active-row');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            syncMobileDockInterface();
         }
 
-        // --- Exclusive OMR Selection Handler Module Matrix ---
+        function syncMobileDockInterface() {
+            document.getElementById('mobile-dock-q-title').innerText = `Select Answer (Q${currentActiveIdx + 1})`;
+            const currentSavedAnswer = responsesState[currentActiveIdx];
+            let dockBubblesHTML = "";
+            for (let oIdx = 0; oIdx < 4; oIdx++) {
+                let isMarkedClass = (currentSavedAnswer === oIdx) ? "marked" : "";
+                dockBubblesHTML += `<div class="omr-bubble ${isMarkedClass}" onclick="markOmrBubble(${currentActiveIdx}, ${oIdx})">${alphaArr[oIdx]}</div>`;
+            }
+            document.getElementById('mobile-dock-bubbles-container').innerHTML = dockBubblesHTML;
+        }
+
         function markOmrBubble(questionIdx, optionIdx) {
             responsesState[questionIdx] = optionIdx;
-
             const row = document.getElementById('omr-row-' + questionIdx);
             const bubbles = row.getElementsByClassName('omr-bubble');
             for(let j=0; j<bubbles.length; j++) bubbles[j].classList.remove('marked');
-            document.getElementById(`omr-bubble-${questionIdx}-${optionIdx}`).classList.add('marked');
+            
+            const desktopBubble = document.getElementById(`omr-bubble-${questionIdx}-${optionIdx}`);
+            if (desktopBubble) desktopBubble.classList.add('marked');
 
             const card = document.getElementById('q-card-' + questionIdx);
             const displayItems = card.getElementsByClassName('option-display-item');
             for(let i=0; i<displayItems.length; i++) displayItems[i].classList.remove('active-selection');
-            document.getElementById(`opt-display-${questionIdx}-${optionIdx}`).classList.add('active-selection');
+            
+            const displayItem = document.getElementById(`opt-display-${questionIdx}-${optionIdx}`);
+            if (displayItem) displayItem.classList.add('active-selection');
 
-            if(currentActiveIdx !== questionIdx) navigateQuestion(questionIdx);
+            if (currentActiveIdx !== questionIdx) navigateQuestion(questionIdx);
+            else syncMobileDockInterface();
         }
 
-        function triggerSubmit(forced = false) {
-            if (!forced && !confirm("Are you sure you want to finalize and submit your responses?")) return;
-            clearInterval(timerInterval); timerInterval = null; 
+        async function triggerSubmit(forced = false) {
+            if (!forced && !confirm("Finalize and submit your answers?")) return;
+            clearInterval(timerInterval);
+            showLoading(true);
             
-            let obtainedScore = 0; let evaluationHTML = "";
+            let score = 0; 
+            let reviewHtml = "";
+            let responsesFormattedLog = [];
 
             compiledActiveData.forEach((q, idx) => {
-                const selectedAns = responsesState[idx];
-                const isCorrect = selectedAns !== null && selectedAns === q.answer;
-                if (isCorrect) obtainedScore++;
+                const userAns = responsesState[idx];
+                const correct = userAns !== null && userAns === q.answer;
+                if(correct) score++;
 
-                const statusBadge = isCorrect ? '<span class="badge badge-success">Correct</span>' : '<span class="badge badge-error">Incorrect / Unanswered</span>';
-                const cardClass = isCorrect ? 'correct-card' : 'wrong-card';
-                const chosenLetter = selectedAns !== null ? alphaArr[selectedAns] : "-";
-                const chosenText = selectedAns !== null ? q.options[selectedAns] : "None (Skipped)";
-                const correctLetter = alphaArr[q.answer];
-                const correctText = q.options[q.answer];
+                responsesFormattedLog.push({
+                    question: q.question,
+                    selected: userAns !== null ? alphaArr[userAns] : "Skipped",
+                    status: correct ? "CORRECT" : "WRONG"
+                });
 
-                let reviewImageBlock = q.image ? `<div class="question-image-container" style="text-align:left; margin:10px 0;"><img src="${q.image}" style="max-height:100px;"></div>` : "";
-
-                evaluationHTML += `
-                    <div class="review-item ${cardClass}">
-                        ${statusBadge}
-                        <div style="font-weight:600; margin-bottom:8px; white-space:pre-wrap;">Q${idx + 1}: ${escapeHtmlEntities(q.question)}</div>
-                        ${reviewImageBlock}
-                        <div>
-                            <p style="color: ${isCorrect ? 'var(--success-color)' : 'var(--error-color)'};"><strong>Your Answer:</strong> [${chosenLetter}] ${escapeHtmlEntities(chosenText)}</p>
-                            ${!isCorrect ? `<p style="color: var(--success-color);"><strong>Correct Answer:</strong> [${correctLetter}] ${escapeHtmlEntities(correctText)}</p>` : ''}
-                        </div>
-                    </div>
-                `;
+                reviewHtml += `
+                    <div class="review-item ${correct ? 'correct-card' : 'wrong-card'}">
+                        <span class="badge ${correct ? 'badge-success' : 'badge-error'}">${correct ? 'Correct' : 'Incorrect'}</span>
+                        <div style="font-weight:600;">Q${idx+1}: ${q.question}</div>
+                        <div>Your Choice: [${userAns !== null ? alphaArr[userAns] : 'Skipped'}]</div>
+                        ${!correct ? `<div>Correct Answer: [${alphaArr[q.answer]}] ${q.options[q.answer]}</div>` : ''}
+                    </div>`;
             });
 
-            document.getElementById('score-display').innerText = obtainedScore + "/" + totalQuestions;
-            const percentage = (obtainedScore / totalQuestions) * 100;
-            document.getElementById('performance-verdict').innerText = percentage >= 50 ? "🎉 CONGRATULATIONS! YOU PASSED." : "❌ ASSESSMENT FAILED. TRY AGAIN.";
-            document.getElementById('performance-verdict').style.color = percentage >= 50 ? "var(--success-color)" : "var(--error-color)";
+            const submissionPayload = {
+                "action": "SUBMIT_RESPONSE",
+                "studentName": usernameSession,
+                "category": document.getElementById('user-category-select').value,
+                "score": `${score}/${totalQuestions}`,
+                "timestamp": new Date().toLocaleString(),
+                "breakdown": JSON.stringify(responsesFormattedLog)
+            };
 
-            document.getElementById('review-cards-container').innerHTML = evaluationHTML;
-            document.getElementById('exam-app-container').style.display = "none";
-            document.getElementById('header-timer').style.display = "none";
-            document.getElementById('results-wrapper').style.display = "block";
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            try {
+                await fetch(GOOGLE_APP_SCRIPT_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(submissionPayload)
+                });
+            } catch (e) { console.error("Cloud Excel logging error:", e); }
+
+            document.getElementById('score-display').innerText = `${score}/${totalQuestions}`;
+            document.getElementById('performance-verdict').innerText = (score/totalQuestions >= 0.5) ? "PASSED" : "FAILED";
+            document.getElementById('review-cards-container').innerHTML = reviewHtml;
+            showLoading(false);
+            updateUIVisibilityState("RESULTS");
         }
 
-        function prepareRetakeSession() {
-            document.getElementById('results-wrapper').style.display = "none";
-            document.getElementById('admin-gate-btn').style.display = "block"; 
-            document.getElementById('setup-container').style.display = "block";
-            fetchLiveSheetDatabase(); // Instantly pulls updates if admin made changes while student was finishing testing
+        function prepareRetakeSession() { 
+            fetchLiveSheetDatabase(); 
         }
 
-        window.onload = function() {
-            fetchLiveSheetDatabase();
+        window.onload = fetchLiveSheetDatabase;
+        window.onresize = function() {
+            if (document.getElementById('exam-app-container').style.display === "flex") {
+                document.getElementById('mobile-active-omr-dock-element').style.display = (window.innerWidth < 768) ? "flex" : "none";
+            }
         };
     </script>
 </body>
