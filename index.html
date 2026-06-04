@@ -688,72 +688,75 @@
         }
 
         .omr-status.answered { background: var(--green); }
-        /*  PASTE THE MOBILE STICKY CODE RIGHT HERE  */
-        @media (max-width: 767px) {
-        /* Pin the sidebar section block to the bottom of mobile screens */
+       /* OBILE-OPTIMIZED: CONTEXTUAL DYNAMIC PER-QUESTION OMR
+   ========================================================================== */
+     @media (max-width: 767px) {
+        /* Hide the global sidebar panel completely on small mobile screens */
         .sidebar-section {
-            position: fixed !important;
-            bottom: 0 !important;
-            left: 0 !important;
+        display: none !important;
+        }
+
+    /* Expand the main container to take up full screen width */
+        .quiz-section {
             width: 100% !important;
-            background: #ffffff !important;
-            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.15) !important;
-            z-index: 2000 !important; 
-            padding: 8px 12px !important;
-            border-top: 3px solid var(--navy, #1e3a8a) !important;
+            padding: 10px !important;
             box-sizing: border-box !important;
         }
 
-        /* Compact the card wrappers within the mobile panel drawer */
-        .sidebar-section .info-card, 
-        .sidebar-section .sidebar-card-body {
-            margin-bottom: 0 !important;
-            padding: 2px 0 !important;
-            border: none !important;
-            background: transparent !important;
+    /* Style the per-question contextual OMR container */
+        .mobile-question-omr {
+            display: flex !important;
+            flex-direction: column !important;
+            background: var(--cream, #fcfbf7) !important;
+            border: 1.5px solid var(--border, #e2e8f0) !important;
+            border-radius: 12px !important;
+            padding: 12px 16px !important;
+            margin: 20px 0 !important;
+        }
+
+        .mobile-omr-title {
+            font-size: 12px !important;
+            font-weight: 700 !important;
+            color: var(--ink-muted, #64748b) !important;
+            margin-bottom: 8px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+        }
+
+        .mobile-omr-row {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
         }
     
-        .sidebar-section h3 {
-            font-size: 11px !important;
-            margin: 0 0 4px 0 !important;
-            padding: 0 !important;
+        .mobile-omr-label {
+            font-size: 14px !important;
+            font-weight: bold !important;
+            color: var(--ink, #1e293b) !important;
+            min-width: 45px !important;
         }
 
-        /* Restrict matrix box vertical height so it doesn't overlap the quiz card */
-        #omr-container {
-            max-height: 105px !important; 
-            overflow-y: auto !important;
-            padding-right: 4px !important;
-        }
-
-        /* Compress row items and padding variables for fingers/thumbs */
-        .omr-row {
-            padding: 4px 6px !important;
-            gap: 6px !important;
+        .mobile-omr-bubbles {
+            display: flex !important;
+            gap: 10px !important;
+            flex: 1 !important;
         }
     
-        .omr-q-label {
-            font-size: 11px !important;
-            width: 32px !important;
-        }
-    
-        .omr-bubbles {
-            gap: 6px !important;
-        }
-
-        .omr-bubble {
-            width: 26px !important;
-            height: 26px !important;
-            font-size: 10px !important;
-        }
-
-    /* Shifts navigation up to prevent elements overlapping underneath the sticky sheet */
-        .mobile-bottom-space {
-            margin-bottom: 165px !important; 
+        /* Scale bubbles to be comfortably thumb-tappable */
+        .mobile-omr-bubbles .omr-bubble {
+            width: 36px !important;
+            height: 36px !important;
+            font-size: 13px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;
         }
     }
-        /* END OF MOBILE STICKY OMR CODE */
 
+    /* Fallback hiding rule for desktop viewports */
+    @media (min-width: 768px) {
+        .mobile-question-omr {
+            display: none !important;
+        }
+    }
         /* ─── STATS MINI ────────────────────────────── */
         .stats-row {
             display: grid;
@@ -1832,6 +1835,22 @@ function startExam() {
     buildExam();
     startTimer();
 }
+   // 👇 PASTE THE CONTROLLER FUNCTION IN THIS GAP 👇
+function selectMobileBubble(questionIndex, optionIndex, element) {
+    // 1. Instantly toggle active highlighters locally on mobile viewports
+    const rowContainer = element.closest('.mobile-omr-bubbles');
+    rowContainer.querySelectorAll('.omr-bubble').forEach(b => b.classList.remove('filled'));
+        element.classList.add('filled');
+        
+        // 2. Sync with your existing core logic system
+    const currentQuestionCard = document.getElementById(`q-${questionIndex}`);
+    if (currentQuestionCard) {
+        const matchingOptionItem = currentQuestionCard.querySelectorAll('.option-item')[optionIndex];
+        if (matchingOptionItem) {
+            matchingOptionItem.click(); // Fires your core state update engine cleanly
+    
+    }
+}
 
 // ─── BUILD EXAM UI ────────────────────────────────────
 function buildExam() {
@@ -1872,21 +1891,47 @@ function buildExam() {
             : `<button class="btn btn-outline btn-nav-hint" disabled title="Tick answer on OMR sheet →">
                   <span style="opacity:0.5;font-size:12px;">← Mark answer on OMR sheet</span>
                </button>`;
+            //  1. INSERT THE MOBILE OMR BUBBLE GENERATOR LOOP HERE 
+        let mobileOmrBubblesHtml = '';
+        ALPHA.forEach((label, oi) => {
+            // Keeps state highlighted if a user navigates back to a previously answered question
+            const isFilled = (userAnswers && userAnswers[i] === oi) ? 'filled' : '';
+            
+            mobileOmrBubblesHtml += `
+                <div class="omr-bubble ${isFilled}" 
+                     data-q="${i}" 
+                     data-opt="${oi}" 
+                     onclick="selectMobileBubble(${i}, ${oi}, this)">
+                     ${label}
+                </div>`;
+        });
+
+        // 2. YOUR REPLACED RETURN TEMPLATE STRING
         return `
-        <div class="question-card ${i===0?'active':''}" id="q-${i}">
-            <div class="q-meta">
-                <span class="q-pill">Question ${i+1} / ${activeData.length}</span>
-                <span class="q-category-tag">${cat}</span>
-            </div>
-            <div class="q-text">${q.question}</div>
-            ${imgHtml}
-            <div class="options-grid">${opts}</div>
-            <div class="nav-actions">
-                <button class="btn btn-outline" onclick="navigate(${i-1})" ${i===0?'disabled':''}>← Previous</button>
-                ${navRight}
-            </div>
-        </div>`;
-    }).join("");
+            <div class="question-card ${i===0?'active':''}" id="q-${i}">
+                <div class="q-meta">
+                    <span class="q-pill">Question ${i+1} / ${activeData.length}</span>
+                    <span class="q-category-tag">${cat}</span>
+                </div>
+                <div class="q-text">${q.question}</div>
+                ${imgHtml}
+                <div class="options-grid">${opts}</div>
+                
+                <div class="mobile-question-omr">
+                    <div class="mobile-omr-title">Tap to save & go to next question</div>
+                    <div class="mobile-omr-row">
+                        <div class="mobile-omr-label">Q. No ${i+1}</div>
+                        <div class="mobile-omr-bubbles">
+                            ${mobileOmrBubblesHtml}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="nav-actions">
+                    <button class="btn btn-outline" onclick="navigate(${i-1})" ${i===0?'disabled':''}><- Previous</button>
+                    ${navRight}
+                </div>
+            </div>`;
 
     // OMR: clicking a bubble selects answer AND auto-advances to next question
     omrContainer.innerHTML = activeData.map((_, i) => `
