@@ -688,13 +688,13 @@
         }
 
         .omr-status.answered { background: var(--green); }
-       /* OBILE-OPTIMIZED: CONTEXTUAL DYNAMIC PER-QUESTION OMR
+       /* MOBILE-OPTIMIZED: CONTEXTUAL DYNAMIC PER-QUESTION OMR
    ========================================================================== */
-     @media (max-width: 767px) {
-        /* Hide the global sidebar panel completely on small mobile screens */
-        .sidebar-section {
-        display: none !important;
-        }
+	     @media (max-width: 767px) {
+	        /* Hide the global answer-sheet sidebar on mobile */
+	        .exam-sidebar {
+	            display: none !important;
+	        }
 
     /* Expand the main container to take up full screen width */
         .quiz-section {
