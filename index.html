@@ -1895,7 +1895,7 @@ function buildExam() {
         let mobileOmrBubblesHtml = '';
         ALPHA.forEach((label, oi) => {
             // Keeps state highlighted if a user navigates back to a previously answered question
-            const isFilled = (userAnswers && userAnswers[i] === oi) ? 'filled' : '';
+            const isFilled = (typeof responses !== 'undefined' && responses[i] === oi) ? 'filled' : '';
             
             mobileOmrBubblesHtml += `
                 <div class="omr-bubble ${isFilled}" 
