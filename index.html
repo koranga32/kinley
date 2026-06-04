@@ -749,12 +749,14 @@
             font-size: 13px !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;
         }
+    }
 
     /* Fallback hiding rule for desktop viewports */
     @media (min-width: 768px) {
         .mobile-question-omr {
             display: none !important;
         }
+    }
         /* ─── STATS MINI ────────────────────────────── */
         .stats-row {
             display: grid;
@@ -1833,21 +1835,14 @@ function startExam() {
     buildExam();
     startTimer();
 }
-   // 👇 PASTE THE CONTROLLER FUNCTION IN THIS GAP 👇
+// ─── MOBILE OMR BUBBLE HANDLER ───────────────────────
 function selectMobileBubble(questionIndex, optionIndex, element) {
-    // 1. Instantly toggle active highlighters locally on mobile viewports
-    const rowContainer = element.closest('.mobile-omr-bubbles');
-    rowContainer.querySelectorAll('.omr-bubble').forEach(b => b.classList.remove('filled'));
-        element.classList.add('filled');
-        
-        // 2. Sync with your existing core logic system
-    const currentQuestionCard = document.getElementById(`q-${questionIndex}`);
-    if (currentQuestionCard) {
-        const matchingOptionItem = currentQuestionCard.querySelectorAll('.option-item')[optionIndex];
-        if (matchingOptionItem) {
-            matchingOptionItem.click(); // Fires your core state update engine cleanly
-    
-    }
+    // Delegate entirely to omrSelect() — the single source of truth.
+    // omrSelect handles: responses[] state, sidebar OMR fill, option highlight,
+    // progress counters, AND auto-advance to next question.
+    // DO NOT call matchingOptionItem.click() — options are .option-readonly
+    // (pointer-events:none) so click() is a silent no-op that loses all state.
+    omrSelect(questionIndex, optionIndex);
 }
 
 // ─── BUILD EXAM UI ────────────────────────────────────
@@ -1930,8 +1925,9 @@ function buildExam() {
                     ${navRight}
                 </div>
             </div>`;
+    }).join("");  // ← closes qContainer activeData.map() correctly
 
-    // OMR: clicking a bubble selects answer AND auto-advances to next question
+    // OMR sidebar: clicking a bubble selects answer AND auto-advances
     omrContainer.innerHTML = activeData.map((_, i) => `
         <div class="omr-row ${i===0?'active':''}" id="omr-${i}">
             <span class="omr-q-label" onclick="navigate(${i})">Q${i+1}</span>
@@ -1942,7 +1938,7 @@ function buildExam() {
         </div>`).join("");
 
     updateProgress();
-}
+}  // ← closes buildExam()
 
 // Called ONLY from OMR bubbles — selects answer + auto-advances
 function omrSelect(qi, oi) {
