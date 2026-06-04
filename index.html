@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ExamPortal — Cloud-Linked Examination System</title>
+    <title>ExamPortal — Cloud-Linked System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
     <style>
@@ -1335,7 +1335,7 @@
     <div class="modal-box" id="modal-box">
         <div class="modal-icon">🔐</div>
         <div class="modal-title">Admin Security Gateway</div>
-        <div class="modal-subtitle">Enter your administrator password to continue.</div>
+        <div class="modal-subtitle">Enter your password.</div>
 
         <div class="pw-input-wrap">
             <input
@@ -1369,7 +1369,7 @@
         <div class="brand-icon">🎓</div>
         <div class="brand-text">
             <h1>ExamPortal</h1>
-            <p>Cloud-Linked Examination System</p>
+            <p>Cloud-Linked System</p>
         </div>
     </div>
     <div class="header-right">
@@ -1387,10 +1387,10 @@
     <!-- ─── SETUP PANEL ────────────────────────────── -->
     <div id="setup-view">
         <div class="panel" style="max-width:520px;">
-            <div class="setup-badge">✦ New Examination</div>
+            <div class="setup-badge">✦ New Test</div>
             <div class="panel-header">
-                <h2>Start Your Exam</h2>
-                <p>Fill in your details and choose an exam category to begin.</p>
+                <h2>Start Your Test</h2>
+                <p>Fill in your details and choose an Test category to begin.</p>
             </div>
 
             <div class="form-group">
@@ -1404,14 +1404,14 @@
                     <input type="number" id="timer-input" class="form-control" value="25" min="1" max="180">
                 </div>
                 <div class="form-group">
-                    <label>Exam Category</label>
+                    <label>Test Category</label>
                     <select id="category-select" class="form-control"></select>
                 </div>
             </div>
 
             <div style="margin-top:6px;">
                 <button class="btn btn-gold btn-full" id="start-btn" onclick="startExam()" disabled>
-                    <span>Begin Examination</span> →
+                    <span>Begin Test</span> →
                 </button>
             </div>
         </div>
@@ -1465,8 +1465,8 @@
                     <div class="score-pct" id="result-pct">0%</div>
                 </div>
             </div>
-            <div class="results-title" id="result-title">Exam Complete</div>
-            <div class="results-subtitle" id="result-subtitle">Thank you for completing your examination.</div>
+            <div class="results-title" id="result-title">Test Complete</div>
+            <div class="results-subtitle" id="result-subtitle">Thank you for completing your Test.</div>
         </div>
 
         <div class="results-stats">
@@ -1488,7 +1488,7 @@
         <div id="review-container"></div>
 
         <div style="margin-top:28px; text-align:center;">
-            <button class="btn btn-navy" onclick="window.location.reload()">↺ Start New Exam</button>
+            <button class="btn btn-navy" onclick="window.location.reload()">↺ Start New Test</button>
         </div>
     </div>
 
@@ -1507,11 +1507,11 @@
                             <div class="cat-mode-row" id="cat-mode-row">
                                 <label class="radio-pill active" id="pill-exist">
                                     <input type="radio" name="cat-mode" value="exist" checked onchange="onCatModeChange()">
-                                    Existing Track
+                                    Existing Catrgory
                                 </label>
                                 <label class="radio-pill" id="pill-new">
                                     <input type="radio" name="cat-mode" value="new" onchange="onCatModeChange()">
-                                    New Track
+                                    New Catrgory
                                 </label>
                             </div>
                             <div class="category-box">
