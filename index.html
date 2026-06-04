@@ -1676,11 +1676,12 @@ async function loadDatabase() {
         setLoaderProgress(prog);
     }, 400);
 
-    // Use Promise.race for timeout — AbortController causes DataCloneError in sandboxed iframes
-    const fetchPromise = fetch(SCRIPT_URL);
-    const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("TIMEOUT")), 8000)
-    );
+    // EMERGENCY SAFETY NET: Unlocks your screen if the database takes more than 15 seconds
+    setTimeout(() => {
+        clearInterval(progInterval); // Stops the progress animation loop from running forever
+        showLoading(false);          // Force closes the loading screen overlay
+        console.warn("Database response took too long. Loading timeout triggered.");
+    }, 15000); // 15000ms = 15 seconds
 
     try {
         document.getElementById("loading-text").textContent = "Fetching questions…";
