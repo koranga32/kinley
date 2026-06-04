@@ -1675,6 +1675,11 @@ async function loadDatabase() {
         prog = Math.min(prog + (Math.random() * 8 + 3), 85);
         setLoaderProgress(prog);
     }, 400);
+    // Use Promise.race for timeout — AbortController causes DataCloneError in sandboxed iframes
+    const fetchPromise = fetch(SCRIPT_URL);
+    const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("TIMEOUT")), 15000)
+    );
 
     // EMERGENCY SAFETY NET: Unlocks your screen if the database takes more than 15 seconds
     setTimeout(() => {
