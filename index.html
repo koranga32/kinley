@@ -455,6 +455,10 @@
             line-height: 1.65;
             margin-bottom: 22px;
             white-space: pre-wrap;
+            user-select: none;
+            -webkit-user-select: none; /* Safari & iOS */
+            -moz-user-select: none;    /* Older Firefox */
+            -ms-user-select: none;     /* IE/Edge */
         }
 
         .q-image {
@@ -483,6 +487,9 @@
             font-size: 14px;
             color: var(--ink);
             user-select: none;
+            -webkit-user-select: none; /* Safari & iOS  to make sure user dont highlight the text*/
+            -moz-user-select: none;    /* Older Firefoxto make sure user dont highlight the text */
+            -ms-user-select: none;     /* IE/Edge to make sure user dont highlight the text*/
         }
 
         .option-item:hover {
@@ -1763,6 +1770,25 @@ function startExam() {
 
 // ─── BUILD EXAM UI ────────────────────────────────────
 function buildExam() {
+    //ADDED FOR SECURITY: Prevents right-click and copying shortcuts
+    document.addEventListener('contextmenu', function(event) {
+        event.preventDefault();
+    });
+
+    document.addEventListener('keydown', function(event) {
+        if (event.ctrlKey || event.metaKey) {
+            if (event.key === 'c' || event.key === 'C' || 
+                event.key === 'u' || event.key === 'U' || 
+                event.key === 's' || event.key === 'S') {
+                event.preventDefault();
+                alert("Copying and viewing page elements is disabled during the examination.");
+            }
+        }
+        if (event.key === 'F12') {
+            event.preventDefault();
+        }
+    });
+    // END OF SECURITY INJECTION
     const qContainer   = document.getElementById("questions-container");
     const omrContainer = document.getElementById("omr-container");
     const cat = document.getElementById("category-select").value;
