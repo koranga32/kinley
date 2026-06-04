@@ -688,6 +688,71 @@
         }
 
         .omr-status.answered { background: var(--green); }
+        /*  PASTE THE MOBILE STICKY CODE RIGHT HERE  */
+        @media (max-width: 767px) {
+        /* Pin the sidebar section block to the bottom of mobile screens */
+        .sidebar-section {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            background: #ffffff !important;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.15) !important;
+            z-index: 2000 !important; 
+            padding: 8px 12px !important;
+            border-top: 3px solid var(--navy, #1e3a8a) !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Compact the card wrappers within the mobile panel drawer */
+        .sidebar-section .info-card, 
+        .sidebar-section .sidebar-card-body {
+            margin-bottom: 0 !important;
+            padding: 2px 0 !important;
+            border: none !important;
+            background: transparent !important;
+        }
+    
+        .sidebar-section h3 {
+            font-size: 11px !important;
+            margin: 0 0 4px 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Restrict matrix box vertical height so it doesn't overlap the quiz card */
+        #omr-container {
+            max-height: 105px !important; 
+            overflow-y: auto !important;
+            padding-right: 4px !important;
+        }
+
+        /* Compress row items and padding variables for fingers/thumbs */
+        .omr-row {
+            padding: 4px 6px !important;
+            gap: 6px !important;
+        }
+    
+        .omr-q-label {
+            font-size: 11px !important;
+            width: 32px !important;
+        }
+    
+        .omr-bubbles {
+            gap: 6px !important;
+        }
+
+        .omr-bubble {
+            width: 26px !important;
+            height: 26px !important;
+            font-size: 10px !important;
+        }
+
+    /* Shifts navigation up to prevent elements overlapping underneath the sticky sheet */
+        .mobile-bottom-space {
+            margin-bottom: 165px !important; 
+        }
+    }
+        /* END OF MOBILE STICKY OMR CODE */
 
         /* ─── STATS MINI ────────────────────────────── */
         .stats-row {
