@@ -337,11 +337,17 @@
             transition: border-color 0.15s, box-shadow 0.15s;
         }
 
-        .form-control:focus {
-            border-color: var(--navy);
-            background: var(--white);
-            box-shadow: 0 0 0 3px rgba(15,27,53,0.07);
-        }
+	        .form-control:focus {
+	            border-color: var(--navy);
+	            background: var(--white);
+	            box-shadow: 0 0 0 3px rgba(15,27,53,0.07);
+	        }
+
+	        .form-control[readonly] {
+	            cursor: default;
+	            color: var(--navy);
+	            font-weight: 700;
+	        }
 
 	        textarea.form-control { resize: vertical; min-height: 90px; }
 
@@ -1566,16 +1572,16 @@
                 <input type="text" id="student-name" class="form-control" placeholder="Enter your full name" autocomplete="name">
             </div>
 
-            <div class="row-2">
-                <div class="form-group">
-                    <label>Duration (minutes)</label>
-                    <input type="number" id="timer-input" class="form-control" value="1" min="5" max="180">
-                </div>
-                <div class="form-group">
-                    <label>Test Category</label>
-                    <select id="category-select" class="form-control"></select>
-                </div>
-            </div>
+	            <div class="row-2">
+	                <div class="form-group">
+	                    <label>Time/No.Q</label>
+	                    <input type="text" id="time-question-summary" class="form-control" value="-" readonly>
+	                </div>
+	                <div class="form-group">
+	                    <label>Test Category</label>
+	                    <select id="category-select" class="form-control" onchange="updateTestSummary()"></select>
+	                </div>
+	            </div>
 
             <div style="margin-top:6px;">
                 <button class="btn btn-gold btn-full" id="start-btn" onclick="startExam()" disabled>
@@ -1741,15 +1747,25 @@
 	                    <div class="bulk-import-box">
 	                        <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Bulk Append Questions</div>
 	                        <p class="form-help">
-	                            Paste one question per line using this format:<br>
-	                            Question | Option A | Option B | Option C | Option D | Correct
+	                            Paste each question as 6 lines: Question, A, B, C, D, Answer. Leave one blank line between questions.
 	                        </p>
 	                        <form id="bulk-form" onsubmit="event.preventDefault(); saveBulkQuestions();">
 	                            <div class="form-group">
 	                                <label>Bulk Question List</label>
 	                                <textarea id="bulk-questions" class="form-control bulk-textarea" placeholder="Example:
-The Constitution of Bhutan has? | 33 Articles | 34 Articles | 35 Articles | 39 Articles | B
-Capital of Bhutan? | Thimphu | Paro | Punakha | Wangdue | A"></textarea>
+The Constitution of Bhutan has?
+A. 33 Articles
+B. 34 Articles
+C. 35 Articles
+D. 39 Articles
+Answer: C
+
+Capital of Bhutan?
+A. Thimphu
+B. Paro
+C. Punakha
+D. Wangdue
+Answer: A"></textarea>
 	                            </div>
 	                            <button type="submit" class="btn btn-navy btn-full">Append Bulk Questions</button>
 	                        </form>
@@ -1794,6 +1810,7 @@ const ADMIN_HASH = "fedc633393ccddfbd76286556b887301fbb51ec34fd86cefc6fbf91d69c6
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const DB_CACHE_KEY = "exam_pool";
+const SECONDS_PER_QUESTION = 60;
 
 // ─── STATE ───────────────────────────────────────────
 let questionPool = [];
@@ -1816,11 +1833,54 @@ let timerInterval= null;
 	    return copy;
 	}
 
-	function prepareRandomizedQuestion(question) {
+	function isTimestampOption(value) {
+	    const text = String(value || "").trim();
+	    if (!text) return false;
+	    return /^\d{1,2}\/\d{1,2}\/\d{2,4}[,\s]+\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?$/i.test(text)
+	        || /^Timestamp$/i.test(text);
+	}
+
+	function formatOptionText(value) {
+	    const text = String(value || "").trim();
+	    const isoDateOnly = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d{3})?Z$/;
+	    if (!isoDateOnly.test(text)) return text;
+
+	    const date = new Date(text);
+	    if (Number.isNaN(date.getTime())) return text;
+
+	    return new Intl.DateTimeFormat("en-GB", {
+	        timeZone: "Asia/Thimphu",
+	        day: "numeric",
+	        month: "long",
+	        year: "numeric"
+	    }).format(date);
+	}
+
+	function cleanQuestionOptions(question) {
+	    const rawOptions = Array.isArray(question.options) ? question.options : [];
 	    const answerIndex = Number.isInteger(question.answer)
 	        ? question.answer
 	        : parseInt(question.answer, 10);
-	    const optionItems = question.options.map((text, index) => ({
+	    let cleanedOptions = rawOptions
+	        .map(text => String(text || "").trim())
+	        .filter(Boolean);
+
+	    if (cleanedOptions.length > 4) {
+	        const withoutExtraTimestamps = cleanedOptions.filter(text => !isTimestampOption(text));
+	        if (withoutExtraTimestamps.length >= 4) cleanedOptions = withoutExtraTimestamps;
+	    }
+
+	    cleanedOptions = cleanedOptions.slice(0, 4).map(formatOptionText);
+
+	    return {
+	        options: cleanedOptions,
+	        answerIndex: answerIndex >= 0 && answerIndex <= 3 ? answerIndex : 0
+	    };
+	}
+
+	function prepareRandomizedQuestion(question) {
+	    const { options, answerIndex } = cleanQuestionOptions(question);
+	    const optionItems = options.map((text, index) => ({
 	        text,
 	        wasCorrect: index === answerIndex
 	    }));
@@ -1978,6 +2038,35 @@ function updateCategorySelects() {
             ? `<option>No categories available</option>`
             : categories.map(c => `<option value="${c}">${c}</option>`).join("");
     });
+    updateTestSummary();
+}
+
+function getCategoryQuestionCount(category) {
+    return questionPool.filter(q => q.category === category).length;
+}
+
+function getTestDurationSeconds(questionCount) {
+    return Math.max(questionCount * SECONDS_PER_QUESTION, SECONDS_PER_QUESTION);
+}
+
+function formatDurationLabel(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (seconds === 0) return `${minutes} min`;
+    return `${minutes} min ${seconds} sec`;
+}
+
+function updateTestSummary() {
+    const select = document.getElementById("category-select");
+    const summary = document.getElementById("time-question-summary");
+    if (!select || !summary || !categories.length) {
+        if (summary) summary.value = "-";
+        return;
+    }
+
+    const questionCount = getCategoryQuestionCount(select.value);
+    const durationSeconds = getTestDurationSeconds(questionCount);
+    summary.value = `${formatDurationLabel(durationSeconds)} / ${questionCount} Q`;
 }
 
 // ─── EXAM START ───────────────────────────────────────
@@ -1991,7 +2080,7 @@ function startExam() {
 	    activeData = shuffleArray(categoryQuestions).map(prepareRandomizedQuestion);
 
     responses  = new Array(activeData.length).fill(null);
-    timeLeft   = parseInt(document.getElementById("timer-input").value) * 60;
+    timeLeft   = getTestDurationSeconds(activeData.length);
     currentIdx = 0;
 
     document.getElementById("setup-view").style.display = "none";
@@ -2137,9 +2226,8 @@ function navigate(idx) {
     currentIdx = idx;
     document.getElementById(`q-${currentIdx}`).classList.add("active");
     document.getElementById(`omr-${currentIdx}`).classList.add("active");
-    // Scroll OMR row into view so user can see current question bubbles
-    const omrRow = document.getElementById(`omr-${currentIdx}`);
-    if (omrRow) omrRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const activeCard = document.getElementById(`q-${currentIdx}`);
+    if (activeCard) activeCard.scrollIntoView({ block: "start", behavior: "auto" });
 }
 
 function updateProgress() {
@@ -2399,42 +2487,119 @@ function handleImageUpload(input) {
 	    }
 	}
 
-	function parseBulkQuestions(rawText, category) {
-	    const lines = rawText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-	    const questions = [];
-	    const errors = [];
+	function stripQuestionPrefix(text) {
+	    return String(text || "").trim().replace(/^\d+[\).:-]\s*/, "").replace(/^Question\s*[:.-]\s*/i, "").trim();
+	}
 
-	    lines.forEach((line, index) => {
-	        const parts = line.split("|").map(part => part.trim());
-	        if (parts.length !== 6) {
-	            errors.push(`Line ${index + 1}: use Question | Option A | Option B | Option C | Option D | Correct`);
-	            return;
-	        }
+	function stripOptionPrefix(text) {
+	    return String(text || "").trim()
+	        .replace(/^Option\s*[A-D]\s*[:).-]\s*/i, "")
+	        .replace(/^[A-D]\s*[:).-]\s*/i, "")
+	        .replace(/^[1-4]\s*[:).-]\s*/i, "")
+	        .trim();
+	}
 
-	        const [question, optA, optB, optC, optD, correctRaw] = parts;
-	        const answer = parseCorrectAnswer(correctRaw);
+	function stripAnswerPrefix(text) {
+	    return String(text || "").trim()
+	        .replace(/^(Correct\s*)?Answer\s*[:.-]\s*/i, "")
+	        .replace(/^Correct\s*[:.-]\s*/i, "")
+	        .trim();
+	}
 
-	        if (!question || !optA || !optB || !optC || !optD) {
-	            errors.push(`Line ${index + 1}: question and all four options are required`);
-	            return;
-	        }
+	function buildBulkQuestion(category, question, options, correctRaw, label) {
+	    const answer = parseCorrectAnswer(stripAnswerPrefix(correctRaw));
+	    const cleanedQuestion = stripQuestionPrefix(question);
+	    const cleanedOptions = options.map(stripOptionPrefix);
 
-	        if (answer === -1) {
-	            errors.push(`Line ${index + 1}: correct answer must be A, B, C, D, or 1-4`);
-	            return;
-	        }
+	    if (!cleanedQuestion || cleanedOptions.some(option => !option)) {
+	        return { error: `${label}: question and all four options are required` };
+	    }
 
-	        questions.push({
+	    if (answer === -1) {
+	        return { error: `${label}: answer must be A, B, C, D, or 1-4` };
+	    }
+
+	    return {
+	        question: {
 	            action: "ADD",
 	            category,
-	            question,
-	            options: [optA, optB, optC, optD],
+	            question: cleanedQuestion,
+	            options: cleanedOptions,
 	            answer,
 	            imageCode: ""
-	        });
+	        }
+	    };
+	}
+
+	function parsePipeBulkQuestions(rawText, category) {
+	    const questions = [];
+	    const errors = [];
+	    const lines = rawText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+
+	    lines.forEach((line, index) => {
+	        const parts = line.split("|").map(part => part.trim()).filter(Boolean);
+	        if (parts.length < 6) {
+	            errors.push(`Line ${index + 1}: use Question | A | B | C | D | Answer`);
+	            return;
+	        }
+
+	        const result = buildBulkQuestion(
+	            category,
+	            parts[0],
+	            parts.slice(1, 5),
+	            parts.slice(5).join(" "),
+	            `Line ${index + 1}`
+	        );
+
+	        if (result.error) errors.push(result.error);
+	        else questions.push(result.question);
 	    });
 
 	    return { questions, errors };
+	}
+
+	function parseBlockBulkQuestions(rawText, category) {
+	    const questions = [];
+	    const errors = [];
+	    let blocks = rawText
+	        .split(/\n\s*\n/)
+	        .map(block => block.split(/\r?\n/).map(line => line.trim()).filter(Boolean))
+	        .filter(block => block.length);
+
+	    if (blocks.length === 1 && blocks[0].length > 6 && blocks[0].length % 6 === 0) {
+	        const allLines = blocks[0];
+	        blocks = [];
+	        for (let i = 0; i < allLines.length; i += 6) {
+	            blocks.push(allLines.slice(i, i + 6));
+	        }
+	    }
+
+	    blocks.forEach((lines, index) => {
+	        if (lines.length !== 6) {
+	            errors.push(`Question ${index + 1}: use 6 lines only - question, A, B, C, D, answer`);
+	            return;
+	        }
+
+	        const result = buildBulkQuestion(
+	            category,
+	            lines[0],
+	            lines.slice(1, 5),
+	            lines[5],
+	            `Question ${index + 1}`
+	        );
+
+	        if (result.error) errors.push(result.error);
+	        else questions.push(result.question);
+	    });
+
+	    return { questions, errors };
+	}
+
+	function parseBulkQuestions(rawText, category) {
+	    const hasPipeFormat = rawText.split(/\r?\n/).some(line => line.includes("|"));
+	    return hasPipeFormat
+	        ? parsePipeBulkQuestions(rawText, category)
+	        : parseBlockBulkQuestions(rawText, category);
 	}
 
 	async function saveBulkQuestions() {
@@ -2470,7 +2635,12 @@ function handleImageUpload(input) {
 
 	        document.getElementById("bulk-form").reset();
 	        clearDatabaseCache();
-	        await loadDatabase();
+	        questionPool = questionPool.concat(questions.map(({ action, ...question }) => question));
+	        categories = [...new Set(questionPool.map(q => q.category).filter(Boolean))];
+	        updateCategorySelects();
+	        renderAdminTable();
+	        document.getElementById("q-count").textContent = questionPool.length;
+	        showLoading(false);
 	        showToast(`${questions.length} questions appended successfully!`, "success");
 	    } catch (e) {
 	        console.error("Bulk save error:", e);
@@ -2500,30 +2670,13 @@ function renderAdminTable() {
         tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><p>No questions in the database yet.</p></div></td></tr>`;
         return;
     }
-    
-    // We open a block with curly braces to allow string splitting logic before mapping HTML
-    tbody.innerHTML = questionPool.map((q, i) => {
-        
-        // FIX: If a timestamp with 'T' exists, pull out only the date portion (YYYY-MM-DD)
-        const cleanDate = q.date && typeof q.date === 'string' && q.date.includes('T') 
-            ? q.date.split('T')[0] 
-            : (q.date || 'N/A');
-
-        return `
-            <tr>
-                <td style="color:var(--ink-muted);font-weight:700;">${i+1}</td>
-                <td>
-                    <span style="font-size:11px;font-weight:600;color:var(--gold);background:var(--gold-pale);padding:3px 8px;border-radius:4px;">
-                        ${cleanDate}
-                    </span>
-                </td>
-                <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.question || ''}">
-                    ${q.question || ''}
-                </td>
-                <td><button class="btn-danger-sm" onclick="deleteQuestion(${i})">x Delete</button></td>
-            </tr>
-    `;
-    }).join("");
+    tbody.innerHTML = questionPool.map((q, i) => `
+        <tr>
+            <td style="color:var(--ink-muted);font-weight:700;">${i+1}</td>
+            <td><span style="font-size:11px;font-weight:600;color:var(--gold);background:var(--gold-pale);padding:3px 8px;border-radius:4px;">${q.category}</span></td>
+            <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.question}">${q.question}</td>
+            <td><button class="btn-danger-sm" onclick="deleteQuestion(${i})">✕ Delete</button></td>
+        </tr>`).join("");
 }
 </script>
 </body>
