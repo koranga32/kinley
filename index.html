@@ -264,7 +264,23 @@
             cursor: pointer;
             transition: all 0.15s;
         }
-        .btn-danger-sm:hover { background: var(--red); color: white; }
+	        .btn-danger-sm:hover { background: var(--red); color: white; }
+
+	        .btn-view-sm {
+	            display: inline-flex;
+	            align-items: center;
+	            gap: 4px;
+	            padding: 5px 12px;
+	            font-size: 12px;
+	            font-weight: 700;
+	            background: rgba(15,27,53,0.06);
+	            color: var(--navy);
+	            border: 1px solid rgba(15,27,53,0.14);
+	            border-radius: 5px;
+	            cursor: pointer;
+	            transition: all 0.15s;
+	        }
+	        .btn-view-sm:hover { background: var(--navy); color: white; }
 
         .btn-full { width: 100%; justify-content: center; }
 
@@ -487,15 +503,44 @@
             -ms-user-select: none;     /* IE/Edge */
         }
 
-        .q-image {
-            max-width: 100%;
-            max-height: 280px;
-            object-fit: contain;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            margin-bottom: 20px;
-            display: block;
-        }
+	        .q-image {
+	            max-width: 100%;
+	            max-height: clamp(130px, 24vh, 220px);
+	            object-fit: contain;
+	            border-radius: 8px;
+	            border: 1px solid var(--border);
+	            margin-bottom: 12px;
+	            display: block;
+	            background: var(--cream);
+	        }
+
+	        .question-card.has-image {
+	            padding-top: 14px !important;
+	        }
+
+	        .question-card.has-image .q-meta {
+	            margin-bottom: 12px;
+	        }
+
+	        .question-card.has-image .q-text {
+	            margin-bottom: 10px !important;
+	            line-height: 1.42 !important;
+	        }
+
+	        .question-card.has-image .q-image {
+	            width: 100%;
+	            height: clamp(130px, 24vh, 220px) !important;
+	            max-height: 220px !important;
+	        }
+
+	        .question-card.has-image .options-grid {
+	            gap: 7px !important;
+	        }
+
+	        .question-card.has-image .option-item {
+	            min-height: 46px;
+	            padding: 9px 12px !important;
+	        }
 
         /* ─── OPTIONS ───────────────────────────────── */
         .options-grid { display: flex; flex-direction: column; gap: 10px; }
@@ -539,9 +584,9 @@
         }
 
         /* Compact question card — no scroll needed */
-        .question-card {
-            padding: 18px 22px 16px !important;
-        }
+	        .question-card {
+	            padding: 18px 22px 16px !important;
+	        }
         .q-text {
             font-size: 15px !important;
             margin-bottom: 14px !important;
@@ -741,6 +786,10 @@
 	            border-radius: 12px !important;
 	        }
 
+	        .question-card.has-image {
+	            padding: 10px 10px 12px !important;
+	        }
+
 	        .q-meta {
 	            gap: 8px !important;
 	        }
@@ -751,8 +800,23 @@
 	            margin-bottom: 12px !important;
 	        }
 
+	        .question-card.has-image .q-text {
+	            font-size: 15px !important;
+	            margin-bottom: 8px !important;
+	        }
+
+	        .question-card.has-image .q-image {
+	            height: clamp(105px, 20vh, 160px) !important;
+	            max-height: 160px !important;
+	            margin-bottom: 8px !important;
+	        }
+
 	        .options-grid {
 	            gap: 10px !important;
+	        }
+
+	        .question-card.has-image .options-grid {
+	            gap: 6px !important;
 	        }
 
 	        .option-item {
@@ -760,6 +824,12 @@
 	            min-height: 56px !important;
 	            font-size: 14px !important;
 	            line-height: 1.35 !important;
+	        }
+
+	        .question-card.has-image .option-item {
+	            min-height: 44px !important;
+	            padding: 8px 10px !important;
+	            font-size: 13px !important;
 	        }
 
 	        .option-alpha {
@@ -1198,8 +1268,64 @@
             overflow-y: auto;
         }
 
-        .admin-table-scroll::-webkit-scrollbar { width: 4px; }
-        .admin-table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+	        .admin-table-scroll::-webkit-scrollbar { width: 4px; }
+	        .admin-table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+	        .question-view-body {
+	            text-align: left;
+	            margin-top: 18px;
+	        }
+
+	        .question-view-category {
+	            display: inline-flex;
+	            color: var(--gold);
+	            background: var(--gold-pale);
+	            border: 1px solid rgba(201,168,76,0.28);
+	            border-radius: 5px;
+	            padding: 4px 9px;
+	            font-size: 11px;
+	            font-weight: 800;
+	            text-transform: uppercase;
+	            letter-spacing: 0.4px;
+	            margin-bottom: 12px;
+	        }
+
+	        .question-view-text {
+	            font-size: 15px;
+	            font-weight: 700;
+	            color: var(--navy);
+	            line-height: 1.45;
+	            margin-bottom: 14px;
+	        }
+
+	        .question-view-options {
+	            display: grid;
+	            gap: 8px;
+	            margin-bottom: 18px;
+	        }
+
+	        .question-view-option {
+	            display: grid;
+	            grid-template-columns: 28px 1fr;
+	            gap: 10px;
+	            align-items: start;
+	            padding: 10px 12px;
+	            border: 1px solid var(--border);
+	            border-radius: 7px;
+	            background: var(--cream);
+	            font-size: 13px;
+	            color: var(--ink);
+	        }
+
+	        .question-view-option.correct {
+	            border-color: rgba(26,127,90,0.35);
+	            background: var(--green-light);
+	        }
+
+	        .question-view-alpha {
+	            font-weight: 800;
+	            color: var(--navy);
+	        }
 
         .empty-state {
             text-align: center;
@@ -1534,10 +1660,21 @@
 
         <div class="modal-divider"></div>
         <div class="modal-security-note">🔒 SHA-256 encrypted · Secure session</div>
-    </div>
-</div>
+	    </div>
+	</div>
 
-<!-- ─── HEADER ────────────────────────────────────── -->
+	<div class="modal-backdrop" id="question-view-modal" onclick="handleQuestionViewBackdropClick(event)">
+	    <div class="modal-box">
+	        <div class="modal-title">Question Details</div>
+	        <div class="modal-subtitle">Review the selected question and answer options.</div>
+	        <div class="question-view-body" id="question-view-body"></div>
+	        <div class="modal-btn-row" style="grid-template-columns:1fr;margin-top:18px;">
+	            <button class="btn-modal-auth" onclick="closeQuestionView()">Close</button>
+	        </div>
+	    </div>
+	</div>
+
+	<!-- ─── HEADER ────────────────────────────────────── -->
 <header>
     <div class="header-brand">
         <div class="brand-icon">🎓</div>
@@ -1810,7 +1947,7 @@ const ADMIN_HASH = "fedc633393ccddfbd76286556b887301fbb51ec34fd86cefc6fbf91d69c6
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const DB_CACHE_KEY = "exam_pool";
-const SECONDS_PER_QUESTION = 60;
+const SECONDS_PER_QUESTION = 30;
 
 // ─── STATE ───────────────────────────────────────────
 let questionPool = [];
@@ -2158,7 +2295,7 @@ function buildExam() {
 
         // 2. YOUR REPLACED RETURN TEMPLATE STRING
         return `
-            <div class="question-card ${i===0?'active':''}" id="q-${i}">
+	            <div class="question-card ${i===0?'active':''} ${q.imageCode?'has-image':''}" id="q-${i}">
                 <div class="q-meta">
                     <span class="q-pill">Question ${i+1} / ${activeData.length}</span>
                     <span class="q-category-tag">${cat}</span>
@@ -2650,34 +2787,63 @@ function handleImageUpload(input) {
 	}
 
 	async function deleteQuestion(idx) {
-    if (!confirm("Permanently delete this question from the database?")) return;
-    showLoading(true, "Deleting question…");
-    try {
-        await fetch(SCRIPT_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ action:"DELETE", index:idx }) });
+	    if (!confirm("Permanently delete this question from the database?")) return;
+	    showLoading(true, "Deleting question…");
+	    try {
+	        await fetch(SCRIPT_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ action:"DELETE", index:idx }) });
         clearDatabaseCache();
         await loadDatabase();
         showToast("Question deleted.", "info");
     } catch (e) {
         showToast("Failed to delete question.", "error");
-        showLoading(false);
-    }
-}
+	        showLoading(false);
+	    }
+	}
 
-function renderAdminTable() {
-    const tbody = document.getElementById("admin-tbody");
-    if (!tbody) return;
+	function viewQuestion(idx) {
+	    const q = questionPool[idx];
+	    if (!q) return;
+
+	    const options = Array.isArray(q.options) ? q.options : [];
+	    const answerIndex = Number.isInteger(q.answer) ? q.answer : parseInt(q.answer, 10);
+	    const optionsHtml = options.slice(0, 4).map((option, oi) => `
+	        <div class="question-view-option ${oi === answerIndex ? 'correct' : ''}">
+	            <span class="question-view-alpha">${ALPHA[oi] || oi + 1}</span>
+	            <span>${formatOptionText(option)}${oi === answerIndex ? ' ✓' : ''}</span>
+	        </div>
+	    `).join("");
+
+	    document.getElementById("question-view-body").innerHTML = `
+	        <div class="question-view-category">${q.category || "Uncategorized"}</div>
+	        <div class="question-view-text">${q.question || ""}</div>
+	        <div class="question-view-options">${optionsHtml || '<div class="empty-state"><p>No options found.</p></div>'}</div>
+	    `;
+	    document.getElementById("question-view-modal").classList.add("open");
+	}
+
+	function closeQuestionView() {
+	    document.getElementById("question-view-modal").classList.remove("open");
+	}
+
+	function handleQuestionViewBackdropClick(e) {
+	    if (e.target === document.getElementById("question-view-modal")) closeQuestionView();
+	}
+
+	function renderAdminTable() {
+	    const tbody = document.getElementById("admin-tbody");
+	    if (!tbody) return;
     if (questionPool.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><p>No questions in the database yet.</p></div></td></tr>`;
         return;
     }
     tbody.innerHTML = questionPool.map((q, i) => `
-        <tr>
-            <td style="color:var(--ink-muted);font-weight:700;">${i+1}</td>
-            <td><span style="font-size:11px;font-weight:600;color:var(--gold);background:var(--gold-pale);padding:3px 8px;border-radius:4px;">${q.category}</span></td>
-            <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.question}">${q.question}</td>
-            <td><button class="btn-danger-sm" onclick="deleteQuestion(${i})">✕ Delete</button></td>
-        </tr>`).join("");
-}
+	        <tr>
+	            <td style="color:var(--ink-muted);font-weight:700;">${i+1}</td>
+	            <td><span style="font-size:11px;font-weight:600;color:var(--gold);background:var(--gold-pale);padding:3px 8px;border-radius:4px;">${q.category}</span></td>
+	            <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.question}">${q.question}</td>
+	            <td><button class="btn-view-sm" onclick="viewQuestion(${i})">View</button></td>
+	        </tr>`).join("");
+	}
 </script>
 </body>
 </html>
