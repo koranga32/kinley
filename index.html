@@ -517,6 +517,25 @@
 	            margin: 0 0 12px;
 	            display: block;
 	        }
+			.audio-autoplay-badge .audio-pulse {
+			    width: 8px;
+			    height: 8px;
+			    background: var(--gold);
+			    border-radius: 50%;
+			    animation: audioPulse 0.9s ease-in-out infinite;
+			}
+			@keyframes audioPulse {
+			    0%, 100% { opacity: 1; transform: scale(1); }
+			    50%       { opacity: 0.4; transform: scale(0.6); }
+			}
+			.audio-autoplay-badge.done {
+			    background: var(--green);
+			    color: #fff;
+			}
+			.audio-autoplay-badge.done .audio-pulse {
+			    animation: none;
+			    background: #fff;
+			}
 
 	        .question-card.has-image {
 	            padding-top: 14px !important;
@@ -2457,7 +2476,13 @@ function buildExam() {
     // Questions: options are READ-ONLY display (no onclick). Answer only via OMR.
     qContainer.innerHTML = activeData.map((q, i) => {
         const imgHtml = q.imageCode ? `<img src="${q.imageCode}" class="q-image" alt="Question image">` : "";
-        const audioHtml = q.audioCode ? `<audio src="${q.audioCode}" class="q-audio" controls></audio>` : "";
+        const audioHtml = q.audioCode
+	    ? `<div class="audio-autoplay-badge" id="audio-badge-${i}">
+	           <span class="audio-pulse"></span>
+	           <span id="audio-badge-text-${i}">🔊 Auto-playing — 30s</span>
+	       </div>
+	       <audio src="${q.audioCode}" class="q-audio" controls id="audio-el-${i}"></audio>`
+	    : "";
         const opts = q.options.map((o, oi) => `
             <div class="option-item option-readonly" id="opt-${i}-${oi}">
                 <span class="option-alpha">${ALPHA[oi]}</span>
@@ -2524,6 +2549,8 @@ function buildExam() {
         </div>`).join("");
 
     updateProgress();
+    // Auto-play audio for the very first question if it has one
+    setTimeout(() => playQuestionAudio(0), 300);
 }  // ← closes buildExam()
 
 // Called ONLY from OMR bubbles — selects answer + auto-advances
@@ -2557,6 +2584,67 @@ function navigate(idx) {
     document.getElementById(`omr-${currentIdx}`).classList.add("active");
     const activeCard = document.getElementById(`q-${currentIdx}`);
     if (activeCard) activeCard.scrollIntoView({ block: "start", behavior: "auto" });
+}
+// ── AUDIO AUTO-PLAY ──────────────────────────────────
+let _audioTimer = null;
+
+function playQuestionAudio(idx) {
+    // Stop any previously playing audio
+    if (_audioTimer) { clearTimeout(_audioTimer); _audioTimer = null; }
+    document.querySelectorAll('.q-audio').forEach(a => { a.pause(); a.currentTime = 0; });
+
+    const audio     = document.getElementById(`audio-el-${idx}`);
+    const badge     = document.getElementById(`audio-badge-${idx}`);
+    const badgeText = document.getElementById(`audio-badge-text-${idx}`);
+    if (!audio) return; // this question has no audio
+
+    // Reset badge to playing state
+    if (badge) badge.classList.remove('done');
+    if (badgeText) badgeText.textContent = '🔊 Auto-playing — 30s';
+
+    // Live countdown in the badge
+    let remaining = 30;
+    const countInterval = setInterval(() => {
+        remaining--;
+        if (badgeText && remaining > 0) {
+            badgeText.textContent = `🔊 Auto-playing — ${remaining}s`;
+        } else {
+            clearInterval(countInterval);
+        }
+    }, 1000);
+
+    audio.currentTime = 0;
+    audio.play().catch(() => {}); // silently handles browser autoplay policy
+
+    // Stop after 30 seconds
+    _audioTimer = setTimeout(() => {
+        clearInterval(countInterval);
+        audio.pause();
+        if (badge)     badge.classList.add('done');
+        if (badgeText) badgeText.textContent = '✓ Audio complete — use controls to replay';
+        _audioTimer = null;
+    }, 30000);
+
+    // Also mark done if audio ends naturally before 30s
+    audio.onended = () => {
+        clearInterval(countInterval);
+        if (_audioTimer) { clearTimeout(_audioTimer); _audioTimer = null; }
+        if (badge)     badge.classList.add('done');
+        if (badgeText) badgeText.textContent = '✓ Audio complete — use controls to replay';
+    };
+}
+
+function navigate(idx) {
+    if (idx < 0 || idx >= activeData.length) return;
+    document.getElementById(`q-${currentIdx}`).classList.remove("active");
+    document.getElementById(`omr-${currentIdx}`).classList.remove("active");
+    currentIdx = idx;
+    document.getElementById(`q-${currentIdx}`).classList.add("active");
+    document.getElementById(`omr-${currentIdx}`).classList.add("active");
+    const activeCard = document.getElementById(`q-${currentIdx}`);
+    if (activeCard) activeCard.scrollIntoView({ block: "start", behavior: "auto" });
+	// Auto-play audio if this question has one
+    playQuestionAudio(currentIdx);
 }
 
 function updateProgress() {
