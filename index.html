@@ -1616,7 +1616,7 @@
 <body>
 
 <!-- ─── LOADING OVERLAY ────────────────────────────── -->
-<div id="loading-overlay" class="loading-overlay">
+<div id="loading-overlay" class="loading-overlay hidden">
     <div class="loader-emblem">
         <div class="loader-ring"></div>
         <div class="loader-dot"></div>
@@ -1635,7 +1635,7 @@
     <div class="modal-box" id="modal-box">
         <div class="modal-icon">🔐</div>
         <div class="modal-title">Admin Security Gateway</div>
-        <div class="modal-subtitle">Enter your password.</div>
+        <div class="modal-subtitle">Enter the Supabase password for koranga6265@gmail.com.</div>
 
         <div class="pw-input-wrap">
             <input
@@ -1659,7 +1659,7 @@
         </div>
 
         <div class="modal-divider"></div>
-        <div class="modal-security-note">🔒 SHA-256 encrypted · Secure session</div>
+        <div class="modal-security-note">🔒 Protected by Supabase Authentication</div>
 	    </div>
 	</div>
 
@@ -1706,23 +1706,23 @@
 
             <div class="form-group">
                 <label>Full Name</label>
-                <input type="text" id="student-name" class="form-control" placeholder="Enter your full name" autocomplete="name">
+                <input type="text" id="student-name" class="form-control" placeholder="Enter your full name" autocomplete="name" onkeydown="if(event.key==='Enter') startExam()">
             </div>
 
-	            <div class="row-2">
-	                <div class="form-group">
-	                    <label>Time/No.Q</label>
-	                    <input type="text" id="time-question-summary" class="form-control" value="-" readonly>
-	                </div>
+	            <div class="row-2" id="setup-options" style="display:none;">
 	                <div class="form-group">
 	                    <label>Test Category</label>
 	                    <select id="category-select" class="form-control" onchange="updateTestSummary()"></select>
 	                </div>
+	                <div class="form-group">
+	                    <label>Time/No.Q</label>
+	                    <input type="text" id="time-question-summary" class="form-control" value="-" readonly>
+	                </div>
 	            </div>
 
             <div style="margin-top:6px;">
-                <button class="btn btn-gold btn-full" id="start-btn" onclick="startExam()" disabled>
-                    <span>Begin Test</span> →
+                <button class="btn btn-gold btn-full" id="start-btn" onclick="startExam()">
+                    <span>Continue</span> →
                 </button>
             </div>
         </div>
@@ -1799,7 +1799,7 @@
         <div id="review-container"></div>
 
         <div style="margin-top:28px; text-align:center;">
-            <button class="btn btn-navy" onclick="window.location.reload()">↺Start New Test</button>
+            <button class="btn btn-navy" onclick="retakeExam()">↺Start New Test</button>
         </div>
     </div>
 
@@ -1942,11 +1942,12 @@ Answer: A"></textarea>
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWO_UoyP702VR9aBAzEAzEILeS2XmscI_mTZDEhd2I7C-uaIuVSdnT28uK8MjolJy2/exec";
-const ADMIN_HASH = "fedc633393ccddfbd76286556b887301fbb51ec34fd86cefc6fbf91d69c64a79"; // kin@123!
+const SUPABASE_URL = "https://nwkfuluvgbsmyzomlpvw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_I9WL1ChnlPJp2V_MSM4R5Q_RXQ48iBR";
+const ADMIN_EMAIL = "koranga6265@gmail.com";
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
-const DB_CACHE_KEY = "exam_pool";
+const DB_CACHE_KEY = "supabase_exam_pool_v1";
 const SECONDS_PER_QUESTION = 30;
 
 // ─── STATE ───────────────────────────────────────────
@@ -1957,9 +1958,17 @@ let responses    = [];
 let currentIdx   = 0;
 let timeLeft     = 0;
 let timerInterval= null;
+let databaseReady = false;
+let databaseLoading = false;
+let adminAccessToken = sessionStorage.getItem("exam_admin_token") || "";
 
 	// ─── INIT ────────────────────────────────────────────
-	window.onload = loadDatabase;
+	window.onload = initializeApp;
+
+	function initializeApp() {
+	    showLoading(false);
+	    document.getElementById("student-name").focus();
+	}
 
 	function shuffleArray(items) {
 	    const copy = [...items];
@@ -2080,22 +2089,89 @@ function clearDatabaseCache() {
     try { localStorage.removeItem(DB_CACHE_KEY); } catch (e) {}
 }
 
+function supabaseHeaders(useAdmin = false, extra = {}) {
+    return {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${useAdmin && adminAccessToken ? adminAccessToken : SUPABASE_KEY}`,
+        ...extra
+    };
+}
+
+async function supabaseRequest(path, { method = "GET", body, useAdmin = false, prefer = "" } = {}) {
+    const headers = supabaseHeaders(useAdmin, body ? { "Content-Type": "application/json" } : {});
+    if (prefer) headers.Prefer = prefer;
+
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined
+    });
+
+    if (!response.ok) {
+        let detail = `Supabase request failed (${response.status})`;
+        try {
+            const error = await response.json();
+            detail = error.message || error.details || detail;
+        } catch (e) {}
+        throw new Error(detail);
+    }
+
+    if (response.status === 204) return null;
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+}
+
+function mapExamRows(rows) {
+    return (rows || []).map(row => ({
+        id: row.id,
+        category: row.category,
+        question: row.question,
+        options: [row.optionA, row.optionB, row.optionC, row.optionD],
+        answer: parseCorrectAnswer(row.answer),
+        imageCode: row.image || ""
+    }));
+}
+
+async function fetchQuestions() {
+    const fields = "id,category,question,optionA,optionB,optionC,optionD,answer,image";
+    const rows = await supabaseRequest(`Exam?select=${fields}&order=id.asc`);
+    return mapExamRows(rows);
+}
+
+function toSupabaseQuestion(question) {
+    return {
+        category: question.category,
+        question: question.question,
+        optionA: question.options[0],
+        optionB: question.options[1],
+        optionC: question.options[2],
+        optionD: question.options[3],
+        answer: ALPHA[question.answer] || "A",
+        image: question.imageCode || ""
+    };
+}
+
 async function loadDatabase() {
+    if (databaseReady) return true;
+    if (databaseLoading) return false;
+    databaseLoading = true;
+
     // ── Cache-first: render instantly if we have data ──
     const cached = sessionStorage.getItem(DB_CACHE_KEY) || localStorage.getItem(DB_CACHE_KEY);
     if (cached) {
         try {
             processData(JSON.parse(cached));
+            databaseReady = true;
+            databaseLoading = false;
             showLoading(false);
             // Refresh in background silently (no spinner)
-            fetch(SCRIPT_URL)
-                .then(r => r.json())
+            fetchQuestions()
                 .then(data => {
                     saveDatabaseCache(data);
                     processData(data);
                 })
                 .catch(() => {}); // silent background refresh failure is OK
-            return;
+            return true;
         } catch(e) {
             clearDatabaseCache();
         }
@@ -2112,7 +2188,7 @@ async function loadDatabase() {
         setLoaderProgress(prog);
     }, 400);
     // Use Promise.race for timeout — AbortController causes DataCloneError in sandboxed iframes
-    const fetchPromise = fetch(SCRIPT_URL);
+    const fetchPromise = fetchQuestions();
     let timeoutId;
     const timeoutPromise = new Promise((_, reject) =>
         timeoutId = setTimeout(() => reject(new Error("TIMEOUT")), DB_TIMEOUT_MS)
@@ -2120,18 +2196,20 @@ async function loadDatabase() {
 
     try {
         document.getElementById("loading-text").textContent = "Fetching questions…";
-        const res = await Promise.race([fetchPromise, timeoutPromise]);
+        const data = await Promise.race([fetchPromise, timeoutPromise]);
         clearTimeout(timeoutId);
         clearInterval(progInterval);
         setLoaderProgress(95);
 
-        const data = await res.json();
         saveDatabaseCache(data);
         processData(data);
+        databaseReady = true;
 
         document.getElementById("loading-text").textContent = "Ready!";
         setLoaderProgress(100);
         setTimeout(() => showLoading(false), 300);
+        databaseLoading = false;
+        return true;
 
     } catch (e) {
         clearTimeout(timeoutId);
@@ -2141,9 +2219,11 @@ async function loadDatabase() {
             const fallback = localStorage.getItem(DB_CACHE_KEY);
             if (fallback) {
                 processData(JSON.parse(fallback));
+                databaseReady = true;
+                databaseLoading = false;
                 showToast("Using saved questions. Internet is slow.", "info");
                 showLoading(false);
-                return;
+                return true;
             }
             showToast("Database is taking too long. Please try again.", "error");
             document.getElementById("loading-text").textContent = "Database is taking too long.";
@@ -2152,7 +2232,9 @@ async function loadDatabase() {
             document.getElementById("loading-text").textContent = "Failed to connect.";
         }
         console.error(e);
+        databaseLoading = false;
         setTimeout(() => showLoading(false), 1500);
+        return false;
     }
 }
 
@@ -2207,9 +2289,25 @@ function updateTestSummary() {
 }
 
 // ─── EXAM START ───────────────────────────────────────
-function startExam() {
+async function startExam() {
     const name = document.getElementById("student-name").value.trim();
     if (!name) { showToast("Please enter your full name.", "error"); return; }
+
+    if (!databaseReady) {
+        const btn = document.getElementById("start-btn");
+        btn.disabled = true;
+        const loaded = await loadDatabase();
+        if (!loaded || !categories.length) {
+            btn.disabled = false;
+            btn.innerHTML = "<span>Try Again</span> →";
+            return;
+        }
+        document.getElementById("setup-options").style.display = "grid";
+        btn.innerHTML = "<span>Begin Examination</span> →";
+        btn.disabled = false;
+        document.getElementById("category-select").focus();
+        return;
+    }
 
 	    const cat = document.getElementById("category-select").value;
 	    const categoryQuestions = questionPool.filter(q => q.category === cat);
@@ -2228,6 +2326,28 @@ function startExam() {
     document.getElementById("stat-total").textContent = activeData.length;
     buildExam();
     startTimer();
+}
+
+function retakeExam() {
+    clearInterval(timerInterval);
+    activeData = [];
+    responses = [];
+    currentIdx = 0;
+    timeLeft = 0;
+
+    document.getElementById("results-view").classList.remove("show");
+    document.getElementById("exam-view").classList.remove("show");
+    document.getElementById("exam-view").style.display = "";
+    document.getElementById("setup-view").style.display = "block";
+    document.getElementById("admin-btn").style.display = "block";
+    document.getElementById("timer-badge").classList.remove("show", "urgent");
+    document.getElementById("timer-display").textContent = "--:--";
+    document.getElementById("progress-fill").style.width = "0%";
+    document.getElementById("score-ring-fill").style.strokeDashoffset = 345;
+    document.getElementById("start-btn").innerHTML = "<span>Begin Examination</span> →";
+    document.getElementById("start-btn").disabled = categories.length === 0;
+    updateTestSummary();
+    window.scrollTo({ top: 0, behavior: "auto" });
 }
 // ─── MOBILE OMR BUBBLE HANDLER ───────────────────────
 function selectMobileBubble(questionIndex, optionIndex, element) {
@@ -2411,19 +2531,18 @@ async function submitExam() {
     const total = activeData.length;
     const pct   = Math.round((correct/total)*100);
 
-    // Submit to backend
+    // Submit to Supabase
     try {
-        await fetch(SCRIPT_URL, {
-            method: "POST", mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                action: "SUBMIT_RESPONSE",
-                studentName: document.getElementById("student-name").value.trim(),
-                category: document.getElementById("category-select").value,
-                score: `${correct}/${total}`,
-                timestamp: new Date().toLocaleString(),
-                breakdown: JSON.stringify(breakdown)
-            })
+        await supabaseRequest("Response", {
+            method: "POST",
+            prefer: "return=minimal",
+            body: {
+                time_stamp: new Date().toISOString(),
+                student_name: document.getElementById("student-name").value.trim(),
+                category_track: document.getElementById("category-select").value,
+                final_score: `${correct}/${total}`,
+                detailed_breakdown: breakdown
+            }
         });
     } catch (e) { console.error("Submit error:", e); }
 
@@ -2482,11 +2601,6 @@ async function submitExam() {
 }
 
 // ─── ADMIN ────────────────────────────────────────────
-async function sha256(text) {
-    const buf  = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-}
-
 function openAdminPortal() {
     // Show the styled modal instead of browser prompt
     const modal = document.getElementById("admin-modal");
@@ -2536,18 +2650,34 @@ async function authenticateAdmin() {
         input.focus();
         return;
     }
-    const hash = await sha256(pw);
-    if (hash !== ADMIN_HASH) {
+    let authData;
+    try {
+        const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+            method: "POST",
+            headers: {
+                apikey: SUPABASE_KEY,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ email: ADMIN_EMAIL, password: pw })
+        });
+        authData = await response.json();
+        if (!response.ok || !authData.access_token) {
+            throw new Error(authData.error_description || authData.msg || "Authentication failed");
+        }
+    } catch (e) {
         input.value = "";
         input.classList.remove("error-shake");
         void input.offsetWidth;
         input.classList.add("error-shake");
-        errMsg.textContent = "⚠ Incorrect password. Please try again.";
+        errMsg.textContent = "⚠ Supabase sign-in failed. Check the admin password.";
         errMsg.classList.add("visible");
         input.focus();
         return;
     }
+    adminAccessToken = authData.access_token;
+    sessionStorage.setItem("exam_admin_token", adminAccessToken);
     // Authenticated
+    if (!databaseReady) await loadDatabase();
     closeAdminModal();
     document.getElementById("setup-view").style.display = "none";
     document.getElementById("admin-view").style.display = "block";
@@ -2561,6 +2691,7 @@ async function authenticateAdmin() {
 function closeAdminPortal() {
     document.getElementById("admin-view").style.display  = "none";
     document.getElementById("setup-view").style.display  = "block";
+    document.getElementById("setup-options").style.display = databaseReady ? "grid" : "none";
     document.getElementById("admin-btn").style.display   = "block";
     document.getElementById("admin-back-btn").style.display = "none";
 }
@@ -2602,7 +2733,6 @@ function handleImageUpload(input) {
 
 	    showLoading(true, "Saving question to database…");
 	    const payload = {
-	        action: "ADD",
 	        category: cat,
 	        question,
 	        options,
@@ -2611,14 +2741,21 @@ function handleImageUpload(input) {
 	    };
 
     try {
-        await fetch(SCRIPT_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
+        await supabaseRequest("Exam", {
+            method: "POST",
+            body: toSupabaseQuestion(payload),
+            useAdmin: true,
+            prefer: "return=minimal"
+        });
         document.getElementById("admin-form").reset();
         document.getElementById("adm-img-preview").style.display = "none";
         document.getElementById("adm-img-b64").value = "";
         clearDatabaseCache();
+        databaseReady = false;
         await loadDatabase();
         showToast("Question saved successfully!", "success");
     } catch (e) {
+        console.error("Save question error:", e);
         showToast("Failed to save question.", "error");
 	        showLoading(false);
 	    }
@@ -2658,7 +2795,6 @@ function handleImageUpload(input) {
 
 	    return {
 	        question: {
-	            action: "ADD",
 	            category,
 	            question: cleanedQuestion,
 	            options: cleanedOptions,
@@ -2758,21 +2894,18 @@ function handleImageUpload(input) {
 	        showToast("No valid questions found.", "error"); return;
 	    }
 
-	    showLoading(true, `Saving 1 of ${questions.length} questions…`);
+	    showLoading(true, `Saving ${questions.length} questions…`);
 	    try {
-	        for (let i = 0; i < questions.length; i++) {
-	            document.getElementById("loading-text").textContent = `Saving ${i + 1} of ${questions.length} questions…`;
-	            await fetch(SCRIPT_URL, {
-	                method: "POST",
-	                mode: "no-cors",
-	                headers: {"Content-Type":"application/json"},
-	                body: JSON.stringify(questions[i])
-	            });
-	        }
+	        const savedRows = await supabaseRequest("Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer,image", {
+	            method: "POST",
+	            body: questions.map(toSupabaseQuestion),
+	            useAdmin: true,
+	            prefer: "return=representation"
+	        });
 
 	        document.getElementById("bulk-form").reset();
 	        clearDatabaseCache();
-	        questionPool = questionPool.concat(questions.map(({ action, ...question }) => question));
+	        questionPool = questionPool.concat(mapExamRows(savedRows));
 	        categories = [...new Set(questionPool.map(q => q.category).filter(Boolean))];
 	        updateCategorySelects();
 	        renderAdminTable();
@@ -2788,13 +2921,24 @@ function handleImageUpload(input) {
 
 	async function deleteQuestion(idx) {
 	    if (!confirm("Permanently delete this question from the database?")) return;
+	    const question = questionPool[idx];
+	    if (!question || question.id === undefined || question.id === null) {
+	        showToast("Question ID is missing. Refresh and try again.", "error");
+	        return;
+	    }
 	    showLoading(true, "Deleting question…");
 	    try {
-	        await fetch(SCRIPT_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ action:"DELETE", index:idx }) });
+	        await supabaseRequest(`Exam?id=eq.${encodeURIComponent(question.id)}`, {
+	            method: "DELETE",
+	            useAdmin: true,
+	            prefer: "return=minimal"
+	        });
         clearDatabaseCache();
+        databaseReady = false;
         await loadDatabase();
         showToast("Question deleted.", "info");
     } catch (e) {
+        console.error("Delete question error:", e);
         showToast("Failed to delete question.", "error");
 	        showLoading(false);
 	    }
