@@ -2569,6 +2569,9 @@ function omrSelect(qi, oi) {
 	        el.classList.toggle("filled", parseInt(el.dataset.opt, 10) === oi);
 	    });
 	    updateProgress();
+	// Stop current audio immediately when answer is selected
+    if (_audioTimer) { clearTimeout(_audioTimer); _audioTimer = null; }
+    document.querySelectorAll('.q-audio').forEach(a => { a.pause(); a.currentTime = 0; });
     // Auto-advance to next question (with slight delay so user sees the fill)
     setTimeout(() => {
         if (qi < activeData.length - 1) navigate(qi + 1);
