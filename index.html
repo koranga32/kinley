@@ -375,13 +375,11 @@
 	        }
 
 	        .bulk-import-box {
-	            margin-top: 24px;
-	            padding-top: 22px;
-	            border-top: 1px solid var(--border);
+	            padding-top: 2px;
 	        }
 
 	        textarea.bulk-textarea {
-	            min-height: 170px;
+	            min-height: 260px;
 	            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 	            font-size: 12px;
 	            line-height: 1.5;
@@ -512,6 +510,12 @@
 	            margin-bottom: 12px;
 	            display: block;
 	            background: var(--cream);
+	        }
+
+	        .q-audio {
+	            width: 100%;
+	            margin: 0 0 12px;
+	            display: block;
 	        }
 
 	        .question-card.has-image {
@@ -1161,17 +1165,27 @@
         .review-verdict.skipped { background: #f3f4f6; color: var(--ink-muted); }
 
         /* ─── ADMIN PANEL ───────────────────────────── */
-        .admin-wrap { padding: 0 16px 60px; }
+        .admin-wrap { padding: 0 32px 60px; }
 
         .admin-grid {
             display: grid;
-            grid-template-columns: 1fr 1.4fr;
+            grid-template-columns: minmax(360px, 0.8fr) minmax(560px, 1.35fr);
             gap: 24px;
-            max-width: 1000px;
+            max-width: 1500px;
             margin: 0 auto;
         }
 
-        @media (max-width: 780px) { .admin-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 980px) {
+            .admin-wrap { padding: 0 16px 60px; }
+            .admin-grid { grid-template-columns: 1fr; }
+        }
+
+        .admin-side-stack {
+            display: grid;
+            gap: 18px;
+            margin: 24px 0 0;
+            animation: fadeUp 0.3s ease 0.05s both;
+        }
 
         .panel-title {
             font-family: 'DM Serif Display', serif;
@@ -1236,7 +1250,12 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
+            table-layout: fixed;
         }
+
+        .admin-col-num { width: 56px; }
+        .admin-col-category { width: 180px; }
+        .admin-col-action { width: 96px; }
 
         .admin-table thead th {
             background: var(--navy);
@@ -1261,6 +1280,12 @@
             padding: 11px 14px;
             color: var(--ink);
             vertical-align: middle;
+        }
+
+        .admin-question-cell {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .admin-table-scroll {
@@ -1688,6 +1713,7 @@
             <span class="timer-icon">⏱</span>
             <span id="timer-display">--:--</span>
         </div>
+        <button class="btn btn-ghost" id="pay-play-btn" style="display:none;" onclick="showPayPlayComingSoon()">Pay & Play</button>
         <button class="btn btn-ghost" id="admin-btn" onclick="openAdminPortal()">⚙ Admin</button>
         <button class="btn btn-ghost" id="admin-back-btn" style="display:none;" onclick="closeAdminPortal()">← Back</button>
     </div>
@@ -1706,7 +1732,7 @@
 
             <div class="form-group">
                 <label>Full Name</label>
-                <input type="text" id="student-name" class="form-control" placeholder="Enter your full name" autocomplete="name" onkeydown="if(event.key==='Enter') startExam()">
+                <input type="text" id="student-name" class="form-control" placeholder="Enter your full name" autocomplete="name" oninput="updatePayPlayVisibility()" onkeydown="if(event.key==='Enter') startExam()">
             </div>
 
 	            <div class="row-2" id="setup-options" style="display:none;">
@@ -1810,7 +1836,7 @@
 
                 <!-- Add Question Form -->
                 <div class="panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
-                    <div class="panel-title">Add Question</div>
+                    <div class="panel-title" id="admin-form-title">Add Question</div>
 
                     <form id="admin-form" onsubmit="event.preventDefault(); saveQuestion();">
                         <div class="form-group">
@@ -1849,6 +1875,13 @@
                             <img id="adm-img-preview" class="img-preview" alt="Preview">
                         </div>
 
+                        <div class="form-group">
+                            <label>Music / Audio Question (Optional)</label>
+                            <input type="file" id="adm-audio-file" accept="audio/*" class="form-control" style="padding:8px;" onchange="handleAudioUpload(this)">
+                            <input type="hidden" id="adm-audio-b64">
+                            <audio id="adm-audio-preview" class="q-audio" controls style="display:none;"></audio>
+                        </div>
+
                         <div class="row-2">
                             <div class="form-group">
                                 <label>Option A</label>
@@ -1878,23 +1911,65 @@
                             </select>
                         </div>
 
-	                        <button type="submit" class="btn btn-green btn-full">+ Save to Database</button>
+	                        <button type="submit" class="btn btn-green btn-full" id="admin-submit-btn">+ Save to Database</button>
+	                        <button type="button" class="btn btn-outline btn-full" id="cancel-edit-btn" style="display:none;margin-top:10px;" onclick="cancelQuestionEdit()">Cancel Edit</button>
 	                    </form>
+	                </div>
 
-	                    <div class="bulk-import-box">
-	                        <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Bulk Append Questions</div>
-	                        <p class="form-help">
-	                            Paste each question as 6 lines: Question, A, B, C, D, Answer. Leave one blank line between questions.
-	                        </p>
-	                        <form id="bulk-form" onsubmit="event.preventDefault(); saveBulkQuestions();">
-	                            <div class="form-group">
-	                                <label>Bulk Question List</label>
-	                                <textarea id="bulk-questions" class="form-control bulk-textarea" placeholder="Example:
-The Constitution of Bhutan has?
-A. 33 Articles
-B. 34 Articles
-C. 35 Articles
-D. 39 Articles
+                <!-- Question Registry Table -->
+                <div class="admin-side-stack">
+                    <div class="panel" style="margin:0;">
+                        <div class="panel-title">
+                            Question Registry
+                            <span class="badge-count" id="q-count">0</span>
+                        </div>
+
+                        <div class="admin-table-wrap">
+                            <table class="admin-table">
+                                <colgroup>
+                                    <col class="admin-col-num">
+                                    <col class="admin-col-category">
+                                    <col>
+                                    <col class="admin-col-action">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Category</th>
+                                        <th>Question</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                            </table>
+                            <div class="admin-table-scroll">
+                                <table class="admin-table">
+                                    <colgroup>
+                                        <col class="admin-col-num">
+                                        <col class="admin-col-category">
+                                        <col>
+                                        <col class="admin-col-action">
+                                    </colgroup>
+                                    <tbody id="admin-tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel bulk-import-box" style="margin:0;">
+                        <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Bulk Append Questions</div>
+                        <p class="form-help">
+                            Paste each question as up to 15 lines: question text can use multiple lines, followed by A, B, C, D, and Answer. Leave one blank line between questions.
+                        </p>
+                        <form id="bulk-form" onsubmit="event.preventDefault(); saveBulkQuestions();">
+                            <div class="form-group">
+                                <label>Bulk Question List</label>
+                                <textarea id="bulk-questions" class="form-control bulk-textarea" placeholder="Example:
+This is a long question.
+You can continue the question on another line.
+A. First option
+B. Second option
+C. Third option
+D. Fourth option
 Answer: C
 
 Capital of Bhutan?
@@ -1903,35 +1978,9 @@ B. Paro
 C. Punakha
 D. Wangdue
 Answer: A"></textarea>
-	                            </div>
-	                            <button type="submit" class="btn btn-navy btn-full">Append Bulk Questions</button>
-	                        </form>
-	                    </div>
-	                </div>
-
-                <!-- Question Registry Table -->
-                <div class="panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease 0.05s both;">
-                    <div class="panel-title">
-                        Question Registry
-                        <span class="badge-count" id="q-count">0</span>
-                    </div>
-
-                    <div class="admin-table-wrap">
-                        <table class="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Category</th>
-                                    <th>Question</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                        </table>
-                        <div class="admin-table-scroll">
-                            <table class="admin-table">
-                                <tbody id="admin-tbody"></tbody>
-                            </table>
-                        </div>
+                            </div>
+                            <button type="submit" class="btn btn-navy btn-full">Append Bulk Questions</button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -1961,12 +2010,18 @@ let timerInterval= null;
 let databaseReady = false;
 let databaseLoading = false;
 let adminAccessToken = sessionStorage.getItem("exam_admin_token") || "";
+let editingQuestionIndex = null;
 
 	// ─── INIT ────────────────────────────────────────────
 	window.onload = initializeApp;
 
 	function initializeApp() {
 	    showLoading(false);
+	    if (sessionStorage.getItem("exam_admin_active") === "1" && adminAccessToken) {
+	        restoreAdminPortal();
+	        return;
+	    }
+	    updatePayPlayVisibility();
 	    document.getElementById("student-name").focus();
 	}
 
@@ -2072,6 +2127,17 @@ function showToast(msg, type = "info") {
     toastTimer = setTimeout(() => t.classList.remove("show"), 3200);
 }
 
+function updatePayPlayVisibility() {
+    const nameInput = document.getElementById("student-name");
+    const payBtn = document.getElementById("pay-play-btn");
+    if (!nameInput || !payBtn) return;
+    payBtn.style.display = nameInput.value.trim() ? "inline-flex" : "none";
+}
+
+function showPayPlayComingSoon() {
+    showToast("Coming Soon", "info");
+}
+
 // ─── DATABASE ─────────────────────────────────────────
 function setLoaderProgress(pct) {
     const bar = document.getElementById("loader-progress");
@@ -2128,12 +2194,13 @@ function mapExamRows(rows) {
         question: row.question,
         options: [row.optionA, row.optionB, row.optionC, row.optionD],
         answer: parseCorrectAnswer(row.answer),
-        imageCode: row.image || ""
+        imageCode: row.image || "",
+        audioCode: row.audio || ""
     }));
 }
 
 async function fetchQuestions() {
-    const fields = "id,category,question,optionA,optionB,optionC,optionD,answer,image";
+    const fields = "id,category,question,optionA,optionB,optionC,optionD,answer,image,audio";
     const rows = await supabaseRequest(`Exam?select=${fields}&order=id.asc`);
     return mapExamRows(rows);
 }
@@ -2147,7 +2214,8 @@ function toSupabaseQuestion(question) {
         optionC: question.options[2],
         optionD: question.options[3],
         answer: ALPHA[question.answer] || "A",
-        image: question.imageCode || ""
+        image: question.imageCode || "",
+        audio: question.audioCode || ""
     };
 }
 
@@ -2320,6 +2388,7 @@ async function startExam() {
 
     document.getElementById("setup-view").style.display = "none";
     document.getElementById("admin-btn").style.display  = "none";
+    document.getElementById("pay-play-btn").style.display = "none";
     document.getElementById("exam-view").classList.add("show");
     document.getElementById("timer-badge").classList.add("show");
 
@@ -2340,6 +2409,7 @@ function retakeExam() {
     document.getElementById("exam-view").style.display = "";
     document.getElementById("setup-view").style.display = "block";
     document.getElementById("admin-btn").style.display = "block";
+    updatePayPlayVisibility();
     document.getElementById("timer-badge").classList.remove("show", "urgent");
     document.getElementById("timer-display").textContent = "--:--";
     document.getElementById("progress-fill").style.width = "0%";
@@ -2387,6 +2457,7 @@ function buildExam() {
     // Questions: options are READ-ONLY display (no onclick). Answer only via OMR.
     qContainer.innerHTML = activeData.map((q, i) => {
         const imgHtml = q.imageCode ? `<img src="${q.imageCode}" class="q-image" alt="Question image">` : "";
+        const audioHtml = q.audioCode ? `<audio src="${q.audioCode}" class="q-audio" controls></audio>` : "";
         const opts = q.options.map((o, oi) => `
             <div class="option-item option-readonly" id="opt-${i}-${oi}">
                 <span class="option-alpha">${ALPHA[oi]}</span>
@@ -2422,6 +2493,7 @@ function buildExam() {
                 </div>
                 <div class="q-text">${q.question}</div>
                 ${imgHtml}
+                ${audioHtml}
                 <div class="options-grid">${opts}</div>
                 
                 <div class="mobile-question-omr">
@@ -2602,6 +2674,10 @@ async function submitExam() {
 
 // ─── ADMIN ────────────────────────────────────────────
 function openAdminPortal() {
+    if (adminAccessToken) {
+        restoreAdminPortal();
+        return;
+    }
     // Show the styled modal instead of browser prompt
     const modal = document.getElementById("admin-modal");
     const input = document.getElementById("admin-pw-input");
@@ -2677,22 +2753,37 @@ async function authenticateAdmin() {
     adminAccessToken = authData.access_token;
     sessionStorage.setItem("exam_admin_token", adminAccessToken);
     // Authenticated
-    if (!databaseReady) await loadDatabase();
+    await showAdminPortal();
     closeAdminModal();
-    document.getElementById("setup-view").style.display = "none";
-    document.getElementById("admin-view").style.display = "block";
-    document.getElementById("admin-btn").style.display  = "none";
-    document.getElementById("admin-back-btn").style.display = "block";
-    document.querySelectorAll("[name='cat-mode']")[0].checked = true;
-    onCatModeChange();
     showToast("Admin access granted.", "success");
 }
 
+async function showAdminPortal() {
+    sessionStorage.setItem("exam_admin_active", "1");
+    if (!databaseReady) await loadDatabase();
+    document.getElementById("setup-view").style.display = "none";
+    document.getElementById("admin-view").style.display = "block";
+    document.getElementById("admin-btn").style.display  = "none";
+    document.getElementById("pay-play-btn").style.display = "none";
+    document.getElementById("admin-back-btn").style.display = "block";
+    document.querySelectorAll("[name='cat-mode']")[0].checked = true;
+    onCatModeChange();
+}
+
+async function restoreAdminPortal() {
+    await showAdminPortal();
+}
+
 function closeAdminPortal() {
+    sessionStorage.removeItem("exam_admin_active");
+    sessionStorage.removeItem("exam_admin_token");
+    adminAccessToken = "";
+    cancelQuestionEdit();
     document.getElementById("admin-view").style.display  = "none";
     document.getElementById("setup-view").style.display  = "block";
     document.getElementById("setup-options").style.display = databaseReady ? "grid" : "none";
     document.getElementById("admin-btn").style.display   = "block";
+    updatePayPlayVisibility();
     document.getElementById("admin-back-btn").style.display = "none";
 }
 
@@ -2718,6 +2809,73 @@ function handleImageUpload(input) {
     reader.readAsDataURL(file);
 }
 
+function handleAudioUpload(input) {
+    const file = input.files[0];
+    const preview = document.getElementById("adm-audio-preview");
+    const b64 = document.getElementById("adm-audio-b64");
+    if (!file) { b64.value = ""; preview.style.display = "none"; return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+        b64.value = e.target.result;
+        preview.src = e.target.result;
+        preview.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+}
+
+function setAdminFormMode(mode) {
+    const isEdit = mode === "edit";
+    document.getElementById("admin-form-title").textContent = isEdit ? "Edit Question" : "Add Question";
+    document.getElementById("admin-submit-btn").textContent = isEdit ? "Save Changes" : "+ Save to Database";
+    document.getElementById("cancel-edit-btn").style.display = isEdit ? "inline-flex" : "none";
+}
+
+function resetAdminForm() {
+    document.getElementById("admin-form").reset();
+    document.getElementById("adm-img-preview").style.display = "none";
+    document.getElementById("adm-img-b64").value = "";
+    document.getElementById("adm-audio-preview").style.display = "none";
+    document.getElementById("adm-audio-preview").removeAttribute("src");
+    document.getElementById("adm-audio-b64").value = "";
+    document.querySelectorAll("[name='cat-mode']")[0].checked = true;
+    editingQuestionIndex = null;
+    onCatModeChange();
+    setAdminFormMode("add");
+}
+
+function cancelQuestionEdit() {
+    resetAdminForm();
+}
+
+function editQuestion(idx) {
+    const q = questionPool[idx];
+    if (!q) return;
+
+    editingQuestionIndex = idx;
+    const existingCategory = categories.includes(q.category);
+    document.querySelector("[name='cat-mode'][value='exist']").checked = existingCategory;
+    document.querySelector("[name='cat-mode'][value='new']").checked = !existingCategory;
+    onCatModeChange();
+    if (existingCategory) document.getElementById("adm-cat-select").value = q.category;
+    else document.getElementById("adm-cat-input").value = q.category || "";
+
+    document.getElementById("adm-question").value = q.question || "";
+    ["A","B","C","D"].forEach((label, index) => {
+        document.getElementById(`adm-${label}`).value = (q.options || [])[index] || "";
+    });
+    document.getElementById("adm-correct").value = Number.isInteger(q.answer) && q.answer >= 0 ? q.answer : 0;
+    document.getElementById("adm-img-b64").value = q.imageCode || "";
+    const preview = document.getElementById("adm-img-preview");
+    preview.src = q.imageCode || "";
+    preview.style.display = q.imageCode ? "block" : "none";
+    document.getElementById("adm-audio-b64").value = q.audioCode || "";
+    const audioPreview = document.getElementById("adm-audio-preview");
+    audioPreview.src = q.audioCode || "";
+    audioPreview.style.display = q.audioCode ? "block" : "none";
+    setAdminFormMode("edit");
+    document.getElementById("admin-form").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
 	async function saveQuestion() {
 	    let cat = getAdminCategory();
 
@@ -2737,23 +2895,38 @@ function handleImageUpload(input) {
 	        question,
 	        options,
 	        answer: parseInt(document.getElementById("adm-correct").value),
-	        imageCode: document.getElementById("adm-img-b64").value
+	        imageCode: document.getElementById("adm-img-b64").value,
+	        audioCode: document.getElementById("adm-audio-b64").value
 	    };
 
     try {
-        await supabaseRequest("Exam", {
-            method: "POST",
-            body: toSupabaseQuestion(payload),
-            useAdmin: true,
-            prefer: "return=minimal"
-        });
-        document.getElementById("admin-form").reset();
-        document.getElementById("adm-img-preview").style.display = "none";
-        document.getElementById("adm-img-b64").value = "";
+        const wasEditing = editingQuestionIndex !== null;
+        if (wasEditing) {
+            const existing = questionPool[editingQuestionIndex];
+            if (!existing || existing.id === undefined || existing.id === null) {
+                showToast("Question ID is missing. Refresh and try again.", "error");
+                showLoading(false);
+                return;
+            }
+            await supabaseRequest(`Exam?id=eq.${encodeURIComponent(existing.id)}`, {
+                method: "PATCH",
+                body: toSupabaseQuestion(payload),
+                useAdmin: true,
+                prefer: "return=minimal"
+            });
+        } else {
+            await supabaseRequest("Exam", {
+                method: "POST",
+                body: toSupabaseQuestion(payload),
+                useAdmin: true,
+                prefer: "return=minimal"
+            });
+        }
+        resetAdminForm();
         clearDatabaseCache();
         databaseReady = false;
         await loadDatabase();
-        showToast("Question saved successfully!", "success");
+        showToast(wasEditing ? "Question updated successfully!" : "Question saved successfully!", "success");
     } catch (e) {
         console.error("Save question error:", e);
         showToast("Failed to save question.", "error");
@@ -2799,7 +2972,8 @@ function handleImageUpload(input) {
 	            question: cleanedQuestion,
 	            options: cleanedOptions,
 	            answer,
-	            imageCode: ""
+	            imageCode: "",
+	            audioCode: ""
 	        }
 	    };
 	}
@@ -2839,7 +3013,7 @@ function handleImageUpload(input) {
 	        .map(block => block.split(/\r?\n/).map(line => line.trim()).filter(Boolean))
 	        .filter(block => block.length);
 
-	    if (blocks.length === 1 && blocks[0].length > 6 && blocks[0].length % 6 === 0) {
+	    if (blocks.length === 1 && blocks[0].length > 15 && blocks[0].length % 6 === 0) {
 	        const allLines = blocks[0];
 	        blocks = [];
 	        for (let i = 0; i < allLines.length; i += 6) {
@@ -2848,16 +3022,19 @@ function handleImageUpload(input) {
 	    }
 
 	    blocks.forEach((lines, index) => {
-	        if (lines.length !== 6) {
-	            errors.push(`Question ${index + 1}: use 6 lines only - question, A, B, C, D, answer`);
+	        if (lines.length < 6 || lines.length > 15) {
+	            errors.push(`Question ${index + 1}: use 6 to 15 lines - question text, A, B, C, D, answer`);
 	            return;
 	        }
+	        const questionLines = lines.slice(0, -5);
+	        const optionLines = lines.slice(-5, -1);
+	        const answerLine = lines[lines.length - 1];
 
 	        const result = buildBulkQuestion(
 	            category,
-	            lines[0],
-	            lines.slice(1, 5),
-	            lines[5],
+	            questionLines.join("\n"),
+	            optionLines,
+	            answerLine,
 	            `Question ${index + 1}`
 	        );
 
@@ -2896,7 +3073,7 @@ function handleImageUpload(input) {
 
 	    showLoading(true, `Saving ${questions.length} questions…`);
 	    try {
-	        const savedRows = await supabaseRequest("Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer,image", {
+	        const savedRows = await supabaseRequest("Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer,image,audio", {
 	            method: "POST",
 	            body: questions.map(toSupabaseQuestion),
 	            useAdmin: true,
@@ -2984,8 +3161,8 @@ function handleImageUpload(input) {
 	        <tr>
 	            <td style="color:var(--ink-muted);font-weight:700;">${i+1}</td>
 	            <td><span style="font-size:11px;font-weight:600;color:var(--gold);background:var(--gold-pale);padding:3px 8px;border-radius:4px;">${q.category}</span></td>
-	            <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.question}">${q.question}</td>
-	            <td><button class="btn-view-sm" onclick="viewQuestion(${i})">View</button></td>
+	            <td class="admin-question-cell" title="${q.question}">${q.question}</td>
+	            <td><button class="btn-view-sm" onclick="editQuestion(${i})">Edit</button></td>
 	        </tr>`).join("");
 	}
 </script>
