@@ -1756,7 +1756,7 @@
 
 	            <div class="row-2" id="setup-options" style="display:none;">
 	                <div class="form-group">
-	                    <label>Test Category</label>
+	                    <label>Choose Category</label>
 	                    <select id="category-select" class="form-control" onchange="updateTestSummary()"></select>
 	                </div>
 	                <div class="form-group">
@@ -2479,7 +2479,7 @@ function buildExam() {
         const audioHtml = q.audioCode
 	    ? `<div class="audio-autoplay-badge" id="audio-badge-${i}">
 	           <span class="audio-pulse"></span>
-	           <span id="audio-badge-text-${i}">🔊 Auto-playing — 30s</span>
+	           <span id="audio-badge-text-${i}"> Auto-playing — 30s</span>
 	       </div>
 	       <audio src="${q.audioCode}" class="q-audio" controls id="audio-el-${i}"></audio>`
 	    : "";
