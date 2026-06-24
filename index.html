@@ -4680,7 +4680,7 @@ function renderPEDIGrid() {
                 ${thumb}
                 <div class="pe-card-info">
                     <div class="pe-card-title">${escapePEHtml(s.topic)}</div>
-                    <div class="pe-card-meta">📊 ${s.count} question${s.count === 1 ? "" : "s"}</div>
+                    <div class="pe-card-meta"> ${s.count} question${s.count === 1 ? "" : "s"}</div>
                 </div>
             </div>
         `;
@@ -4922,7 +4922,7 @@ function handleAudioUpload(input) {
 function setAdminFormMode(mode) {
     const isEdit = mode === "edit";
     document.getElementById("admin-form-title").textContent = isEdit ? "Edit Question" : "Add Question";
-    document.getElementById("admin-submit-btn").textContent = isEdit ? "Save Changes" : "+ Save to Database";
+    document.getElementById("admin-submit-btn").textContent = isEdit ? "Save Changes" : "Save to Database";
     document.getElementById("cancel-edit-btn").style.display = isEdit ? "inline-flex" : "none";
 }
 
