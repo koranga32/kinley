@@ -1701,255 +1701,6 @@
             font-weight: 500;
         }
 
-        /* ═══════════════════════════════════════
-           JIGSAW PLAY MODALS & GAME STYLES
-        ═══════════════════════════════════════ */
-        @keyframes timerPulse {
-            0%,100% { transform: scale(1); }
-            50% { transform: scale(1.08); }
-        }
-        @keyframes jigsawFadeIn {
-            from { opacity:0; transform: translateY(20px) scale(0.97); }
-            to   { opacity:1; transform: translateY(0) scale(1); }
-        }
-        @keyframes confettiBurst {
-            0%   { opacity:1; transform: translateY(0) rotate(0deg) scale(1); }
-            100% { opacity:0; transform: translateY(-80px) rotate(720deg) scale(0.3); }
-        }
-
-        .jigsaw-modal-overlay {
-            position: fixed; inset: 0; z-index: 9000;
-            background: rgba(10,16,35,0.75);
-            backdrop-filter: blur(6px);
-            display: flex; align-items: center; justify-content: center;
-            padding: 16px;
-        }
-        .jigsaw-modal-box {
-            background: var(--white);
-            border-radius: 18px;
-            box-shadow: 0 32px 80px rgba(0,0,0,0.4);
-            animation: jigsawFadeIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
-            overflow: hidden;
-            display: flex; flex-direction: column;
-        }
-
-        /* ── SELECT MODAL ── */
-        .jigsaw-select-box {
-            width: 100%; max-width: 640px; max-height: 85vh;
-        }
-        .jigsaw-modal-header {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 20px 24px 14px;
-            border-bottom: 1px solid var(--border);
-        }
-        .jigsaw-modal-title { font-size: 20px; font-weight: 800; color: var(--navy); }
-        .jigsaw-close-btn {
-            width: 32px; height: 32px; border-radius: 50%;
-            border: none; background: var(--cream); cursor: pointer;
-            font-size: 14px; display: flex; align-items: center; justify-content: center;
-            transition: all 0.15s; color: var(--ink-muted);
-        }
-        .jigsaw-close-btn:hover { background: #fee2e2; color: #e53e3e; }
-        .jigsaw-select-subtitle {
-            padding: 8px 24px 12px; font-size: 13px; color: var(--ink-muted);
-        }
-        .jigsaw-select-list {
-            overflow-y: auto; padding: 4px 24px 24px; flex: 1;
-        }
-        .jigsaw-select-card {
-            display: flex; align-items: center; gap: 14px;
-            border: 2px solid var(--border); border-radius: 12px;
-            padding: 14px; margin-bottom: 12px; cursor: pointer;
-            transition: all 0.18s; background: var(--white);
-        }
-        .jigsaw-select-card:hover {
-            border-color: var(--navy); box-shadow: var(--shadow-md);
-            transform: translateY(-2px);
-        }
-        .jigsaw-select-thumb-wrap { flex-shrink: 0; }
-        .jigsaw-select-thumb {
-            width: 72px; height: 56px; object-fit: cover;
-            border-radius: 8px; border: 1px solid var(--border);
-        }
-        .jigsaw-select-no-img {
-            width: 72px; height: 56px; border-radius: 8px;
-            background: var(--cream); display: flex; align-items: center;
-            justify-content: center; font-size: 28px;
-        }
-        .jigsaw-select-info { flex: 1; min-width: 0; }
-        .jigsaw-select-name { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
-        .jigsaw-select-meta { display: flex; gap: 12px; font-size: 12px; color: var(--ink-muted); margin-bottom: 4px; }
-        .jigsaw-select-tags { display: flex; flex-wrap: wrap; gap: 5px; }
-        .jigsaw-tag {
-            background: var(--gold-pale); color: var(--navy);
-            font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
-        }
-        .jigsaw-select-play-btn {
-            background: var(--navy); color: white;
-            font-size: 13px; font-weight: 700; padding: 10px 18px; border-radius: 10px;
-            flex-shrink: 0; transition: all 0.15s;
-        }
-        .jigsaw-select-card:hover .jigsaw-select-play-btn { background: var(--gold); color: var(--navy); }
-
-        /* ── GAME MODAL ── */
-        .jigsaw-game-box {
-            width: 100%; max-width: 1100px;
-            height: 92vh; max-height: 900px;
-        }
-        .jigsaw-game-topbar {
-            display: flex; align-items: flex-start; gap: 16px;
-            padding: 16px 20px 12px;
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-        }
-        .jigsaw-game-info { flex: 1; }
-        .jigsaw-game-puzzle-name { font-size: 18px; font-weight: 800; color: var(--navy); }
-        .jigsaw-pieces-label { font-size: 12px; color: var(--ink-muted); margin-top: 3px; }
-        .jigsaw-timer-block { text-align: center; }
-        .jigsaw-timer-label { font-size: 11px; color: var(--ink-muted); font-weight: 600; }
-        .jigsaw-timer-display {
-            font-size: 32px; font-weight: 900; color: var(--navy);
-            font-variant-numeric: tabular-nums; line-height: 1;
-            transition: color 0.3s;
-        }
-        .jigsaw-time-bar-wrap {
-            height: 6px; background: #e2e8f0; flex-shrink: 0;
-        }
-        .jigsaw-time-bar {
-            height: 100%; width: 100%;
-            background: #48bb78;
-            transition: width 1s linear, background 0.5s;
-        }
-        .jigsaw-score-bar-wrap {
-            padding: 8px 20px 4px; flex-shrink: 0;
-        }
-        .jigsaw-score-bar-bg {
-            height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;
-        }
-        .jigsaw-score-bar {
-            height: 100%; width: 0%; background: var(--gold);
-            border-radius: 4px; transition: width 0.4s ease;
-        }
-        .jigsaw-game-area {
-            display: grid;
-            grid-template-columns: 1fr 280px;
-            gap: 12px;
-            padding: 12px 20px 16px;
-            flex: 1; min-height: 0; overflow: hidden;
-        }
-        .jigsaw-board-wrap { display: flex; flex-direction: column; min-height: 0; }
-        .jigsaw-tray-wrap { display: flex; flex-direction: column; min-height: 0; }
-        .jigsaw-board-label {
-            font-size: 12px; font-weight: 700; color: var(--ink-muted);
-            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
-        }
-        .jigsaw-board {
-            flex: 1; display: grid;
-            gap: 3px;
-            background: #f1f5f9;
-            border: 2px solid var(--border); border-radius: 10px;
-            padding: 8px; overflow: hidden;
-            min-height: 0;
-        }
-        .jigsaw-slot {
-            background: var(--cream);
-            border-radius: 4px; border: 1px dashed var(--border);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 10px; color: #cbd5e0;
-            transition: all 0.15s; position: relative;
-            min-height: 40px;
-            background-size: cover;
-        }
-        .jigsaw-slot-active { cursor: pointer; }
-        .jigsaw-slot-active:hover { border-color: var(--navy); background-color: rgba(15,27,53,0.04); }
-        .slot-hover { border-color: var(--gold) !important; background: var(--gold-pale) !important; transform: scale(1.03); }
-        .slot-filled { cursor: default; border: none; }
-        .slot-correct { box-shadow: inset 0 0 0 2px #48bb78; }
-        .slot-wrong   { box-shadow: inset 0 0 0 2px #fc8181; opacity: 0.75; }
-        .slot-check, .slot-cross {
-            position: absolute; top: 2px; right: 3px;
-            font-size: 9px; font-weight: 900; line-height: 1;
-        }
-        .slot-check { color: #38a169; }
-        .slot-cross { color: #e53e3e; }
-
-        .jigsaw-piece-tray {
-            flex: 1; overflow-y: auto;
-            display: flex; flex-wrap: wrap;
-            align-content: flex-start;
-            gap: 5px; padding: 6px;
-            background: #f8fafc;
-            border: 2px solid var(--border); border-radius: 10px;
-            min-height: 0;
-        }
-        .jigsaw-piece {
-            width: 52px; height: 52px;
-            border-radius: 6px; border: 2px solid var(--border);
-            cursor: grab; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center;
-            transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
-            background-size: cover;
-            background-color: var(--cream);
-        }
-        .jigsaw-piece:hover {
-            transform: scale(1.12); box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            border-color: var(--navy);
-        }
-        .jigsaw-piece:active { cursor: grabbing; transform: scale(1.18); }
-        .piece-selected {
-            border-color: var(--gold) !important;
-            box-shadow: 0 0 0 3px rgba(212,167,44,0.4), 0 4px 12px rgba(0,0,0,0.15) !important;
-            transform: scale(1.15) !important;
-        }
-        .dragging { opacity: 0.5; cursor: grabbing; }
-
-        /* ── RESULT MODAL ── */
-        .jigsaw-result-box {
-            width: 100%; max-width: 520px;
-            padding: 36px 32px 28px;
-            text-align: center; align-items: center;
-        }
-        .result-win-modal    .jigsaw-result-box { border-top: 5px solid #38a169; }
-        .result-timeout-modal .jigsaw-result-box { border-top: 5px solid #e53e3e; }
-        .result-giveup-modal .jigsaw-result-box { border-top: 5px solid #718096; }
-        .jigsaw-result-emoji { font-size: 56px; margin-bottom: 12px; }
-        .jigsaw-result-title { font-size: 26px; font-weight: 900; color: var(--navy); margin-bottom: 6px; }
-        .jigsaw-result-msg { font-size: 14px; color: var(--ink-muted); margin-bottom: 20px; }
-        .jigsaw-result-score-ring {
-            width: 110px; height: 110px; border-radius: 50%;
-            background: var(--navy); color: white;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            margin: 0 auto 24px;
-            box-shadow: 0 8px 30px rgba(15,27,53,0.3);
-        }
-        .jigsaw-score-big { font-size: 36px; font-weight: 900; line-height: 1; }
-        .jigsaw-score-label { font-size: 11px; opacity: 0.75; letter-spacing: 1px; text-transform: uppercase; }
-        .jigsaw-result-stats {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 12px; width: 100%; margin-bottom: 24px;
-        }
-        .jigsaw-stat-card {
-            background: var(--cream); border-radius: 10px; padding: 12px;
-        }
-        .jigsaw-stat-val { font-size: 20px; font-weight: 800; color: var(--navy); }
-        .jigsaw-stat-lbl { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
-        .jigsaw-result-actions {
-            display: flex; gap: 10px; width: 100%;
-        }
-
-        /* ── btn-red ── */
-        .btn-red {
-            background: #e53e3e; color: white; border: none;
-        }
-        .btn-red:hover { background: #c53030; }
-
-        @media (max-width: 700px) {
-            .jigsaw-game-area { grid-template-columns: 1fr; }
-            .jigsaw-tray-wrap { max-height: 180px; }
-            .jigsaw-result-stats { grid-template-columns: 1fr 1fr; }
-            .jigsaw-result-actions { flex-direction: column; }
-        }
-
         /* ══════════════════════════════════════════════════
            PE (PRACTICE ENGINE) — Sidebar Menu Indicator
            Adapted directly from the reference template:
@@ -2495,8 +2246,7 @@
 
         .pe-back-link:hover { color: #fff; }
 
-        /* ── Data Interpretation: GMAT/GRE-style split screen ──
-           Left pane: chart image, sticky/fixed in place.
+    /* ── Data Interpretation: GMAT/GRE-style split screen ──Left pane: chart image, sticky/fixed in place.
            Right pane: one question at a time, scrolls independently. ── */
         .pe-di-split {
             display: flex;
@@ -2765,7 +2515,7 @@
         <div class="loader-ring"></div>
         <div class="loader-dot"></div>
     </div>
-    <div class="loader-label" id="loading-text">Connecting to live database…</div>
+    <div class="loader-label" id="loading-text">Connecting </div>
     <div class="loader-progress-wrap">
         <div class="loader-progress-fill" id="loader-progress"></div>
     </div>
@@ -2779,7 +2529,7 @@
     <div class="modal-box" id="modal-box">
         <div class="modal-icon">🔐</div>
         <div class="modal-title">Admin Security Gateway</div>
-        <div class="modal-subtitle">Enter the Supabase password for koranga6265@gmail.com.</div>
+        <div class="modal-subtitle">Enter the password </div>
 
         <div class="pw-input-wrap">
             <input
@@ -2803,7 +2553,7 @@
         </div>
 
         <div class="modal-divider"></div>
-        <div class="modal-security-note">🔒 Protected by Supabase Authentication</div>
+        <div class="modal-security-note">🔒 Protected </div>
 	    </div>
 	</div>
 
@@ -2824,7 +2574,6 @@
         <div class="brand-icon">🎓</div>
         <div class="brand-text">
             <h1>ExamPortal</h1>
-            <p>Cloud-Linked System</p>
         </div>
     </div>
     <div class="header-right">
@@ -2832,10 +2581,10 @@
             <span class="timer-icon">⏱</span>
             <span id="timer-display">--:--</span>
         </div>
-        <button class="btn btn-ghost" id="pe-btn" style="display:none;" onclick="openPEPortal()">📚 PE</button>
+        <button class="btn btn-ghost" id="pe-btn" style="display:none;" onclick="openPEPortal()">📚PE</button>
         <button class="btn btn-ghost" id="admin-btn" onclick="openAdminPortal()">⚙ Admin</button>
-        <button class="btn btn-ghost" id="admin-back-btn" style="display:none;" onclick="closeAdminPortal()">← Back</button>
-        <button class="btn btn-ghost" id="pe-back-btn" style="display:none;" onclick="closePEPortal()">← Back</button>
+        <button class="btn btn-ghost" id="admin-back-btn" style="display:none;" onclick="closeAdminPortal()">Back</button>
+        <button class="btn btn-ghost" id="pe-back-btn" style="display:none;" onclick="closePEPortal()">Back</button>
     </div>
 </header>
 
@@ -2911,14 +2660,13 @@
 
     <!-- ─── PE ONLINE TEST: SPLIT-SCREEN WORKSPACE ───────────
          Dedicated to the PE Online Test only — normal exams keep using
-         #exam-view above untouched. Mirrors the OMR-driven sticky split
-         layout: graph panel hidden by default, expands to a 60/40 split
+         #exam-view above untouched. Mirrors the OMR-driven sticky splitlayout: graph panel hidden by default, expands to a 60/40 split
          automatically when the current question carries a chart image. ── -->
     <div class="peo-test-workspace" id="peo-workspace" style="display:none;">
         <div class="peo-mobile-top-wrapper">
             <!-- Graph panel: collapsed (0 width) unless the active question has a chart -->
             <section class="peo-graph-panel" id="peo-graph-panel">
-                <h4 class="peo-graph-title">📊 Reference Diagram</h4>
+                <h4 class="peo-graph-title">Reference Diagram</h4>
                 <div class="peo-graph-image-box">
                     <img id="peo-graph-img" src="" alt="Data exhibit">
                 </div>
@@ -2935,14 +2683,14 @@
                     <div class="peo-options-container" id="peo-options-wrapper"></div>
                 </div>
                 <footer class="peo-footer-nav">
-                    <button class="peo-btn-prev" id="peo-btn-prev" onclick="peoNavigateBack()">← Previous</button>
+                    <button class="peo-btn-prev" id="peo-btn-prev" onclick="peoNavigateBack()">Previous</button>
                 </footer>
             </main>
         </div>
 
         <!-- OMR sheet: always visible, same column on desktop, sticky strip on mobile -->
         <aside class="peo-omr-panel">
-            <div class="peo-omr-header">📋 OMR Sheet</div>
+            <div class="peo-omr-header">OMR Sheet</div>
             <div class="peo-omr-rows-container" id="peo-omr-rows"></div>
             <div class="peo-omr-footer-area">
                 <div class="peo-omr-summary-bar">
@@ -2950,7 +2698,7 @@
                     <div>Remaining: <span class="peo-summary-val" id="peo-count-remaining">20</span></div>
                 </div>
                 <div class="peo-submit-btn-container" id="peo-submit-block" style="display:none;">
-                    <button class="peo-btn-submit" onclick="peoSubmitOnlineTest()">Submit Exam ✓</button>
+                    <button class="peo-btn-submit" onclick="peoSubmitOnlineTest()">Submit Exam </button>
                 </div>
             </div>
         </aside>
@@ -2970,21 +2718,21 @@
                 </div>
             </div>
             <div class="results-title" id="result-title">Test Complete</div>
-            <div class="results-subtitle" id="result-subtitle">Thank you for completing your Test.</div>
+            <div class="results-subtitle" id="result-subtitle">Thank you for completing.</div>
         </div>
 
         <div class="results-stats">
             <div class="result-stat-card correct">
                 <div class="num" id="res-correct">0</div>
-                <div class="lbl">✓ Correct</div>
+                <div class="lbl">Correct</div>
             </div>
             <div class="result-stat-card wrong">
                 <div class="num" id="res-wrong">0</div>
-                <div class="lbl">✕ Incorrect</div>
+                <div class="lbl">Incorrect</div>
             </div>
             <div class="result-stat-card skipped">
                 <div class="num" id="res-skipped">0</div>
-                <div class="lbl">— Skipped</div>
+                <div class="lbl">Skipped</div>
             </div>
         </div>
 
@@ -2992,8 +2740,8 @@
         <div id="review-container"></div>
 
         <div style="margin-top:28px; text-align:center; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-            <button class="btn btn-navy" onclick="startNewTestFromResults()">↺ Start New Test</button>
-            <button class="btn btn-outline" onclick="retakeExam()">🏠 Return to Home</button>
+            <button class="btn btn-navy" onclick="startNewTestFromResults()"> Start New</button>
+            <button class="btn btn-outline" onclick="retakeExam()"> Home </button>
         </div>
     </div>
 
@@ -3016,7 +2764,7 @@
                                 </label>
                                 <label class="radio-pill" id="pill-pe">
                                     <input type="radio" name="dest-mode" value="pe" onchange="onDestModeChange()">
-                                    📚 PE (Practice Engine)
+                                    PE (Practice Engine)
                                 </label>
                             </div>
                         </div>
@@ -3035,7 +2783,7 @@
                                 </label>
                                 <label class="radio-pill" id="pill-pe-di">
                                     <input type="radio" name="pe-type" value="Data Interpretation" onchange="onPeTypeChange()">
-                                    📊 Data Interpretation
+                                     Data Interpretation
                                 </label>
                             </div>
                             <div style="margin-top:10px;">
@@ -3043,7 +2791,7 @@
                                 <input type="text" id="adm-pe-topic" class="form-control" placeholder="e.g., Problems on Trains, RCSC 2024 Paper 1">
                             </div>
                             <div id="pe-di-note" style="display:none;margin-top:10px;font-size:12px;color:var(--ink-muted);background:var(--cream);border-left:3px solid var(--gold);padding:10px 12px;border-radius:6px;line-height:1.5;">
-                                📊 <strong>Data Interpretation set:</strong> upload the chart/graph in the <strong>Illustration / Image</strong> field below — every question you save under this same Set Name will share that chart in a split-screen view (chart fixed on the left, questions on the right). Add each question for this chart one at a time, keeping the same Set Name.
+                                  <strong>Data Interpretation set:</strong> upload the chart/graph in the <strong>Illustration / Image</strong> field below — every question you save under this same Set Name will share that chart in a split-screen view (chart fixed on the left, questions on the righ)
                             </div>
                         </div>
 
@@ -3120,11 +2868,11 @@
                         </div>
 
                         <div class="form-group">
-                            <label>Explanation / Solution (Optional)</label>
+                            <label>Explanation / Solution </label>
                             <textarea id="adm-explanation" class="form-control" placeholder="Provide detailed explanation or solution… (shown only on PE page)" style="min-height:80px;"></textarea>
                         </div>
 
-	                        <button type="submit" class="btn btn-green btn-full" id="admin-submit-btn">+ Save to Database</button>
+	                        <button type="submit" class="btn btn-green btn-full" id="admin-submit-btn"> Save to Database</button>
 	                        <button type="button" class="btn btn-outline btn-full" id="cancel-edit-btn" style="display:none;margin-top:10px;" onclick="cancelQuestionEdit()">Cancel Edit</button>
 	                    </form>
 	                </div>
@@ -3180,7 +2928,6 @@
                             <div class="form-group">
                                 <label>Bulk Question List</label>
                                 <textarea id="bulk-questions" class="form-control bulk-textarea" placeholder="Example:
-This is a long question.
 You can continue the question on another line.
 A. First option
 B. Second option
@@ -3190,9 +2937,6 @@ Answer: C
 
 Capital of Bhutan?
 A. Thimphu
-B. Paro
-C. Punakha
-D. Wangdue
 Answer: A"></textarea>
                             </div>
                             <button type="submit" class="btn btn-navy btn-full">Append Bulk Questions</button>
@@ -3252,7 +2996,7 @@ Answer: A"></textarea>
 
                 <!-- HOME: overview of all PE topics, grouped -->
                 <div id="pe-home-panel" class="pe-section active">
-                    <h1>📚 Practice Engine</h1>
+                    <h1>Practice Engine</h1>
                     <p class="pe-section-desc">Browse Mock tests and past PE examination questions with step-by-step solutions.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
@@ -3263,7 +3007,7 @@ Answer: A"></textarea>
 
                 <!-- MOCK TEST: topic folders for Mock only -->
                 <div id="pe-mock-panel" class="pe-section">
-                    <h1>📝 Mock Tests</h1>
+                    <h1>Mock Tests</h1>
                     <p class="pe-section-desc">Pick a topic below to start a mock practice set.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
@@ -3274,7 +3018,7 @@ Answer: A"></textarea>
 
                 <!-- PE PAST PAPER: topic folders for Past Paper only -->
                 <div id="pe-past-panel" class="pe-section">
-                    <h1>📄 PE Past Question Papers</h1>
+                    <h1>PE Past Question Papers</h1>
                     <p class="pe-section-desc">Pick a paper below to review past PE examination questions.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
@@ -3285,8 +3029,8 @@ Answer: A"></textarea>
 
                 <!-- DATA INTERPRETATION: chart sets, opens the split-screen viewer -->
                 <div id="pe-di-panel" class="pe-section">
-                    <h1>📊 Data Interpretation</h1>
-                    <p class="pe-section-desc">Pick a chart set below — the chart stays fixed on the left while you work through its questions on the right.</p>
+                    <h1>Data Interpretation</h1>
+                    <p class="pe-section-desc"> Try your best with graph related Question </p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
                         <input type="text" id="pe-di-search" class="pe-filter-input" placeholder="Filter chart sets…" oninput="renderPEDIGrid()">
@@ -3296,13 +3040,13 @@ Answer: A"></textarea>
 
                 <!-- ONLINE TEST: timed full-length simulation, 2h 30m -->
                 <div id="pe-online-panel" class="pe-section">
-                    <h1>💻 Online Test</h1>
-                    <p class="pe-section-desc">A timed simulation with 10 random questions from Mock, 10 from Past Paper, plus one Data Interpretation chart set.</p>
+                    <h1> Online Test</h1>
+                    <p class="pe-section-desc"> 10 random questions from Mock, 10 from Past Paper, plus one Data Interpretation chart set.</p>
                     <div class="pe-online-card">
                         <div class="pe-online-stat">
                             <i class="bi bi-clock-history"></i>
                             <div>
-                                <div class="pe-online-stat-val">2h 30m</div>
+                                <div class="pe-online-stat-val">2h:30m</div>
                                 <div class="pe-online-stat-lbl">Time Limit</div>
                             </div>
                         </div>
@@ -3316,20 +3060,20 @@ Answer: A"></textarea>
                         <div class="pe-online-breakdown" id="pe-online-breakdown" style="font-size:12.5px;color:#8a92a6;margin:-4px 0 18px;">
                             Mock available: <span id="pe-online-mock-count">0</span> &nbsp;•&nbsp; Past Paper available: <span id="pe-online-past-count">0</span> &nbsp;•&nbsp; Data Interpretation available: <span id="pe-online-di-count">0</span>
                         </div>
-                        <p class="pe-online-note">Make sure your name is entered on the home screen before starting — your result is saved under that name. Once started, the timer cannot be paused.</p>
-                        <button class="pe-online-start-btn" onclick="startPEOnlineTest()">▶ Start Online Test</button>
+                        <p class="pe-online-note">Make sure your name is entered on the home screen before starting, Once started, the timer cannot be paused.</p>
+                        <button class="pe-online-start-btn" onclick="startPEOnlineTest()"> Start Online Test</button>
                     </div>
                 </div>
 
                 <!-- QUESTION ATTEMPT SCREEN (shared by Home/Mock/Past Paper panels) -->
                 <div id="pe-question-screen" class="pe-section">
-                    <button class="pe-back-link" onclick="showPEFolderScreen()">← Back to Topics</button>
+                    <button class="pe-back-link" onclick="showPEFolderScreen()"> Back to Topics</button>
                     <div id="pe-questions-container"></div>
                 </div>
 
                 <!-- DI SPLIT-SCREEN VIEWER: chart fixed left, one question at a time right -->
                 <div id="pe-di-viewer-screen" class="pe-section">
-                    <button class="pe-back-link" onclick="closePEDIViewer()">← Back to Chart Sets</button>
+                    <button class="pe-back-link" onclick="closePEDIViewer()"> Back to Chart Sets</button>
                     <div class="pe-di-split">
                         <div class="pe-di-split-left">
                             <div class="pe-di-chart-wrap">
@@ -3348,108 +3092,6 @@ Answer: A"></textarea>
     </div>
 
 </div><!-- /page-content -->
-
-<!-- ═══════════════════════════════════════════════════════
-     JIGSAW PUZZLE SELECT MODAL
-════════════════════════════════════════════════════════════ -->
-<div id="jigsaw-play-modal" class="jigsaw-modal-overlay" style="display:none;">
-    <div class="jigsaw-modal-box jigsaw-select-box">
-        <div class="jigsaw-modal-header">
-            <div class="jigsaw-modal-title">🧩 Pay &amp; Play — Choose a Puzzle</div>
-            <button class="jigsaw-close-btn" onclick="closeJigsawSelectModal()">✕</button>
-        </div>
-        <div class="jigsaw-select-subtitle">Select a puzzle to play. Beat the clock to win!</div>
-        <div id="jigsaw-select-list" class="jigsaw-select-list"></div>
-    </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     JIGSAW GAME MODAL
-════════════════════════════════════════════════════════════ -->
-<div id="jigsaw-game-modal" class="jigsaw-modal-overlay" style="display:none;">
-    <div class="jigsaw-modal-box jigsaw-game-box">
-
-        <!-- Top Bar -->
-        <div class="jigsaw-game-topbar">
-            <div class="jigsaw-game-info">
-                <div class="jigsaw-game-puzzle-name" id="jigsaw-game-name">Puzzle</div>
-                <div class="jigsaw-pieces-label" id="jigsaw-pieces-count">0 / 0 pieces</div>
-            </div>
-            <div class="jigsaw-timer-block">
-                <div class="jigsaw-timer-label">⏱ Time Left</div>
-                <div class="jigsaw-timer-display" id="jigsaw-timer-display">05:00</div>
-            </div>
-            <button class="btn btn-red" id="jigsaw-giveup-btn" onclick="giveUpJigsaw()" style="align-self:center;padding:10px 20px;font-size:14px;font-weight:700;min-width:110px;">
-                🏳️ Give Up
-            </button>
-        </div>
-
-        <!-- Time Progress Bar -->
-        <div class="jigsaw-time-bar-wrap">
-            <div id="jigsaw-time-bar" class="jigsaw-time-bar"></div>
-        </div>
-
-        <!-- Score Progress -->
-        <div class="jigsaw-score-bar-wrap">
-            <div style="font-size:11px;color:var(--ink-muted);margin-bottom:4px;">Completion Progress</div>
-            <div class="jigsaw-score-bar-bg"><div id="jigsaw-score-bar" class="jigsaw-score-bar"></div></div>
-        </div>
-
-        <!-- Game Area: Board + Tray -->
-        <div class="jigsaw-game-area">
-            <div class="jigsaw-board-wrap">
-                <div class="jigsaw-board-label">🖼️ Puzzle Board</div>
-                <div id="jigsaw-board" class="jigsaw-board"></div>
-            </div>
-            <div class="jigsaw-tray-wrap">
-                <div class="jigsaw-board-label">🎒 Piece Tray</div>
-                <div id="jigsaw-piece-tray" class="jigsaw-piece-tray"></div>
-            </div>
-        </div>
-
-    </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     JIGSAW RESULT MODAL
-════════════════════════════════════════════════════════════ -->
-<div id="jigsaw-result-modal" class="jigsaw-modal-overlay" style="display:none;">
-    <div class="jigsaw-modal-box jigsaw-result-box">
-        <div class="jigsaw-result-emoji" id="jigsaw-result-emoji">🏆</div>
-        <div class="jigsaw-result-title" id="jigsaw-result-title">Puzzle Solved!</div>
-        <div class="jigsaw-result-msg" id="jigsaw-result-msg">Outstanding!</div>
-
-        <div class="jigsaw-result-score-ring">
-            <div class="jigsaw-score-big" id="jigsaw-result-score">0</div>
-            <div class="jigsaw-score-label">Score</div>
-        </div>
-
-        <div class="jigsaw-result-stats">
-            <div class="jigsaw-stat-card">
-                <div class="jigsaw-stat-val" id="jigsaw-result-placed">0/0</div>
-                <div class="jigsaw-stat-lbl">Pieces Placed</div>
-            </div>
-            <div class="jigsaw-stat-card">
-                <div class="jigsaw-stat-val" id="jigsaw-result-time">00:00</div>
-                <div class="jigsaw-stat-lbl">Time Used</div>
-            </div>
-            <div class="jigsaw-stat-card">
-                <div class="jigsaw-stat-val" id="jigsaw-result-reason">—</div>
-                <div class="jigsaw-stat-lbl">Result</div>
-            </div>
-            <div class="jigsaw-stat-card" style="background:rgba(72,187,120,0.1);">
-                <div class="jigsaw-stat-val" style="color:#38a169;" id="jigsaw-result-bonus">+0</div>
-                <div class="jigsaw-stat-lbl">Time Bonus</div>
-            </div>
-        </div>
-
-        <div class="jigsaw-result-actions">
-            <button class="btn btn-navy" onclick="retryJigsaw()" style="flex:1;padding:12px;">🔄 Try Again</button>
-            <button class="btn btn-outline" onclick="closeJigsawResult();showPayPlayJigsaw();" style="flex:1;padding:12px;">🧩 Other Puzzles</button>
-            <button class="btn btn-ghost" onclick="closeJigsawResult();" style="flex:1;padding:12px;">✕ Close</button>
-        </div>
-    </div>
-</div>
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────
@@ -3625,344 +3267,7 @@ function updatePayPlayVisibility() {
     payBtn.style.display = nameInput.value.trim() ? "inline-flex" : "none";
 }
 
-// ─── PAY & PLAY JIGSAW ────────────────────────────────
-let jigsawTimer = null;
-let jigsawSecondsLeft = 300;
-let jigsawPieces = [];
-let jigsawPlacedCount = 0;
-let jigsawTotalPieces = 0;
-let jigsawStartTime = null;
-let jigsawSelectedPiece = null;
-let jigsawCurrentPuzzle = null;
-
-function showPayPlayJigsaw() {
-    // Get active puzzles from localStorage
-    const puzzles = getJigsawPuzzles();
-    if (!puzzles.length) {
-        showToast("No puzzles available! Admin must create a jigsaw puzzle first.", "info");
-        return;
-    }
-
-    // Show puzzle selection modal
-    const modal = document.getElementById('jigsaw-play-modal');
-    if (modal) {
-        renderJigsawPuzzleList(puzzles);
-        modal.style.display = 'flex';
-    }
-}
-
-function getJigsawPuzzles() {
-    try {
-        return JSON.parse(localStorage.getItem('jigsawPuzzles') || '[]');
-    } catch(e) { return []; }
-}
-
-function saveJigsawPuzzles(arr) {
-    localStorage.setItem('jigsawPuzzles', JSON.stringify(arr));
-}
-
-function renderJigsawPuzzleList(puzzles) {
-    const list = document.getElementById('jigsaw-select-list');
-    if (!list) return;
-    list.innerHTML = puzzles.map((p, i) => `
-        <div class="jigsaw-select-card" onclick="startJigsawGame(${i})">
-            <div class="jigsaw-select-thumb-wrap">
-                ${p.imageData ? `<img src="${p.imageData}" class="jigsaw-select-thumb" alt="${p.name}">` : '<div class="jigsaw-select-no-img">🧩</div>'}
-            </div>
-            <div class="jigsaw-select-info">
-                <div class="jigsaw-select-name">${p.name || 'Untitled Puzzle'}</div>
-                <div class="jigsaw-select-meta">
-                    <span>🧩 ${p.pieces} pieces</span>
-                    <span>⏱ ${p.timeLimit} min</span>
-                    <span>🔷 ${p.shape}</span>
-                </div>
-                ${p.tags ? `<div class="jigsaw-select-tags">${p.tags.split(' ').map(t=>`<span class="jigsaw-tag">${t}</span>`).join('')}</div>` : ''}
-            </div>
-            <div class="jigsaw-select-play-btn">▶ Play</div>
-        </div>
-    `).join('');
-}
-
-function closeJigsawSelectModal() {
-    const modal = document.getElementById('jigsaw-play-modal');
-    if (modal) modal.style.display = 'none';
-}
-
-function startJigsawGame(puzzleIndex) {
-    const puzzles = getJigsawPuzzles();
-    const puzzle = puzzles[puzzleIndex];
-    if (!puzzle) return;
-    jigsawCurrentPuzzle = puzzle;
-    closeJigsawSelectModal();
-
-    // Build play screen
-    const playModal = document.getElementById('jigsaw-game-modal');
-    if (!playModal) return;
-    playModal.style.display = 'flex';
-
-    jigsawSecondsLeft = (parseInt(puzzle.timeLimit) || 5) * 60;
-    jigsawPlacedCount = 0;
-    jigsawTotalPieces = parseInt(puzzle.pieces) || 35;
-    jigsawStartTime = Date.now();
-
-    renderJigsawBoard(puzzle);
-    updateJigsawTimer();
-    clearInterval(jigsawTimer);
-    jigsawTimer = setInterval(() => {
-        jigsawSecondsLeft--;
-        updateJigsawTimer();
-        if (jigsawSecondsLeft <= 0) {
-            clearInterval(jigsawTimer);
-            showJigsawResult(false, 'timeout');
-        }
-    }, 1000);
-}
-
-function updateJigsawTimer() {
-    const m = Math.floor(jigsawSecondsLeft / 60);
-    const s = jigsawSecondsLeft % 60;
-    const display = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    const el = document.getElementById('jigsaw-timer-display');
-    if (el) {
-        el.textContent = display;
-        // Pulse red when < 60 seconds
-        el.style.color = jigsawSecondsLeft < 60 ? '#e53e3e' : '';
-        el.style.animation = jigsawSecondsLeft < 60 ? 'timerPulse 1s ease-in-out infinite' : '';
-    }
-    // Progress bar
-    const total = (parseInt(jigsawCurrentPuzzle?.timeLimit) || 5) * 60;
-    const pct = Math.max(0, (jigsawSecondsLeft / total) * 100);
-    const bar = document.getElementById('jigsaw-time-bar');
-    if (bar) {
-        bar.style.width = pct + '%';
-        bar.style.background = jigsawSecondsLeft < 60 ? '#e53e3e' : (jigsawSecondsLeft < 120 ? '#f6ad55' : '#48bb78');
-    }
-}
-
-function renderJigsawBoard(puzzle) {
-    const board = document.getElementById('jigsaw-board');
-    const tray = document.getElementById('jigsaw-piece-tray');
-    if (!board || !tray) return;
-
-    // Update header info
-    const nameEl = document.getElementById('jigsaw-game-name');
-    if (nameEl) nameEl.textContent = puzzle.name || 'Untitled Puzzle';
-    const piecesEl = document.getElementById('jigsaw-pieces-count');
-    if (piecesEl) piecesEl.textContent = `0 / ${jigsawTotalPieces} pieces`;
-
-    // Build grid for puzzle board
-    const cols = Math.ceil(Math.sqrt(jigsawTotalPieces * 1.5));
-    const rows = Math.ceil(jigsawTotalPieces / cols);
-    board.innerHTML = '';
-    board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-
-    jigsawPieces = [];
-
-    // Create slots
-    for (let i = 0; i < rows * cols; i++) {
-        const slot = document.createElement('div');
-        slot.className = 'jigsaw-slot';
-        slot.dataset.slotIndex = i;
-        if (i < jigsawTotalPieces) {
-            slot.classList.add('jigsaw-slot-active');
-            slot.dataset.targetPiece = i;
-            slot.ondragover = (e) => { e.preventDefault(); slot.classList.add('slot-hover'); };
-            slot.ondragleave = () => slot.classList.remove('slot-hover');
-            slot.ondrop = (e) => jigsawDropPiece(e, slot);
-            slot.onclick = () => jigsawClickPlace(slot);
-        }
-        board.appendChild(slot);
-    }
-
-    // Create scrambled pieces in tray
-    tray.innerHTML = '';
-    const pieceOrder = Array.from({length: jigsawTotalPieces}, (_, i) => i).sort(() => Math.random() - 0.5);
-
-    pieceOrder.forEach(i => {
-        const colsPct = cols;
-        const rowsPct = rows;
-        const px = (i % cols) / cols * 100;
-        const py = Math.floor(i / cols) / rows * 100;
-        const pw = 100 / cols;
-        const ph = 100 / rows;
-
-        const piece = document.createElement('div');
-        piece.className = 'jigsaw-piece';
-        piece.dataset.pieceIndex = i;
-        piece.draggable = true;
-        piece.title = `Piece #${i+1}`;
-
-        if (puzzle.imageData) {
-            piece.style.backgroundImage = `url(${puzzle.imageData})`;
-            piece.style.backgroundSize = `${colsPct * 100}% ${rowsPct * 100}%`;
-            piece.style.backgroundPosition = `${px / (1 - pw/100) || 0}% ${py / (1 - ph/100) || 0}%`;
-        } else {
-            piece.style.background = `hsl(${(i * 37) % 360}, 60%, 70%)`;
-            piece.innerHTML = `<span style="font-size:10px;font-weight:700;color:#fff;">${i+1}</span>`;
-        }
-
-        piece.ondragstart = (e) => {
-            jigsawSelectedPiece = piece;
-            e.dataTransfer.setData('pieceIndex', i);
-            piece.classList.add('dragging');
-            setTimeout(() => piece.style.opacity = '0.5', 0);
-        };
-        piece.ondragend = () => {
-            piece.style.opacity = '1';
-            piece.classList.remove('dragging');
-        };
-        piece.onclick = () => {
-            if (jigsawSelectedPiece === piece) {
-                jigsawSelectedPiece = null;
-                piece.classList.remove('piece-selected');
-            } else {
-                document.querySelectorAll('.jigsaw-piece').forEach(p => p.classList.remove('piece-selected'));
-                jigsawSelectedPiece = piece;
-                piece.classList.add('piece-selected');
-            }
-        };
-
-        jigsawPieces.push({ el: piece, index: i, placed: false });
-        tray.appendChild(piece);
-    });
-}
-
-function jigsawDropPiece(e, slot) {
-    e.preventDefault();
-    slot.classList.remove('slot-hover');
-    if (slot.classList.contains('slot-filled')) return;
-    const pieceIndex = parseInt(e.dataTransfer.getData('pieceIndex'));
-    placePieceInSlot(pieceIndex, slot);
-}
-
-function jigsawClickPlace(slot) {
-    if (!jigsawSelectedPiece || slot.classList.contains('slot-filled')) return;
-    const pieceIndex = parseInt(jigsawSelectedPiece.dataset.pieceIndex);
-    placePieceInSlot(pieceIndex, slot);
-    jigsawSelectedPiece = null;
-}
-
-function placePieceInSlot(pieceIndex, slot) {
-    const puzzle = jigsawCurrentPuzzle;
-    const cols = Math.ceil(Math.sqrt(jigsawTotalPieces * 1.5));
-    const rows = Math.ceil(jigsawTotalPieces / cols);
-    const targetPiece = parseInt(slot.dataset.targetPiece);
-    const isCorrect = pieceIndex === targetPiece;
-
-    // Visual: place piece image into slot
-    slot.classList.add('slot-filled');
-    slot.classList.add(isCorrect ? 'slot-correct' : 'slot-wrong');
-
-    const pw = 100 / cols;
-    const ph = 100 / rows;
-    const px = (pieceIndex % cols) / cols * 100;
-    const py = Math.floor(pieceIndex / cols) / rows * 100;
-
-    if (puzzle.imageData) {
-        slot.style.backgroundImage = `url(${puzzle.imageData})`;
-        slot.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
-        slot.style.backgroundPosition = `${px / (1 - pw/100) || 0}% ${py / (1 - ph/100) || 0}%`;
-    } else {
-        slot.style.background = `hsl(${(pieceIndex * 37) % 360}, 60%, 70%)`;
-        slot.innerHTML = `<span style="font-size:10px;color:#fff;font-weight:700;">${pieceIndex+1}</span>`;
-    }
-    slot.innerHTML += isCorrect ? '<div class="slot-check">✓</div>' : '<div class="slot-cross">✗</div>';
-
-    // Remove piece from tray
-    const pieceData = jigsawPieces.find(p => p.index === pieceIndex);
-    if (pieceData && !pieceData.placed) {
-        pieceData.placed = true;
-        pieceData.el.style.transition = 'all 0.3s';
-        pieceData.el.style.transform = 'scale(0)';
-        pieceData.el.style.opacity = '0';
-        setTimeout(() => { if(pieceData.el.parentNode) pieceData.el.parentNode.removeChild(pieceData.el); }, 300);
-    }
-
-    if (isCorrect) jigsawPlacedCount++;
-    const countEl = document.getElementById('jigsaw-pieces-count');
-    if (countEl) countEl.textContent = `${jigsawPlacedCount} / ${jigsawTotalPieces} pieces`;
-
-    // Score progress
-    const scoreBar = document.getElementById('jigsaw-score-bar');
-    if (scoreBar) {
-        scoreBar.style.width = `${(jigsawPlacedCount / jigsawTotalPieces) * 100}%`;
-    }
-
-    // Check win
-    const allPlaced = jigsawPieces.every(p => p.placed);
-    if (allPlaced) {
-        setTimeout(() => showJigsawResult(true, 'completed'), 400);
-    }
-}
-
-function giveUpJigsaw() {
-    clearInterval(jigsawTimer);
-    showJigsawResult(false, 'giveup');
-}
-
-function showJigsawResult(won, reason) {
-    clearInterval(jigsawTimer);
-    const elapsed = Math.floor((Date.now() - jigsawStartTime) / 1000);
-    const em = Math.floor(elapsed / 60);
-    const es = elapsed % 60;
-    const timeStr = `${String(em).padStart(2,'0')}:${String(es).padStart(2,'0')}`;
-    const score = Math.round((jigsawPlacedCount / Math.max(jigsawTotalPieces, 1)) * 100);
-    const total = (parseInt(jigsawCurrentPuzzle?.timeLimit) || 5) * 60;
-    const timeBonus = won ? Math.round((jigsawSecondsLeft / total) * 50) : 0;
-    const finalScore = Math.min(100, score + timeBonus);
-
-    let title, emoji, msg, cls;
-    if (won) {
-        title = '🎉 Puzzle Solved!';
-        emoji = '🏆';
-        msg = 'Outstanding! You completed the puzzle!';
-        cls = 'result-win';
-    } else if (reason === 'timeout') {
-        title = '⏰ Time\'s Up!';
-        emoji = '⌛';
-        msg = 'The clock ran out. Better luck next time!';
-        cls = 'result-timeout';
-    } else {
-        title = '🏳️ You Gave Up';
-        emoji = '😔';
-        msg = 'No worries — every attempt makes you better!';
-        cls = 'result-giveup';
-    }
-
-    const resultModal = document.getElementById('jigsaw-result-modal');
-    if (!resultModal) return;
-
-    document.getElementById('jigsaw-result-emoji').textContent = emoji;
-    document.getElementById('jigsaw-result-title').textContent = title;
-    document.getElementById('jigsaw-result-msg').textContent = msg;
-    document.getElementById('jigsaw-result-score').textContent = finalScore;
-    document.getElementById('jigsaw-result-placed').textContent = `${jigsawPlacedCount} / ${jigsawTotalPieces}`;
-    document.getElementById('jigsaw-result-time').textContent = timeStr;
-    document.getElementById('jigsaw-result-reason').textContent = reason === 'completed' ? 'Completed ✓' : reason === 'timeout' ? 'Time Out' : 'Gave Up';
-    document.getElementById('jigsaw-result-bonus').textContent = `+${timeBonus}`;
-
-    resultModal.className = `jigsaw-modal-overlay ${cls}-modal`;
-    resultModal.style.display = 'flex';
-
-    // Hide game modal
-    const gameModal = document.getElementById('jigsaw-game-modal');
-    if (gameModal) gameModal.style.display = 'none';
-}
-
-function closeJigsawResult() {
-    const resultModal = document.getElementById('jigsaw-result-modal');
-    if (resultModal) resultModal.style.display = 'none';
-}
-
-function retryJigsaw() {
-    closeJigsawResult();
-    if (jigsawCurrentPuzzle) {
-        const puzzles = getJigsawPuzzles();
-        const idx = puzzles.findIndex(p => p.name === jigsawCurrentPuzzle.name);
-        startJigsawGame(idx >= 0 ? idx : 0);
-    }
-}
-
+  
 // ─── DATABASE ─────────────────────────────────────────
 function setLoaderProgress(pct) {
     const bar = document.getElementById("loader-progress");
