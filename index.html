@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ExamPortal — Cloud-Linked System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         :root {
@@ -1243,22 +1243,80 @@
 
         .admin-grid {
             display: grid;
-            grid-template-columns: minmax(360px, 0.8fr) minmax(560px, 1.35fr);
+            grid-template-columns: 1fr;
             gap: 24px;
             max-width: 1500px;
             margin: 0 auto;
+            align-items: start;
         }
 
-        @media (max-width: 980px) {
-            .admin-wrap { padding: 0 16px 60px; }
-            .admin-grid { grid-template-columns: 1fr; }
+        .admin-grid > .panel,
+        .admin-side-stack > .panel {
+            width: 100%;
+            max-width: none;
         }
 
         .admin-side-stack {
             display: grid;
+            grid-column: 1 / -1;
+            grid-template-columns: minmax(360px, 0.8fr) minmax(0, 1.2fr);
             gap: 18px;
-            margin: 24px 0 0;
+            margin: 0;
             animation: fadeUp 0.3s ease 0.05s both;
+        }
+
+        .admin-registry-panel { order: 2; }
+        .admin-side-stack .bulk-import-box { order: 1; }
+
+        @media (min-width: 1101px) {
+            .admin-grid > .panel,
+            .admin-side-stack > .panel {
+                padding: 22px 24px;
+            }
+
+            .admin-grid .panel-title {
+                margin-bottom: 14px;
+                padding-bottom: 10px;
+            }
+
+            .admin-grid .form-group {
+                margin-bottom: 12px;
+            }
+
+            .admin-grid .form-group label {
+                margin-bottom: 5px;
+            }
+
+            .admin-grid .form-control {
+                padding: 9px 12px;
+            }
+
+            .admin-grid textarea.form-control {
+                min-height: 74px;
+            }
+
+            .admin-grid #adm-question {
+                min-height: 86px;
+            }
+
+            .admin-grid .cat-mode-row {
+                gap: 8px;
+                margin-bottom: 8px;
+            }
+
+            .admin-grid .radio-pill {
+                padding: 6px 12px;
+            }
+
+            .admin-grid .category-box {
+                padding: 10px 12px;
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .admin-wrap { padding: 0 16px 60px; }
+            .admin-grid { grid-template-columns: 1fr; }
+            .admin-side-stack { grid-template-columns: 1fr !important; }
         }
 
         .panel-title {
@@ -2261,6 +2319,325 @@
             color: #8a92a6;
             padding: 40px 20px;
             grid-column: 1 / -1;
+        }
+
+        /* ── Current Affair magazine inside PE ── */
+        .ca-shell {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 18px;
+            align-items: start;
+        }
+
+        .ca-panel {
+            background: #2b2f36;
+            border: 1px solid #383d46;
+            border-radius: 12px;
+            padding: 18px;
+            color: #fff;
+        }
+
+        .ca-panel-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+            color: #fff;
+            font-weight: 800;
+        }
+
+        .ca-topic-card {
+            background: #20232a;
+            border: 1px solid #383d46;
+            border-left: 4px solid #38bdf8;
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .ca-topic-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .ca-topic-title {
+            margin: 6px 0 0;
+            font-size: 1.25rem;
+            line-height: 1.25;
+            color: #fff;
+            font-weight: 800;
+        }
+
+        .ca-tag {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(56,189,248,0.14);
+            color: #7dd3fc;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 800;
+            border: 1px solid rgba(125,211,252,0.25);
+        }
+
+        .ca-source-btn {
+            color: #f8fafc;
+            background: #323844;
+            border: 1px solid #4b5563;
+            border-radius: 7px;
+            padding: 7px 10px;
+            font-size: 12px;
+            font-weight: 800;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .ca-cover {
+            width: 100%;
+            height: 100%;
+            min-height: 220px;
+            max-height: 360px;
+            object-fit: contain;
+            border-radius: 8px;
+            border: 1px solid #383d46;
+            background: #111827;
+            display: block;
+        }
+
+        .ca-topic-body {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+            gap: 16px;
+            align-items: stretch;
+            margin-top: 12px;
+        }
+
+        .ca-notes-box,
+        .ca-visual-box {
+            background: #2b2f36;
+            border: 1px solid #383d46;
+            border-radius: 10px;
+            padding: 14px;
+            min-height: 220px;
+        }
+
+        .ca-box-label {
+            color: #7dd3fc;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.2px;
+            margin-bottom: 10px;
+        }
+
+        .ca-image-placeholder {
+            height: 100%;
+            min-height: 220px;
+            border: 1px dashed #475569;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #94a3b8;
+            font-size: 13px;
+            line-height: 1.4;
+            background: #20232a;
+            padding: 16px;
+        }
+
+        .ca-summary-list {
+            margin: 0;
+            padding-left: 20px;
+            color: #d6d9df;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .ca-summary-list li { margin-bottom: 7px; }
+
+        .ca-flashcards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .ca-flashcard {
+            perspective: 1000px;
+            min-height: 132px;
+            cursor: pointer;
+        }
+
+        .ca-flashcard-inner {
+            position: relative;
+            width: 100%;
+            min-height: 132px;
+            transition: transform 0.55s ease;
+            transform-style: preserve-3d;
+        }
+
+        .ca-flashcard.flipped .ca-flashcard-inner { transform: rotateY(180deg); }
+
+        .ca-fc-front,
+        .ca-fc-back {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            border-radius: 10px;
+            border: 1px solid #3b4452;
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .ca-fc-front {
+            background: #f8fafc;
+            color: #0f1b35;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .ca-fc-front::after {
+            content: "Click to flip";
+            position: absolute;
+            right: 10px;
+            bottom: 7px;
+            font-size: 10px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .ca-fc-back {
+            background: #0f4c81;
+            color: #fff;
+            transform: rotateY(180deg);
+            align-items: flex-start;
+            overflow-y: auto;
+        }
+
+        .ca-carousel-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid #383d46;
+        }
+
+        .ca-control-btn {
+            border: 1px solid #475569;
+            background: #111827;
+            color: #fff;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .ca-control-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .ca-indicator {
+            color: #9ca3af;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .ca-stream-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .ca-stream-tag {
+            background: #20232a;
+            border: 1px solid #383d46;
+            color: #cbd5e1;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .ca-stream-tag.active {
+            background: #0f4c81;
+            border-color: #38bdf8;
+            color: #fff;
+        }
+
+        .ca-stream-box {
+            background: #20232a;
+            border: 1px dashed #38bdf8;
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        .ca-stream-title {
+            color: #7dd3fc;
+            font-size: 13px;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+
+        .ca-stream-fact {
+            background: #2b2f36;
+            border-left: 3px solid #10b981;
+            border-radius: 7px;
+            padding: 9px 10px;
+            color: #d6d9df;
+            font-size: 13px;
+            line-height: 1.45;
+            margin-bottom: 8px;
+        }
+
+        .ca-empty {
+            color: #9ca3af;
+            padding: 22px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .ca-admin-panel .rich-input {
+            min-height: 120px;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .ca-admin-panel .rich-input:empty::before {
+            content: attr(placeholder);
+            color: #94a3b8;
+        }
+
+        .ca-admin-preview {
+            width: 100%;
+            max-height: 180px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            display: none;
+            margin-top: 8px;
+        }
+
+        @media (max-width: 920px) {
+            .ca-shell { grid-template-columns: 1fr; }
+            .ca-topic-body { grid-template-columns: 1fr; }
         }
 
         /* ── Online Test landing panel ── */
@@ -3358,9 +3735,65 @@
 	                    </form>
 	                </div>
 
+                <div class="panel ca-admin-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
+                    <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Current Affair Publisher</div>
+                    <p class="form-help">Publish magazine topics, flashcards, cover images, and stream facts for the PE Current Affair section.</p>
+
+                    <div class="form-group">
+                        <label>Cover Image</label>
+                        <input type="file" id="ca-cover-file" accept="image/*" class="form-control" style="padding:8px;" onchange="caPreviewImage(this)">
+                        <img id="ca-cover-preview" class="ca-admin-preview" alt="Current affair cover preview">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Raw Article Capture</label>
+                        <div id="ca-raw-paste" class="rich-input" contenteditable="true" placeholder="Paste article text here, then use Auto Extract or fill the fields manually."></div>
+                        <button type="button" class="btn btn-outline btn-full" style="margin-top:10px;" onclick="caAutoExtract()">Auto Extract Bullets & Flashcards</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Topic Title</label>
+                        <input type="text" id="ca-title" class="form-control" placeholder="Enter current affair headline">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Source URL</label>
+                        <input type="text" id="ca-source-link" class="form-control" placeholder="https://www.bbs.bt/news/example-article">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Stream Category</label>
+                        <select id="ca-category" class="form-control"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Key Bullet Summary</label>
+                        <textarea id="ca-summary" class="form-control" rows="6" placeholder="• Bullet 1&#10;• Bullet 2&#10;• Bullet 3"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Revision Flashcards</label>
+                        <textarea id="ca-flashcards" class="form-control" rows="6" placeholder="Card 1 Front: Question text?&#10;Card 1 Back: Answer text&#10;&#10;Card 2 Front: Question text?&#10;Card 2 Back: Answer text"></textarea>
+                    </div>
+
+                    <button type="button" class="btn btn-green btn-full" onclick="caPublishTopic()">Publish Current Affair Topic</button>
+
+                    <div style="border-top:1px solid var(--border);margin:18px 0 14px;"></div>
+
+                    <div class="form-group">
+                        <label>Fact Stream Category</label>
+                        <select id="ca-stream-category" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Core Facts & Figures</label>
+                        <textarea id="ca-stream-fact" class="form-control" rows="4" placeholder="e.g., Inflation threshold at 4.2%; reserves valued at Nu 78 billion."></textarea>
+                    </div>
+                    <button type="button" class="btn btn-navy btn-full" onclick="caPublishStreamFact()">Publish to Fact Bank</button>
+                </div>
+
                 <!-- Question Registry Table -->
                 <div class="admin-side-stack">
-                    <div class="panel" style="margin:0;">
+                    <div class="panel admin-registry-panel" style="margin:0;">
                         <div class="panel-title">
                             Question Registry
                             <span class="badge-count" id="q-count">0</span>
@@ -3427,6 +3860,7 @@ Answer: A"></textarea>
                             <button type="submit" class="btn btn-navy btn-full">Append Bulk Questions</button>
                         </form>
                     </div>
+
                 </div>
             </div>
 
@@ -3446,6 +3880,12 @@ Answer: A"></textarea>
                         <a href="javascript:void(0)">
                             <span class="pe-icon"><i class="bi bi-house"></i></span>
                             <span class="pe-text">Home</span>
+                        </a>
+                    </li>
+                    <li class="pe-list-item" style="--clr:#38bdf8;" data-target="pe-current-affair-panel">
+                        <a href="javascript:void(0)">
+                            <span class="pe-icon"><i class="bi bi-newspaper"></i></span>
+                            <span class="pe-text">Current Affair</span>
                         </a>
                     </li>
                     <li class="pe-list-item" style="--clr:#00bcd4;" data-target="pe-mock-panel">
@@ -3488,6 +3928,36 @@ Answer: A"></textarea>
                         <input type="text" id="pe-home-search" class="pe-filter-input" placeholder="Filter topics…" oninput="renderPEHomeGrid()">
                     </div>
                     <div class="pe-grid" id="pe-home-grid"></div>
+                </div>
+
+                <!-- CURRENT AFFAIR: magazine-style current affairs reader -->
+                <div id="pe-current-affair-panel" class="pe-section">
+                    <h1>📰 Current Affair</h1>
+                    <p class="pe-section-desc">Read important current affairs, revise key bullet facts, and flip short memory cards for exam preparation.</p>
+                    <div class="ca-shell">
+                        <div class="ca-panel">
+                            <div class="ca-panel-title">
+                                <span>Today's Important Topics</span>
+                                <span class="ca-indicator" id="ca-carousel-indicator">Topic 0 of 0</span>
+                            </div>
+                            <div id="ca-carousel-view"></div>
+                            <div class="ca-carousel-controls">
+                                <button type="button" class="ca-control-btn" id="ca-prev-btn" onclick="caNavigateCarousel(-1)">← Previous</button>
+                                <button type="button" class="ca-control-btn" id="ca-next-btn" onclick="caNavigateCarousel(1)">Next →</button>
+                            </div>
+                        </div>
+
+                        <div class="ca-panel">
+                            <div class="ca-panel-title">
+                                <span>Fact & Figures Bank</span>
+                            </div>
+                            <div class="ca-stream-tags" id="ca-stream-tags"></div>
+                            <div class="ca-stream-box">
+                                <div class="ca-stream-title" id="ca-stream-title">Viewing: Economy Database</div>
+                                <div id="ca-stream-facts"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- MOCK TEST: topic folders for Mock only -->
@@ -3689,6 +4159,8 @@ const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const DB_CACHE_KEY = "supabase_exam_pool_v1";
 const SECONDS_PER_QUESTION = 30;
+const CA_STORAGE_KEY = "examportal_current_affairs_v1";
+const CA_CATEGORIES = ["Economy", "International Relations", "Science & Technology", "Environment", "Governance"];
 
 // ─── STATE ───────────────────────────────────────────
 let questionPool = [];
@@ -3704,12 +4176,19 @@ let activeCategoryLabel = null; // overrides category-select value when set (e.g
 let audioQuestionTimer = null;  // tracks the 30s countdown for the current audio question
 let adminAccessToken = sessionStorage.getItem("exam_admin_token") || "";
 let editingQuestionIndex = null;
+let caCoverImageBase64 = "";
+let caCarouselIndex = 0;
+let caActiveStream = "Economy";
+let caState = getDefaultCurrentAffairState();
 
 	// ─── INIT ────────────────────────────────────────────
 	window.onload = initializeApp;
 
 	function initializeApp() {
 	    showLoading(false);
+        caLoadState();
+        caHydrateAdminControls();
+        caRenderAll();
 	    if (sessionStorage.getItem("exam_admin_active") === "1" && adminAccessToken) {
 	        restoreAdminPortal();
 	        return;
@@ -5021,6 +5500,8 @@ async function authenticateAdmin() {
 async function showAdminPortal() {
     sessionStorage.setItem("exam_admin_active", "1");
     if (!databaseReady) await loadDatabase();
+    caHydrateAdminControls();
+    caRenderAll();
     document.getElementById("setup-view").style.display = "none";
     document.getElementById("admin-view").style.display = "block";
     document.getElementById("admin-btn").style.display  = "none";
@@ -5110,6 +5591,281 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ════════════════════════════════════════════════════════
+// ─── CURRENT AFFAIR MAGAZINE MODULE ───────────────────
+function getDefaultCurrentAffairState() {
+    return {
+        topics: [{
+            title: "Hydropower Trade Tariffs Signed",
+            sourceLink: "https://www.bbs.bt",
+            category: "Economy",
+            summary: [
+                "A bilateral clean energy pricing architecture agreement was formally executed on May 12, 2026.",
+                "The framework establishes an export pricing configuration model scaling base capacity up to 1,200 MW.",
+                "Export rates will register a structured increase calculated at 4.2% annually over the next five cycles.",
+                "Total cross-border infrastructure connectivity outlays require a capital mobilization target of Nu 8.4 billion.",
+                "Regional grid distribution parameters will be evaluated bi-annually starting from Q3."
+            ],
+            flashcards: [
+                { front: "What base capacity limit is configured under the energy pricing model?", back: "Up to 1,200 MW capacity thresholds." },
+                { front: "What is the annual export rate indexing percentage?", back: "A structured increase of 4.2% annually over five cycles." },
+                { front: "What capital allocation figure is required for infrastructure outlays?", back: "Nu 8.4 billion in total mobilized valuations." }
+            ],
+            coverImg: ""
+        }],
+        streams: {
+            "Economy": [
+                "Initial base inflation parameters monitored down to 4.5% line limits.",
+                "Macroeconomic resource adjustment asset ceilings target Nu 8.4 billion."
+            ],
+            "Governance": ["Civil service processing execution timeline mandates complete framework optimization within 45 working cycles."],
+            "Environment": ["Total protected forest metrics registry updates scale national baseline thresholds above 60%."],
+            "Science & Technology": ["New local datacenter arrays improve transaction latency optimization by 24% globally."],
+            "International Relations": ["Bilateral institutional treaties require joint asset inspection over specified trans-boundary transport links."]
+        }
+    };
+}
+
+function caLoadState() {
+    try {
+        const raw = localStorage.getItem(CA_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.topics) && parsed.streams) {
+            caState = parsed;
+            CA_CATEGORIES.forEach(cat => {
+                if (!Array.isArray(caState.streams[cat])) caState.streams[cat] = [];
+            });
+        }
+    } catch (e) {
+        caState = getDefaultCurrentAffairState();
+    }
+}
+
+function caSaveState() {
+    try { localStorage.setItem(CA_STORAGE_KEY, JSON.stringify(caState)); } catch (e) {}
+}
+
+function caHydrateAdminControls() {
+    ["ca-category", "ca-stream-category"].forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        select.innerHTML = CA_CATEGORIES.map(cat => `<option>${cat}</option>`).join("");
+    });
+}
+
+function caRenderAll() {
+    caRenderMagazine();
+    caRenderStreamTags();
+    caRenderStreamFacts();
+}
+
+function caRenderMagazine() {
+    const view = document.getElementById("ca-carousel-view");
+    const indicator = document.getElementById("ca-carousel-indicator");
+    const prevBtn = document.getElementById("ca-prev-btn");
+    const nextBtn = document.getElementById("ca-next-btn");
+    if (!view || !indicator || !prevBtn || !nextBtn) return;
+
+    const topics = caState.topics || [];
+    if (!topics.length) {
+        view.innerHTML = `<div class="ca-empty">No Current Affair topics yet. Add one from the Admin portal.</div>`;
+        indicator.textContent = "Topic 0 of 0";
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        return;
+    }
+
+    caCarouselIndex = Math.max(0, Math.min(caCarouselIndex, topics.length - 1));
+    const item = topics[caCarouselIndex];
+    const coverHtml = item.coverImg
+        ? `<img src="${item.coverImg}" class="ca-cover" alt="Current affair cover">`
+        : `<div class="ca-image-placeholder">Upload a Current Affair cover image from Admin to show it here beside the bullet notes.</div>`;
+    const sourceHtml = item.sourceLink
+        ? `<a href="${escapePEHtml(item.sourceLink)}" target="_blank" rel="noopener" class="ca-source-btn">View Source</a>`
+        : "";
+    const summaryHtml = (item.summary || []).map(line => `<li>${escapePEHtml(line)}</li>`).join("");
+    const cardsHtml = (item.flashcards || []).map(card => `
+        <div class="ca-flashcard" onclick="this.classList.toggle('flipped')">
+            <div class="ca-flashcard-inner">
+                <div class="ca-fc-front">${escapePEHtml(card.front || "Review question")}</div>
+                <div class="ca-fc-back"><strong>Answer:</strong><br>${escapePEHtml(card.back || "")}</div>
+            </div>
+        </div>
+    `).join("");
+
+    view.innerHTML = `
+        <article class="ca-topic-card">
+            <div class="ca-topic-head">
+                <div>
+                    <span class="ca-tag">${escapePEHtml(item.category || "Current Affair")}</span>
+                    <h2 class="ca-topic-title">${escapePEHtml(item.title || "Untitled Topic")}</h2>
+                </div>
+                ${sourceHtml}
+            </div>
+            <div class="ca-topic-body">
+                <div class="ca-notes-box">
+                    <div class="ca-box-label">Bullet Facts & Figure Notes</div>
+                    <ul class="ca-summary-list">${summaryHtml}</ul>
+                </div>
+                <div class="ca-visual-box">
+                    <div class="ca-box-label">Uploaded Picture</div>
+                    ${coverHtml}
+                </div>
+            </div>
+            <div class="ca-flashcards-grid">${cardsHtml}</div>
+        </article>
+    `;
+    indicator.textContent = `Topic ${caCarouselIndex + 1} of ${topics.length}`;
+    prevBtn.disabled = caCarouselIndex === 0;
+    nextBtn.disabled = caCarouselIndex === topics.length - 1;
+}
+
+function caNavigateCarousel(direction) {
+    caCarouselIndex += direction;
+    caRenderMagazine();
+}
+
+function caRenderStreamTags() {
+    const wrap = document.getElementById("ca-stream-tags");
+    if (!wrap) return;
+    wrap.innerHTML = CA_CATEGORIES.map(cat => `
+        <button type="button" class="ca-stream-tag ${cat === caActiveStream ? "active" : ""}" onclick="caFilterStream('${cat.replace(/'/g, "\\'")}')">${escapePEHtml(cat)}</button>
+    `).join("");
+}
+
+function caFilterStream(category) {
+    caActiveStream = category;
+    caRenderStreamTags();
+    caRenderStreamFacts();
+}
+
+function caRenderStreamFacts() {
+    const title = document.getElementById("ca-stream-title");
+    const pool = document.getElementById("ca-stream-facts");
+    if (!title || !pool) return;
+    title.textContent = `Viewing: ${caActiveStream} Database`;
+    const facts = caState.streams?.[caActiveStream] || [];
+    pool.innerHTML = facts.length
+        ? facts.map(fact => `<div class="ca-stream-fact">${escapePEHtml(fact)}</div>`).join("")
+        : `<div class="ca-empty">No facts posted to this stream yet.</div>`;
+}
+
+function caPreviewImage(input) {
+    if (!input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        caCoverImageBase64 = e.target.result;
+        const preview = document.getElementById("ca-cover-preview");
+        if (preview) {
+            preview.src = caCoverImageBase64;
+            preview.style.display = "block";
+        }
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+
+function caAutoExtract() {
+    const rawBox = document.getElementById("ca-raw-paste");
+    const raw = (rawBox?.innerText || "").trim();
+    if (!raw) {
+        showToast("Paste article text first.", "error");
+        return;
+    }
+
+    const sourceMatch = raw.match(/https?:\/\/\S+/);
+    const sentences = raw
+        .replace(/\s+/g, " ")
+        .split(/(?<=[.!?])\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 35);
+    const title = raw.split(/\n+/).map(s => s.trim()).find(Boolean) || sentences[0] || "";
+    const bullets = sentences.slice(0, 6).map(s => `• ${s}`);
+    const cards = sentences.slice(0, 3).map((s, idx) =>
+        `Card ${idx + 1} Front: What important fact is highlighted in point ${idx + 1}?\nCard ${idx + 1} Back: ${s}`
+    ).join("\n\n");
+
+    document.getElementById("ca-title").value = title.slice(0, 120);
+    if (sourceMatch) document.getElementById("ca-source-link").value = sourceMatch[0];
+    document.getElementById("ca-summary").value = bullets.join("\n");
+    document.getElementById("ca-flashcards").value = cards;
+    showToast("Current affair fields extracted.", "success");
+}
+
+function caParseSummary(text) {
+    return (text || "")
+        .split(/\r?\n/)
+        .map(line => line.replace(/^[•\-\*]\s*/, "").trim())
+        .filter(Boolean);
+}
+
+function caParseFlashcards(text) {
+    const cards = [];
+    (text || "").split(/\n\s*\n/).forEach((block, idx) => {
+        let front = `Review Question ${idx + 1}`;
+        let back = `Review Answer ${idx + 1}`;
+        block.split(/\r?\n/).forEach(line => {
+            const lower = line.toLowerCase();
+            if (lower.includes("front:")) front = line.slice(line.indexOf(":") + 1).trim();
+            if (lower.includes("back:")) back = line.slice(line.indexOf(":") + 1).trim();
+        });
+        if (front || back) cards.push({ front, back });
+    });
+    return cards.slice(0, 6);
+}
+
+function caPublishTopic() {
+    const title = document.getElementById("ca-title")?.value.trim();
+    const sourceLink = document.getElementById("ca-source-link")?.value.trim() || "";
+    const category = document.getElementById("ca-category")?.value || "Economy";
+    const summary = caParseSummary(document.getElementById("ca-summary")?.value || "");
+    const flashcards = caParseFlashcards(document.getElementById("ca-flashcards")?.value || "");
+
+    if (!title || !summary.length) {
+        showToast("Add a title and bullet summary first.", "error");
+        return;
+    }
+
+    caState.topics.unshift({ title, sourceLink, category, summary, flashcards, coverImg: caCoverImageBase64 });
+    caCarouselIndex = 0;
+    caSaveState();
+    caResetTopicForm();
+    caRenderAll();
+    showToast("Current Affair topic published.", "success");
+}
+
+function caResetTopicForm() {
+    ["ca-title", "ca-source-link", "ca-summary", "ca-flashcards"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+    const raw = document.getElementById("ca-raw-paste");
+    if (raw) raw.innerHTML = "";
+    const file = document.getElementById("ca-cover-file");
+    if (file) file.value = "";
+    const preview = document.getElementById("ca-cover-preview");
+    if (preview) {
+        preview.src = "";
+        preview.style.display = "none";
+    }
+    caCoverImageBase64 = "";
+}
+
+function caPublishStreamFact() {
+    const category = document.getElementById("ca-stream-category")?.value || "Economy";
+    const fact = document.getElementById("ca-stream-fact")?.value.trim();
+    if (!fact) {
+        showToast("Add a fact before publishing.", "error");
+        return;
+    }
+    if (!Array.isArray(caState.streams[category])) caState.streams[category] = [];
+    caState.streams[category].unshift(fact);
+    document.getElementById("ca-stream-fact").value = "";
+    caActiveStream = category;
+    caSaveState();
+    caRenderAll();
+    showToast("Fact added to Current Affair bank.", "success");
+}
+
 // PE (PRACTICE ENGINE) PAGE
 // Sidebar click-handling below mirrors the reference template's
 // own logic exactly:
@@ -5155,6 +5911,7 @@ function wirePESidebar() {
 
             // Refresh whichever folder grid this panel shows
             if (targetPanelId === "pe-home-panel") renderPEHomeGrid();
+            else if (targetPanelId === "pe-current-affair-panel") caRenderAll();
             else if (targetPanelId === "pe-mock-panel") renderPEMockGrid();
             else if (targetPanelId === "pe-past-panel") renderPEPastGrid();
             else if (targetPanelId === "pe-di-panel") renderPEDIGrid();
@@ -5191,6 +5948,7 @@ async function openPEPortal() {
     renderPEMockGrid();
     renderPEPastGrid();
     renderPEDIGrid();
+    caRenderAll();
     updatePEOnlineCount();
 }
 
@@ -5283,8 +6041,6 @@ function updatePEOnlineCount() {
     const el = document.getElementById("pe-online-qcount");
     if (el) el.textContent = buildPEOnlineTestSet().length;
 
-    console.log("[PE Online Test] questionPool total:", (questionPool || []).length,
-        "| PE total:", peQuestions.length, "| Mock:", mockCount, "| Past Paper:", pastCount, "| DI:", diCount);
 }
 
 // Picks up to N random questions from Mock, up to N from Past Paper, and
@@ -5327,8 +6083,6 @@ function startPEOnlineTest() {
     const peQuestions = getPEQuestions();
     const mockCount = peQuestions.filter(q => parsePECategory(q.category).peType === "Mock").length;
     const pastCount = peQuestions.filter(q => parsePECategory(q.category).peType === "Past Paper").length;
-    console.log("[PE Online Test] Start clicked — questionPool:", (questionPool || []).length,
-        "| PE total:", peQuestions.length, "| Mock:", mockCount, "| Past Paper:", pastCount);
 
     const testSet = buildPEOnlineTestSet();
     if (testSet.length === 0) {
