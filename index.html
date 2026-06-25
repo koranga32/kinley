@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ExamPortal </title>
+    <title>ExamPortal — Cloud-Linked System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -2090,8 +2090,10 @@
             flex-shrink: 0;
         }
 
-        /* Reserves the same horizontal space in the flex layout so the main content doesn't sit underneath the fixed sidebar.
-           Its width is kept in sync with .pe-navigation via JS so that expanding the sidebar pushes the content over instead of
+        /* Reserves the same horizontal space in the flex layout so the
+           main content doesn't sit underneath the fixed sidebar.
+           Its width is kept in sync with .pe-navigation via JS so that
+           expanding the sidebar pushes the content over instead of
            covering it. */
         .pe-navigation-spacer {
             width: 115px;
@@ -2633,6 +2635,31 @@
             margin-top: 8px;
         }
 
+        .ca-manage-box {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--cream);
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        .ca-manage-actions {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .ca-manage-actions .btn {
+            min-height: 38px;
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 700px) {
+            .ca-manage-actions { grid-template-columns: 1fr; }
+        }
+
         @media (max-width: 920px) {
             .ca-shell { grid-template-columns: 1fr; }
             .ca-topic-body { grid-template-columns: 1fr; }
@@ -2704,7 +2731,9 @@
 
         /* ══════════════════════════════════════════════════
            PE ONLINE TEST — SPLIT-SCREEN WORKSPACE
-Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel stays hidden by default and expandsabove the question automatically for DI questions.
+           Adapted from the OMR-Driven Sticky Mobile Testing Engine
+           reference: graph panel stays hidden by default and expands
+           above the question automatically for DI questions.
         ══════════════════════════════════════════════════ */
         .peo-test-workspace {
             position: fixed;
@@ -2796,7 +2825,9 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
             min-height: 0;
         }
 
-        /* Fades the question content in on every render (new question or a split-mode switch), so swaps feel smooth instead of aninstant content snap. */
+        /* Fades the question content in on every render (new question or
+           a split-mode switch), so swaps feel smooth instead of an
+           instant content snap. */
         @keyframes peoContentFadeIn {
             from { opacity: 0; transform: translateY(4px); }
             to   { opacity: 1; transform: translateY(0); }
@@ -3095,8 +3126,9 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
 
         .pe-back-link:hover { color: #fff; }
 
-        /* ── Data Interpretation: GMAT/GRE-style split screen ──Left pane: chart image, sticky/fixed in place.
-             Right pane: one question at a time, scrolls independently. ── */
+        /* ── Data Interpretation: GMAT/GRE-style split screen ──
+           Left pane: chart image, sticky/fixed in place.
+           Right pane: one question at a time, scrolls independently. ── */
         .pe-di-split {
             display: flex;
             gap: 24px;
@@ -3364,7 +3396,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
         <div class="loader-ring"></div>
         <div class="loader-dot"></div>
     </div>
-    <div class="loader-label" id="loading-text">Connecting...</div>
+    <div class="loader-label" id="loading-text">Connecting to live database…</div>
     <div class="loader-progress-wrap">
         <div class="loader-progress-fill" id="loader-progress"></div>
     </div>
@@ -3377,8 +3409,8 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
 <div class="modal-backdrop" id="admin-modal" onclick="handleModalBackdropClick(event)">
     <div class="modal-box" id="modal-box">
         <div class="modal-icon">🔐</div>
-        <div class="modal-title">Admin Gateway</div>
-        <div class="modal-subtitle">Enter Ur password </div>
+        <div class="modal-title">Admin Security Gateway</div>
+        <div class="modal-subtitle">Enter the Supabase password for koranga6265@gmail.com.</div>
 
         <div class="pw-input-wrap">
             <input
@@ -3402,7 +3434,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
         </div>
 
         <div class="modal-divider"></div>
-        <div class="modal-security-note">🔒 Protected </div>
+        <div class="modal-security-note">🔒 Protected by Supabase Authentication</div>
 	    </div>
 	</div>
 
@@ -3432,9 +3464,9 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
             <span id="timer-display">--:--</span>
         </div>
         <button class="btn btn-ghost" id="pe-btn" style="display:none;" onclick="openPEPortal()">📚 PE</button>
-        <button class="btn btn-ghost" id="admin-btn" onclick="openAdminPortal()">⚙Admin</button>
-        <button class="btn btn-ghost" id="admin-back-btn" style="display:none;" onclick="closeAdminPortal()">Back</button>
-        <button class="btn btn-ghost" id="pe-back-btn" style="display:none;" onclick="closePEPortal()">Back</button>
+        <button class="btn btn-ghost" id="admin-btn" onclick="openAdminPortal()">⚙ Admin</button>
+        <button class="btn btn-ghost" id="admin-back-btn" style="display:none;" onclick="closeAdminPortal()">← Back</button>
+        <button class="btn btn-ghost" id="pe-back-btn" style="display:none;" onclick="closePEPortal()">← Back</button>
     </div>
 </header>
 
@@ -3445,7 +3477,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
         <div class="panel" style="max-width:520px;">
             <div class="setup-badge">✦ New Test</div>
             <div class="panel-header">
-                <h2>Try for Fun</h2>
+                <h2>Start Your Test</h2>
                 <p>Fill in your details and choose an Test category to begin.</p>
             </div>
 
@@ -3511,12 +3543,13 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
     <!-- ─── PE ONLINE TEST: SPLIT-SCREEN WORKSPACE ───────────
          Dedicated to the PE Online Test only — normal exams keep using
          #exam-view above untouched. Mirrors the OMR-driven sticky split
-         layout: graph panel hidden by default, expands to a 60/40 split  automatically when the current question carries a chart image. ── -->
+         layout: graph panel hidden by default, expands to a 60/40 split
+         automatically when the current question carries a chart image. ── -->
     <div class="peo-test-workspace" id="peo-workspace" style="display:none;">
         <div class="peo-mobile-top-wrapper">
             <!-- Graph panel: collapsed (0 width) unless the active question has a chart -->
             <section class="peo-graph-panel" id="peo-graph-panel">
-                <h4 class="peo-graph-title">Reference Diagram</h4>
+                <h4 class="peo-graph-title">📊 Reference Diagram</h4>
                 <div class="peo-graph-image-box">
                     <img id="peo-graph-img" src="" alt="Data exhibit">
                 </div>
@@ -3540,7 +3573,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
 
         <!-- OMR sheet: always visible, same column on desktop, sticky strip on mobile -->
         <aside class="peo-omr-panel">
-            <div class="peo-omr-header">OMR Sheet</div>
+            <div class="peo-omr-header">📋 OMR Sheet</div>
             <div class="peo-omr-rows-container" id="peo-omr-rows"></div>
             <div class="peo-omr-footer-area">
                 <div class="peo-omr-summary-bar">
@@ -3548,7 +3581,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
                     <div>Remaining: <span class="peo-summary-val" id="peo-count-remaining">20</span></div>
                 </div>
                 <div class="peo-submit-btn-container" id="peo-submit-block" style="display:none;">
-                    <button class="peo-btn-submit" onclick="peoSubmitOnlineTest()">Submit Exam </button>
+                    <button class="peo-btn-submit" onclick="peoSubmitOnlineTest()">Submit Exam ✓</button>
                 </div>
             </div>
         </aside>
@@ -3568,7 +3601,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
                 </div>
             </div>
             <div class="results-title" id="result-title">Test Complete</div>
-            <div class="results-subtitle" id="result-subtitle">Thank you for completing </div>
+            <div class="results-subtitle" id="result-subtitle">Thank you for completing your Test.</div>
         </div>
 
         <div class="results-stats">
@@ -3578,11 +3611,11 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
             </div>
             <div class="result-stat-card wrong">
                 <div class="num" id="res-wrong">0</div>
-                <div class="lbl"> Incorrect</div>
+                <div class="lbl">✕ Incorrect</div>
             </div>
             <div class="result-stat-card skipped">
                 <div class="num" id="res-skipped">0</div>
-                <div class="lbl"> Skipped</div>
+                <div class="lbl">— Skipped</div>
             </div>
         </div>
 
@@ -3591,7 +3624,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
 
         <div style="margin-top:28px; text-align:center; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
             <button class="btn btn-navy" id="pe-return-online-btn" onclick="returnToPEOnlineTestPage()" style="display:none;">↺ Return to PE Test Page</button>
-            <button class="btn btn-outline" onclick="retakeExam()"> Return Home</button>
+            <button class="btn btn-outline" onclick="retakeExam()">🏠 Return to Home</button>
         </div>
     </div>
 
@@ -3614,7 +3647,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
                                 </label>
                                 <label class="radio-pill" id="pill-pe">
                                     <input type="radio" name="dest-mode" value="pe" onchange="onDestModeChange()">
-                                      PE (Practice)
+                                    📚 PE (Practice Engine)
                                 </label>
                             </div>
                         </div>
@@ -3625,15 +3658,15 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
                             <div class="cat-mode-row">
                                 <label class="radio-pill active" id="pill-pe-mock">
                                     <input type="radio" name="pe-type" value="Mock" checked onchange="onPeTypeChange()">
-                                    Mock Paper
+                                    Mock Test
                                 </label>
                                 <label class="radio-pill" id="pill-pe-past">
                                     <input type="radio" name="pe-type" value="Past Paper" onchange="onPeTypeChange()">
-                                    Past PE Paper
+                                    Past PE Examination
                                 </label>
                                 <label class="radio-pill" id="pill-pe-di">
                                     <input type="radio" name="pe-type" value="Data Interpretation" onchange="onPeTypeChange()">
-                                      Data Interpretation
+                                    📊 Data Interpretation
                                 </label>
                             </div>
                             <div style="margin-top:10px;">
@@ -3641,7 +3674,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
                                 <input type="text" id="adm-pe-topic" class="form-control" placeholder="e.g., Problems on Trains, RCSC 2024 Paper 1">
                             </div>
                             <div id="pe-di-note" style="display:none;margin-top:10px;font-size:12px;color:var(--ink-muted);background:var(--cream);border-left:3px solid var(--gold);padding:10px 12px;border-radius:6px;line-height:1.5;">
-                                  <strong>Data Interpretation set:</strong> upload the graph  <strong>Illustration / Image</strong> field below — every question you save under this same Set Name will share that chart in a split-screen view.
+                                📊 <strong>Data Interpretation set:</strong> upload the chart/graph in the <strong>Illustration / Image</strong> field below — every question you save under this same Set Name will share that chart in a split-screen view (chart fixed on the left, questions on the right). Add each question for this chart one at a time, keeping the same Set Name.
                             </div>
                         </div>
 
@@ -3663,7 +3696,7 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
                                     <select id="adm-cat-select" class="form-control"></select>
                                 </div>
                                 <div id="new-wrap" style="display:none;">
-                                    <label style="font-size:12px;color:var(--ink-muted);font-weight:600;display:block;margin-bottom:6px;">New Track </label>
+                                    <label style="font-size:12px;color:var(--ink-muted);font-weight:600;display:block;margin-bottom:6px;">New Track Name</label>
                                     <input type="text" id="adm-cat-input" class="form-control" placeholder="e.g., Biology, History">
                                 </div>
                             </div>
@@ -3675,14 +3708,14 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
                         </div>
 
                         <div class="form-group">
-                            <label>Illustration / Image </label>
+                            <label>Illustration / Image (Optional)</label>
                             <input type="file" id="adm-img-file" accept="image/*" class="form-control" style="padding:8px;" onchange="handleImageUpload(this)">
                             <input type="hidden" id="adm-img-b64">
                             <img id="adm-img-preview" class="img-preview" alt="Preview">
                         </div>
 
                         <div class="form-group">
-                            <label>Music / Audio Question </label>
+                            <label>Music / Audio Question (Optional)</label>
                             <input type="file" id="adm-audio-file" accept="audio/*" class="form-control" style="padding:8px;" onchange="handleAudioUpload(this)">
                             <input type="hidden" id="adm-audio-b64">
                             <audio id="adm-audio-preview" class="q-audio" controls style="display:none;"></audio>
@@ -3722,14 +3755,14 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
                             <textarea id="adm-explanation" class="form-control" placeholder="Provide detailed explanation or solution… (shown only on PE page)" style="min-height:80px;"></textarea>
                         </div>
 
-	                        <button type="submit" class="btn btn-green btn-full" id="admin-submit-btn"> Save to Database</button>
+	                        <button type="submit" class="btn btn-green btn-full" id="admin-submit-btn">+ Save to Database</button>
 	                        <button type="button" class="btn btn-outline btn-full" id="cancel-edit-btn" style="display:none;margin-top:10px;" onclick="cancelQuestionEdit()">Cancel Edit</button>
 	                    </form>
 	                </div>
 
                 <div class="panel ca-admin-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
                     <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Current Affair Publisher</div>
-                    <p class="form-help">Publish magazine topics, flashcards, cover images, and stream facts </p>
+                    <p class="form-help">Publish magazine topics, flashcards, cover images, and stream facts for the PE Current Affair section.</p>
 
                     <div class="form-group">
                         <label>Cover Image</label>
@@ -3769,6 +3802,22 @@ Adapted from the OMR-Driven Sticky Mobile Testing Enginereference: graph panel s
                     </div>
 
                     <button type="button" class="btn btn-green btn-full" onclick="caPublishTopic()">Publish Current Affair Topic</button>
+
+                    <div class="ca-manage-box">
+                        <div class="form-group">
+                            <label>Manage Published Topic</label>
+                            <select id="ca-topic-manager" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Upload / Replace Picture Later</label>
+                            <input type="file" id="ca-late-image-file" accept="image/*" class="form-control" style="padding:8px;" onchange="caAttachImageToSelectedTopic(this)">
+                        </div>
+                        <div class="ca-manage-actions">
+                            <button type="button" class="btn btn-outline" onclick="caLoadSelectedTopicIntoForm()">Edit Selected</button>
+                            <button type="button" class="btn btn-outline" onclick="caDeleteSelectedTopicImage()">Delete Picture</button>
+                            <button type="button" class="btn btn-red" onclick="caDeleteSelectedTopic()">Delete Topic</button>
+                        </div>
+                    </div>
 
                     <div style="border-top:1px solid var(--border);margin:18px 0 14px;"></div>
 
@@ -3840,7 +3889,14 @@ A. First option
 B. Second option
 C. Third option
 D. Fourth option
-Answer: C " ></textarea>
+Answer: C
+
+Capital of Bhutan?
+A. Thimphu
+B. Paro
+C. Punakha
+D. Wangdue
+Answer: A"></textarea>
                             </div>
                             <button type="submit" class="btn btn-navy btn-full">Append Bulk Questions</button>
                         </form>
@@ -3906,8 +3962,8 @@ Answer: C " ></textarea>
 
                 <!-- HOME: overview of all PE topics, grouped -->
                 <div id="pe-home-panel" class="pe-section active">
-                    <h1> Practice Engine</h1>
-                    <p class="pe-section-desc">Browse Mock tests and past PE questions with step-by-step solutions.</p>
+                    <h1>📚 Practice Engine</h1>
+                    <p class="pe-section-desc">Browse Mock tests and past PE examination questions with step-by-step solutions.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
                         <input type="text" id="pe-home-search" class="pe-filter-input" placeholder="Filter topics…" oninput="renderPEHomeGrid()">
@@ -3917,8 +3973,8 @@ Answer: C " ></textarea>
 
                 <!-- CURRENT AFFAIR: magazine-style current affairs reader -->
                 <div id="pe-current-affair-panel" class="pe-section">
-                    <h1> Current Affair</h1>
-                    <p class="pe-section-desc">Read important current affairs, revise key bullet facts, and flip  cards </p>
+                    <h1>📰 Current Affair</h1>
+                    <p class="pe-section-desc">Read important current affairs, revise key bullet facts, and flip short memory cards for exam preparation.</p>
                     <div class="ca-shell">
                         <div class="ca-panel">
                             <div class="ca-panel-title">
@@ -3927,14 +3983,14 @@ Answer: C " ></textarea>
                             </div>
                             <div id="ca-carousel-view"></div>
                             <div class="ca-carousel-controls">
-                                <button type="button" class="ca-control-btn" id="ca-prev-btn" onclick="caNavigateCarousel(-1)"> Previous</button>
-                                <button type="button" class="ca-control-btn" id="ca-next-btn" onclick="caNavigateCarousel(1)">Next </button>
+                                <button type="button" class="ca-control-btn" id="ca-prev-btn" onclick="caNavigateCarousel(-1)">← Previous</button>
+                                <button type="button" class="ca-control-btn" id="ca-next-btn" onclick="caNavigateCarousel(1)">Next →</button>
                             </div>
                         </div>
 
                         <div class="ca-panel">
                             <div class="ca-panel-title">
-                                <span>Fact & Figures </span>
+                                <span>Fact & Figures Bank</span>
                             </div>
                             <div class="ca-stream-tags" id="ca-stream-tags"></div>
                             <div class="ca-stream-box">
@@ -3947,7 +4003,7 @@ Answer: C " ></textarea>
 
                 <!-- MOCK TEST: topic folders for Mock only -->
                 <div id="pe-mock-panel" class="pe-section">
-                    <h1> Mock Tests</h1>
+                    <h1>📝 Mock Tests</h1>
                     <p class="pe-section-desc">Pick a topic below to start a mock practice set.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
@@ -3958,7 +4014,7 @@ Answer: C " ></textarea>
 
                 <!-- PE PAST PAPER: topic folders for Past Paper only -->
                 <div id="pe-past-panel" class="pe-section">
-                    <h1> PE Past Question Papers</h1>
+                    <h1>📄 PE Past Question Papers</h1>
                     <p class="pe-section-desc">Pick a paper below to review past PE examination questions.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
@@ -3969,8 +4025,8 @@ Answer: C " ></textarea>
 
                 <!-- DATA INTERPRETATION: chart sets, opens the split-screen viewer -->
                 <div id="pe-di-panel" class="pe-section">
-                    <h1> Data Interpretation</h1>
-                    <p class="pe-section-desc">Pick a chart set below </p>
+                    <h1>📊 Data Interpretation</h1>
+                    <p class="pe-section-desc">Pick a chart set below — the chart stays fixed on the left while you work through its questions on the right.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
                         <input type="text" id="pe-di-search" class="pe-filter-input" placeholder="Filter chart sets…" oninput="renderPEDIGrid()">
@@ -3980,8 +4036,8 @@ Answer: C " ></textarea>
 
                 <!-- ONLINE TEST: timed full-length simulation, 2h 30m -->
                 <div id="pe-online-panel" class="pe-section">
-                    <h1> Online Test</h1>
-                    <p class="pe-section-desc">A timed simulation with 10 random questions from Mock, 10 from Past Paper, plus Data Interpretation chart set.</p>
+                    <h1>💻 Online Test</h1>
+                    <p class="pe-section-desc">A timed simulation with 10 random questions from Mock, 10 from Past Paper, plus one Data Interpretation chart set.</p>
                     <div class="pe-online-card">
                         <div class="pe-online-stat">
                             <i class="bi bi-clock-history"></i>
@@ -4000,20 +4056,20 @@ Answer: C " ></textarea>
                         <div class="pe-online-breakdown" id="pe-online-breakdown" style="font-size:12.5px;color:#8a92a6;margin:-4px 0 18px;">
                             Mock available: <span id="pe-online-mock-count">0</span> &nbsp;•&nbsp; Past Paper available: <span id="pe-online-past-count">0</span> &nbsp;•&nbsp; Data Interpretation available: <span id="pe-online-di-count">0</span>
                         </div>
-                        <p class="pe-online-note">Make sure your name is entered on the home screen before starting, Once started, the timer cannot be paused.</p>
-                        <button class="pe-online-start-btn" onclick="startPEOnlineTest()"> Start Online Test</button>
+                        <p class="pe-online-note">Make sure your name is entered on the home screen before starting — your result is saved under that name. Once started, the timer cannot be paused.</p>
+                        <button class="pe-online-start-btn" onclick="startPEOnlineTest()">▶ Start Online Test</button>
                     </div>
                 </div>
 
                 <!-- QUESTION ATTEMPT SCREEN (shared by Home/Mock/Past Paper panels) -->
                 <div id="pe-question-screen" class="pe-section">
-                    <button class="pe-back-link" onclick="showPEFolderScreen()"> Back to Topics</button>
+                    <button class="pe-back-link" onclick="showPEFolderScreen()">← Back to Topics</button>
                     <div id="pe-questions-container"></div>
                 </div>
 
                 <!-- DI SPLIT-SCREEN VIEWER: chart fixed left, one question at a time right -->
                 <div id="pe-di-viewer-screen" class="pe-section">
-                    <button class="pe-back-link" onclick="closePEDIViewer()"> Back to Chart Sets</button>
+                    <button class="pe-back-link" onclick="closePEDIViewer()">← Back to Chart Sets</button>
                     <div class="pe-di-split">
                         <div class="pe-di-split-left">
                             <div class="pe-di-chart-wrap">
@@ -4031,8 +4087,109 @@ Answer: C " ></textarea>
         </div>
     </div>
 
+</div><!-- /page-content -->
+
+<!-- ═══════════════════════════════════════════════════════
+     JIGSAW PUZZLE SELECT MODAL
+════════════════════════════════════════════════════════════ -->
+<div id="jigsaw-play-modal" class="jigsaw-modal-overlay" style="display:none;">
+    <div class="jigsaw-modal-box jigsaw-select-box">
+        <div class="jigsaw-modal-header">
+            <div class="jigsaw-modal-title">🧩 Pay &amp; Play — Choose a Puzzle</div>
+            <button class="jigsaw-close-btn" onclick="closeJigsawSelectModal()">✕</button>
+        </div>
+        <div class="jigsaw-select-subtitle">Select a puzzle to play. Beat the clock to win!</div>
+        <div id="jigsaw-select-list" class="jigsaw-select-list"></div>
+    </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════
+     JIGSAW GAME MODAL
+════════════════════════════════════════════════════════════ -->
+<div id="jigsaw-game-modal" class="jigsaw-modal-overlay" style="display:none;">
+    <div class="jigsaw-modal-box jigsaw-game-box">
+
+        <!-- Top Bar -->
+        <div class="jigsaw-game-topbar">
+            <div class="jigsaw-game-info">
+                <div class="jigsaw-game-puzzle-name" id="jigsaw-game-name">Puzzle</div>
+                <div class="jigsaw-pieces-label" id="jigsaw-pieces-count">0 / 0 pieces</div>
+            </div>
+            <div class="jigsaw-timer-block">
+                <div class="jigsaw-timer-label">⏱ Time Left</div>
+                <div class="jigsaw-timer-display" id="jigsaw-timer-display">05:00</div>
+            </div>
+            <button class="btn btn-red" id="jigsaw-giveup-btn" onclick="giveUpJigsaw()" style="align-self:center;padding:10px 20px;font-size:14px;font-weight:700;min-width:110px;">
+                🏳️ Give Up
+            </button>
+        </div>
+
+        <!-- Time Progress Bar -->
+        <div class="jigsaw-time-bar-wrap">
+            <div id="jigsaw-time-bar" class="jigsaw-time-bar"></div>
+        </div>
+
+        <!-- Score Progress -->
+        <div class="jigsaw-score-bar-wrap">
+            <div style="font-size:11px;color:var(--ink-muted);margin-bottom:4px;">Completion Progress</div>
+            <div class="jigsaw-score-bar-bg"><div id="jigsaw-score-bar" class="jigsaw-score-bar"></div></div>
+        </div>
+
+        <!-- Game Area: Board + Tray -->
+        <div class="jigsaw-game-area">
+            <div class="jigsaw-board-wrap">
+                <div class="jigsaw-board-label">🖼️ Puzzle Board</div>
+                <div id="jigsaw-board" class="jigsaw-board"></div>
+            </div>
+            <div class="jigsaw-tray-wrap">
+                <div class="jigsaw-board-label">🎒 Piece Tray</div>
+                <div id="jigsaw-piece-tray" class="jigsaw-piece-tray"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     JIGSAW RESULT MODAL
+════════════════════════════════════════════════════════════ -->
+<div id="jigsaw-result-modal" class="jigsaw-modal-overlay" style="display:none;">
+    <div class="jigsaw-modal-box jigsaw-result-box">
+        <div class="jigsaw-result-emoji" id="jigsaw-result-emoji">🏆</div>
+        <div class="jigsaw-result-title" id="jigsaw-result-title">Puzzle Solved!</div>
+        <div class="jigsaw-result-msg" id="jigsaw-result-msg">Outstanding!</div>
+
+        <div class="jigsaw-result-score-ring">
+            <div class="jigsaw-score-big" id="jigsaw-result-score">0</div>
+            <div class="jigsaw-score-label">Score</div>
+        </div>
+
+        <div class="jigsaw-result-stats">
+            <div class="jigsaw-stat-card">
+                <div class="jigsaw-stat-val" id="jigsaw-result-placed">0/0</div>
+                <div class="jigsaw-stat-lbl">Pieces Placed</div>
+            </div>
+            <div class="jigsaw-stat-card">
+                <div class="jigsaw-stat-val" id="jigsaw-result-time">00:00</div>
+                <div class="jigsaw-stat-lbl">Time Used</div>
+            </div>
+            <div class="jigsaw-stat-card">
+                <div class="jigsaw-stat-val" id="jigsaw-result-reason">—</div>
+                <div class="jigsaw-stat-lbl">Result</div>
+            </div>
+            <div class="jigsaw-stat-card" style="background:rgba(72,187,120,0.1);">
+                <div class="jigsaw-stat-val" style="color:#38a169;" id="jigsaw-result-bonus">+0</div>
+                <div class="jigsaw-stat-lbl">Time Bonus</div>
+            </div>
+        </div>
+
+        <div class="jigsaw-result-actions">
+            <button class="btn btn-navy" onclick="retryJigsaw()" style="flex:1;padding:12px;">🔄 Try Again</button>
+            <button class="btn btn-outline" onclick="closeJigsawResult();showPayPlayJigsaw();" style="flex:1;padding:12px;">🧩 Other Puzzles</button>
+            <button class="btn btn-ghost" onclick="closeJigsawResult();" style="flex:1;padding:12px;">✕ Close</button>
+        </div>
+    </div>
+</div>
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────
@@ -4210,6 +4367,350 @@ function showToast(msg, type = "info") {
     toastTimer = setTimeout(() => t.classList.remove("show"), 3200);
 }
 
+function updatePayPlayVisibility() {
+    const nameInput = document.getElementById("student-name");
+    const payBtn = document.getElementById("pay-play-btn");
+    if (!nameInput || !payBtn) return;
+    payBtn.style.display = nameInput.value.trim() ? "inline-flex" : "none";
+}
+
+// ─── PAY & PLAY JIGSAW ────────────────────────────────
+let jigsawTimer = null;
+let jigsawSecondsLeft = 300;
+let jigsawPieces = [];
+let jigsawPlacedCount = 0;
+let jigsawTotalPieces = 0;
+let jigsawStartTime = null;
+let jigsawSelectedPiece = null;
+let jigsawCurrentPuzzle = null;
+
+function showPayPlayJigsaw() {
+    // Get active puzzles from localStorage
+    const puzzles = getJigsawPuzzles();
+    if (!puzzles.length) {
+        showToast("No puzzles available! Admin must create a jigsaw puzzle first.", "info");
+        return;
+    }
+
+    // Show puzzle selection modal
+    const modal = document.getElementById('jigsaw-play-modal');
+    if (modal) {
+        renderJigsawPuzzleList(puzzles);
+        modal.style.display = 'flex';
+    }
+}
+
+function getJigsawPuzzles() {
+    try {
+        return JSON.parse(localStorage.getItem('jigsawPuzzles') || '[]');
+    } catch(e) { return []; }
+}
+
+function saveJigsawPuzzles(arr) {
+    localStorage.setItem('jigsawPuzzles', JSON.stringify(arr));
+}
+
+function renderJigsawPuzzleList(puzzles) {
+    const list = document.getElementById('jigsaw-select-list');
+    if (!list) return;
+    list.innerHTML = puzzles.map((p, i) => `
+        <div class="jigsaw-select-card" onclick="startJigsawGame(${i})">
+            <div class="jigsaw-select-thumb-wrap">
+                ${p.imageData ? `<img src="${p.imageData}" class="jigsaw-select-thumb" alt="${p.name}">` : '<div class="jigsaw-select-no-img">🧩</div>'}
+            </div>
+            <div class="jigsaw-select-info">
+                <div class="jigsaw-select-name">${p.name || 'Untitled Puzzle'}</div>
+                <div class="jigsaw-select-meta">
+                    <span>🧩 ${p.pieces} pieces</span>
+                    <span>⏱ ${p.timeLimit} min</span>
+                    <span>🔷 ${p.shape}</span>
+                </div>
+                ${p.tags ? `<div class="jigsaw-select-tags">${p.tags.split(' ').map(t=>`<span class="jigsaw-tag">${t}</span>`).join('')}</div>` : ''}
+            </div>
+            <div class="jigsaw-select-play-btn">▶ Play</div>
+        </div>
+    `).join('');
+}
+
+function closeJigsawSelectModal() {
+    const modal = document.getElementById('jigsaw-play-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function startJigsawGame(puzzleIndex) {
+    const puzzles = getJigsawPuzzles();
+    const puzzle = puzzles[puzzleIndex];
+    if (!puzzle) return;
+    jigsawCurrentPuzzle = puzzle;
+    closeJigsawSelectModal();
+
+    // Build play screen
+    const playModal = document.getElementById('jigsaw-game-modal');
+    if (!playModal) return;
+    playModal.style.display = 'flex';
+
+    jigsawSecondsLeft = (parseInt(puzzle.timeLimit) || 5) * 60;
+    jigsawPlacedCount = 0;
+    jigsawTotalPieces = parseInt(puzzle.pieces) || 35;
+    jigsawStartTime = Date.now();
+
+    renderJigsawBoard(puzzle);
+    updateJigsawTimer();
+    clearInterval(jigsawTimer);
+    jigsawTimer = setInterval(() => {
+        jigsawSecondsLeft--;
+        updateJigsawTimer();
+        if (jigsawSecondsLeft <= 0) {
+            clearInterval(jigsawTimer);
+            showJigsawResult(false, 'timeout');
+        }
+    }, 1000);
+}
+
+function updateJigsawTimer() {
+    const m = Math.floor(jigsawSecondsLeft / 60);
+    const s = jigsawSecondsLeft % 60;
+    const display = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    const el = document.getElementById('jigsaw-timer-display');
+    if (el) {
+        el.textContent = display;
+        // Pulse red when < 60 seconds
+        el.style.color = jigsawSecondsLeft < 60 ? '#e53e3e' : '';
+        el.style.animation = jigsawSecondsLeft < 60 ? 'timerPulse 1s ease-in-out infinite' : '';
+    }
+    // Progress bar
+    const total = (parseInt(jigsawCurrentPuzzle?.timeLimit) || 5) * 60;
+    const pct = Math.max(0, (jigsawSecondsLeft / total) * 100);
+    const bar = document.getElementById('jigsaw-time-bar');
+    if (bar) {
+        bar.style.width = pct + '%';
+        bar.style.background = jigsawSecondsLeft < 60 ? '#e53e3e' : (jigsawSecondsLeft < 120 ? '#f6ad55' : '#48bb78');
+    }
+}
+
+function renderJigsawBoard(puzzle) {
+    const board = document.getElementById('jigsaw-board');
+    const tray = document.getElementById('jigsaw-piece-tray');
+    if (!board || !tray) return;
+
+    // Update header info
+    const nameEl = document.getElementById('jigsaw-game-name');
+    if (nameEl) nameEl.textContent = puzzle.name || 'Untitled Puzzle';
+    const piecesEl = document.getElementById('jigsaw-pieces-count');
+    if (piecesEl) piecesEl.textContent = `0 / ${jigsawTotalPieces} pieces`;
+
+    // Build grid for puzzle board
+    const cols = Math.ceil(Math.sqrt(jigsawTotalPieces * 1.5));
+    const rows = Math.ceil(jigsawTotalPieces / cols);
+    board.innerHTML = '';
+    board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+    jigsawPieces = [];
+
+    // Create slots
+    for (let i = 0; i < rows * cols; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'jigsaw-slot';
+        slot.dataset.slotIndex = i;
+        if (i < jigsawTotalPieces) {
+            slot.classList.add('jigsaw-slot-active');
+            slot.dataset.targetPiece = i;
+            slot.ondragover = (e) => { e.preventDefault(); slot.classList.add('slot-hover'); };
+            slot.ondragleave = () => slot.classList.remove('slot-hover');
+            slot.ondrop = (e) => jigsawDropPiece(e, slot);
+            slot.onclick = () => jigsawClickPlace(slot);
+        }
+        board.appendChild(slot);
+    }
+
+    // Create scrambled pieces in tray
+    tray.innerHTML = '';
+    const pieceOrder = Array.from({length: jigsawTotalPieces}, (_, i) => i).sort(() => Math.random() - 0.5);
+
+    pieceOrder.forEach(i => {
+        const colsPct = cols;
+        const rowsPct = rows;
+        const px = (i % cols) / cols * 100;
+        const py = Math.floor(i / cols) / rows * 100;
+        const pw = 100 / cols;
+        const ph = 100 / rows;
+
+        const piece = document.createElement('div');
+        piece.className = 'jigsaw-piece';
+        piece.dataset.pieceIndex = i;
+        piece.draggable = true;
+        piece.title = `Piece #${i+1}`;
+
+        if (puzzle.imageData) {
+            piece.style.backgroundImage = `url(${puzzle.imageData})`;
+            piece.style.backgroundSize = `${colsPct * 100}% ${rowsPct * 100}%`;
+            piece.style.backgroundPosition = `${px / (1 - pw/100) || 0}% ${py / (1 - ph/100) || 0}%`;
+        } else {
+            piece.style.background = `hsl(${(i * 37) % 360}, 60%, 70%)`;
+            piece.innerHTML = `<span style="font-size:10px;font-weight:700;color:#fff;">${i+1}</span>`;
+        }
+
+        piece.ondragstart = (e) => {
+            jigsawSelectedPiece = piece;
+            e.dataTransfer.setData('pieceIndex', i);
+            piece.classList.add('dragging');
+            setTimeout(() => piece.style.opacity = '0.5', 0);
+        };
+        piece.ondragend = () => {
+            piece.style.opacity = '1';
+            piece.classList.remove('dragging');
+        };
+        piece.onclick = () => {
+            if (jigsawSelectedPiece === piece) {
+                jigsawSelectedPiece = null;
+                piece.classList.remove('piece-selected');
+            } else {
+                document.querySelectorAll('.jigsaw-piece').forEach(p => p.classList.remove('piece-selected'));
+                jigsawSelectedPiece = piece;
+                piece.classList.add('piece-selected');
+            }
+        };
+
+        jigsawPieces.push({ el: piece, index: i, placed: false });
+        tray.appendChild(piece);
+    });
+}
+
+function jigsawDropPiece(e, slot) {
+    e.preventDefault();
+    slot.classList.remove('slot-hover');
+    if (slot.classList.contains('slot-filled')) return;
+    const pieceIndex = parseInt(e.dataTransfer.getData('pieceIndex'));
+    placePieceInSlot(pieceIndex, slot);
+}
+
+function jigsawClickPlace(slot) {
+    if (!jigsawSelectedPiece || slot.classList.contains('slot-filled')) return;
+    const pieceIndex = parseInt(jigsawSelectedPiece.dataset.pieceIndex);
+    placePieceInSlot(pieceIndex, slot);
+    jigsawSelectedPiece = null;
+}
+
+function placePieceInSlot(pieceIndex, slot) {
+    const puzzle = jigsawCurrentPuzzle;
+    const cols = Math.ceil(Math.sqrt(jigsawTotalPieces * 1.5));
+    const rows = Math.ceil(jigsawTotalPieces / cols);
+    const targetPiece = parseInt(slot.dataset.targetPiece);
+    const isCorrect = pieceIndex === targetPiece;
+
+    // Visual: place piece image into slot
+    slot.classList.add('slot-filled');
+    slot.classList.add(isCorrect ? 'slot-correct' : 'slot-wrong');
+
+    const pw = 100 / cols;
+    const ph = 100 / rows;
+    const px = (pieceIndex % cols) / cols * 100;
+    const py = Math.floor(pieceIndex / cols) / rows * 100;
+
+    if (puzzle.imageData) {
+        slot.style.backgroundImage = `url(${puzzle.imageData})`;
+        slot.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
+        slot.style.backgroundPosition = `${px / (1 - pw/100) || 0}% ${py / (1 - ph/100) || 0}%`;
+    } else {
+        slot.style.background = `hsl(${(pieceIndex * 37) % 360}, 60%, 70%)`;
+        slot.innerHTML = `<span style="font-size:10px;color:#fff;font-weight:700;">${pieceIndex+1}</span>`;
+    }
+    slot.innerHTML += isCorrect ? '<div class="slot-check">✓</div>' : '<div class="slot-cross">✗</div>';
+
+    // Remove piece from tray
+    const pieceData = jigsawPieces.find(p => p.index === pieceIndex);
+    if (pieceData && !pieceData.placed) {
+        pieceData.placed = true;
+        pieceData.el.style.transition = 'all 0.3s';
+        pieceData.el.style.transform = 'scale(0)';
+        pieceData.el.style.opacity = '0';
+        setTimeout(() => { if(pieceData.el.parentNode) pieceData.el.parentNode.removeChild(pieceData.el); }, 300);
+    }
+
+    if (isCorrect) jigsawPlacedCount++;
+    const countEl = document.getElementById('jigsaw-pieces-count');
+    if (countEl) countEl.textContent = `${jigsawPlacedCount} / ${jigsawTotalPieces} pieces`;
+
+    // Score progress
+    const scoreBar = document.getElementById('jigsaw-score-bar');
+    if (scoreBar) {
+        scoreBar.style.width = `${(jigsawPlacedCount / jigsawTotalPieces) * 100}%`;
+    }
+
+    // Check win
+    const allPlaced = jigsawPieces.every(p => p.placed);
+    if (allPlaced) {
+        setTimeout(() => showJigsawResult(true, 'completed'), 400);
+    }
+}
+
+function giveUpJigsaw() {
+    clearInterval(jigsawTimer);
+    showJigsawResult(false, 'giveup');
+}
+
+function showJigsawResult(won, reason) {
+    clearInterval(jigsawTimer);
+    const elapsed = Math.floor((Date.now() - jigsawStartTime) / 1000);
+    const em = Math.floor(elapsed / 60);
+    const es = elapsed % 60;
+    const timeStr = `${String(em).padStart(2,'0')}:${String(es).padStart(2,'0')}`;
+    const score = Math.round((jigsawPlacedCount / Math.max(jigsawTotalPieces, 1)) * 100);
+    const total = (parseInt(jigsawCurrentPuzzle?.timeLimit) || 5) * 60;
+    const timeBonus = won ? Math.round((jigsawSecondsLeft / total) * 50) : 0;
+    const finalScore = Math.min(100, score + timeBonus);
+
+    let title, emoji, msg, cls;
+    if (won) {
+        title = '🎉 Puzzle Solved!';
+        emoji = '🏆';
+        msg = 'Outstanding! You completed the puzzle!';
+        cls = 'result-win';
+    } else if (reason === 'timeout') {
+        title = '⏰ Time\'s Up!';
+        emoji = '⌛';
+        msg = 'The clock ran out. Better luck next time!';
+        cls = 'result-timeout';
+    } else {
+        title = '🏳️ You Gave Up';
+        emoji = '😔';
+        msg = 'No worries — every attempt makes you better!';
+        cls = 'result-giveup';
+    }
+
+    const resultModal = document.getElementById('jigsaw-result-modal');
+    if (!resultModal) return;
+
+    document.getElementById('jigsaw-result-emoji').textContent = emoji;
+    document.getElementById('jigsaw-result-title').textContent = title;
+    document.getElementById('jigsaw-result-msg').textContent = msg;
+    document.getElementById('jigsaw-result-score').textContent = finalScore;
+    document.getElementById('jigsaw-result-placed').textContent = `${jigsawPlacedCount} / ${jigsawTotalPieces}`;
+    document.getElementById('jigsaw-result-time').textContent = timeStr;
+    document.getElementById('jigsaw-result-reason').textContent = reason === 'completed' ? 'Completed ✓' : reason === 'timeout' ? 'Time Out' : 'Gave Up';
+    document.getElementById('jigsaw-result-bonus').textContent = `+${timeBonus}`;
+
+    resultModal.className = `jigsaw-modal-overlay ${cls}-modal`;
+    resultModal.style.display = 'flex';
+
+    // Hide game modal
+    const gameModal = document.getElementById('jigsaw-game-modal');
+    if (gameModal) gameModal.style.display = 'none';
+}
+
+function closeJigsawResult() {
+    const resultModal = document.getElementById('jigsaw-result-modal');
+    if (resultModal) resultModal.style.display = 'none';
+}
+
+function retryJigsaw() {
+    closeJigsawResult();
+    if (jigsawCurrentPuzzle) {
+        const puzzles = getJigsawPuzzles();
+        const idx = puzzles.findIndex(p => p.name === jigsawCurrentPuzzle.name);
+        startJigsawGame(idx >= 0 ? idx : 0);
+    }
+}
 
 // ─── DATABASE ─────────────────────────────────────────
 function setLoaderProgress(pct) {
@@ -5191,12 +5692,32 @@ function caHydrateAdminControls() {
         if (!select) return;
         select.innerHTML = CA_CATEGORIES.map(cat => `<option>${cat}</option>`).join("");
     });
+    caRefreshTopicManager();
 }
 
 function caRenderAll() {
     caRenderMagazine();
     caRenderStreamTags();
     caRenderStreamFacts();
+    caRefreshTopicManager();
+}
+
+function caRefreshTopicManager() {
+    const select = document.getElementById("ca-topic-manager");
+    if (!select) return;
+    const topics = caState.topics || [];
+    if (!topics.length) {
+        select.innerHTML = `<option value="">No published topics yet</option>`;
+        select.disabled = true;
+        return;
+    }
+    const previous = select.value;
+    select.disabled = false;
+    select.innerHTML = topics.map((topic, idx) => {
+        const pictureStatus = topic.coverImg ? "picture added" : "no picture";
+        return `<option value="${idx}">${escapePEHtml(topic.title || `Topic ${idx + 1}`)} - ${pictureStatus}</option>`;
+    }).join("");
+    if (previous && Number(previous) < topics.length) select.value = previous;
 }
 
 function caRenderMagazine() {
@@ -5365,12 +5886,30 @@ function caPublishTopic() {
         return;
     }
 
-    caState.topics.unshift({ title, sourceLink, category, summary, flashcards, coverImg: caCoverImageBase64 });
-    caCarouselIndex = 0;
+    const existingIndex = (caState.topics || []).findIndex(topic =>
+        (topic.title || "").trim().toLowerCase() === title.toLowerCase()
+    );
+    const existingTopic = existingIndex >= 0 ? caState.topics[existingIndex] : null;
+    const updatedTopic = {
+        title,
+        sourceLink,
+        category,
+        summary,
+        flashcards,
+        coverImg: caCoverImageBase64 || existingTopic?.coverImg || ""
+    };
+
+    if (existingIndex >= 0) {
+        caState.topics[existingIndex] = updatedTopic;
+        caCarouselIndex = existingIndex;
+    } else {
+        caState.topics.unshift(updatedTopic);
+        caCarouselIndex = 0;
+    }
     caSaveState();
     caResetTopicForm();
     caRenderAll();
-    showToast("Current Affair topic published.", "success");
+    showToast(existingIndex >= 0 ? "Current Affair topic updated." : "Current Affair topic published.", "success");
 }
 
 function caResetTopicForm() {
@@ -5388,6 +5927,110 @@ function caResetTopicForm() {
         preview.style.display = "none";
     }
     caCoverImageBase64 = "";
+}
+
+function caGetSelectedTopicIndex() {
+    const select = document.getElementById("ca-topic-manager");
+    const topics = caState.topics || [];
+    let idx = Number(select?.value);
+    if (Number.isInteger(idx) && idx >= 0 && idx < topics.length) return idx;
+
+    const typedTitle = document.getElementById("ca-title")?.value.trim().toLowerCase();
+    if (typedTitle) {
+        idx = topics.findIndex(topic => (topic.title || "").trim().toLowerCase() === typedTitle);
+        if (idx >= 0) return idx;
+    }
+    return -1;
+}
+
+function caLoadSelectedTopicIntoForm() {
+    const idx = caGetSelectedTopicIndex();
+    if (idx < 0) {
+        showToast("Select a published Current Affair topic first.", "error");
+        return;
+    }
+    const topic = caState.topics[idx];
+    const title = document.getElementById("ca-title");
+    const source = document.getElementById("ca-source-link");
+    const category = document.getElementById("ca-category");
+    const summary = document.getElementById("ca-summary");
+    const flashcards = document.getElementById("ca-flashcards");
+    const preview = document.getElementById("ca-cover-preview");
+
+    if (title) title.value = topic.title || "";
+    if (source) source.value = topic.sourceLink || "";
+    if (category) category.value = topic.category || "Economy";
+    if (summary) summary.value = (topic.summary || []).map(line => `• ${line}`).join("\n");
+    if (flashcards) {
+        flashcards.value = (topic.flashcards || []).map((card, i) =>
+            `Card ${i + 1} Front: ${card.front || ""}\nCard ${i + 1} Back: ${card.back || ""}`
+        ).join("\n\n");
+    }
+    caCoverImageBase64 = "";
+    if (preview) {
+        preview.src = topic.coverImg || "";
+        preview.style.display = topic.coverImg ? "block" : "none";
+    }
+    showToast("Topic loaded for editing.", "success");
+}
+
+function caAttachImageToSelectedTopic(input) {
+    if (!input.files || !input.files[0]) return;
+    const idx = caGetSelectedTopicIndex();
+    if (idx < 0) {
+        showToast("Select a published topic or type its exact title first.", "error");
+        input.value = "";
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        caState.topics[idx].coverImg = e.target.result;
+        caCarouselIndex = idx;
+        caSaveState();
+        caRenderAll();
+        input.value = "";
+        showToast("Picture added to the selected Current Affair topic.", "success");
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+
+function caDeleteSelectedTopicImage() {
+    const idx = caGetSelectedTopicIndex();
+    if (idx < 0) {
+        showToast("Select a published Current Affair topic first.", "error");
+        return;
+    }
+    if (!caState.topics[idx].coverImg) {
+        showToast("This topic has no uploaded picture.", "info");
+        return;
+    }
+    if (!confirm("Delete the uploaded picture for this Current Affair topic?")) return;
+    caState.topics[idx].coverImg = "";
+    caCarouselIndex = idx;
+    caSaveState();
+    caRenderAll();
+    const preview = document.getElementById("ca-cover-preview");
+    if (preview) {
+        preview.src = "";
+        preview.style.display = "none";
+    }
+    showToast("Current Affair picture deleted.", "success");
+}
+
+function caDeleteSelectedTopic() {
+    const idx = caGetSelectedTopicIndex();
+    if (idx < 0) {
+        showToast("Select a published Current Affair topic first.", "error");
+        return;
+    }
+    const title = caState.topics[idx].title || "this topic";
+    if (!confirm(`Delete "${title}" from Current Affair topics?`)) return;
+    caState.topics.splice(idx, 1);
+    caCarouselIndex = Math.max(0, Math.min(caCarouselIndex, caState.topics.length - 1));
+    caSaveState();
+    caResetTopicForm();
+    caRenderAll();
+    showToast("Current Affair topic deleted.", "success");
 }
 
 function caPublishStreamFact() {
@@ -5902,7 +6545,7 @@ function renderPEDIGrid() {
                 ${thumb}
                 <div class="pe-card-info">
                     <div class="pe-card-title">${escapePEHtml(s.topic)}</div>
-                    <div class="pe-card-meta"> ${s.count} question${s.count === 1 ? "" : "s"}</div>
+                    <div class="pe-card-meta">📊 ${s.count} question${s.count === 1 ? "" : "s"}</div>
                 </div>
             </div>
         `;
