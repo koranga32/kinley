@@ -12,7 +12,7 @@
     <meta property="og:description" content="Practice exam questions, PE papers, current-affair flashcards, and timed online tests in one cloud-linked portal.">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary">
-    <title>ExamPortal - Cloud-Linked Practice and Testing System</title>
+    <title>ExamPortal </title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet">
@@ -4061,7 +4061,7 @@
         <div class="loader-ring"></div>
         <div class="loader-dot"></div>
     </div>
-    <div class="loader-label" id="loading-text">Connecting to live database…</div>
+    <div class="loader-label" id="loading-text"> Connecting...</div>
     <div class="loader-progress-wrap">
         <div class="loader-progress-fill" id="loader-progress"></div>
     </div>
@@ -4074,8 +4074,8 @@
 <div class="modal-backdrop" id="admin-modal" onclick="handleModalBackdropClick(event)">
     <div class="modal-box" id="modal-box">
         <div class="modal-icon">🔐</div>
-        <div class="modal-title">Admin Security Gateway</div>
-        <div class="modal-subtitle">Enter the Supabase password for koranga6265@gmail.com.</div>
+        <div class="modal-title">Admin Gateway</div>
+        <div class="modal-subtitle">Enter password </div>
 
         <div class="pw-input-wrap">
             <input
@@ -4099,7 +4099,7 @@
         </div>
 
         <div class="modal-divider"></div>
-        <div class="modal-security-note">🔒 Protected by Supabase Authentication</div>
+        <div class="modal-security-note">🔒 Protected </div>
 	    </div>
 	</div>
 
@@ -4156,7 +4156,7 @@
                     <label for="contact-company">Leave this field empty</label>
                     <input id="contact-company" name="_honey" type="text" tabindex="-1" autocomplete="off">
                 </div>
-                <div class="contact-form-note contact-span-2">Required fields are marked with *. Your message is securely forwarded through FormSubmit.</div>
+                <div class="contact-form-note contact-span-2">Required fields are marked with *. Your message is securely forwarded .</div>
                 <div class="modal-btn-row contact-span-2">
                     <button type="button" class="btn-modal-cancel" onclick="closeContactModal()">Close</button>
                     <button type="submit" class="btn-modal-auth" id="contact-submit-btn">Submit</button>
@@ -4171,7 +4171,6 @@
         <div class="brand-icon">🎓</div>
         <div class="brand-text">
             <h1>ExamPortal</h1>
-            <p>Cloud-Linked System</p>
         </div>
     </div>
     <div class="header-right">
@@ -4183,8 +4182,8 @@
         <button type="button" class="btn btn-ghost" id="contact-btn" onclick="openContactModal()">Contact Us</button>
         <button type="button" class="btn btn-ghost" id="pe-btn" style="display:none;" onclick="openPEPortal()">📚 PE</button>
         <button type="button" class="btn btn-ghost" id="admin-btn" onclick="openAdminPortal()">⚙ Admin</button>
-        <button type="button" class="btn btn-ghost" id="admin-back-btn" style="display:none;" onclick="closeAdminPortal()">← Back</button>
-        <button type="button" class="btn btn-ghost" id="pe-back-btn" style="display:none;" onclick="closePEPortal()">← Back</button>
+        <button type="button" class="btn btn-ghost" id="admin-back-btn" style="display:none;" onclick="closeAdminPortal()"> Back</button>
+        <button type="button" class="btn btn-ghost" id="pe-back-btn" style="display:none;" onclick="closePEPortal()"> Back</button>
     </div>
 </header>
 
@@ -4197,7 +4196,7 @@
         <div class="daily-quote-strip" id="daily-quote-strip" aria-label="Daily English and Dzongkha quotes" aria-hidden="true" style="visibility:hidden;">
             <div class="daily-quote-window">
                 <div class="daily-quote-track is-empty" id="daily-quote-track">
-                    No quote published for today.
+                    No quote.
                 </div>
             </div>
         </div>
@@ -4206,7 +4205,7 @@
             <div class="setup-badge">✦ New Test</div>
             <div class="panel-header">
                 <h2>Start Your Test</h2>
-                <p>Fill in your details and choose an Test category to begin.</p>
+                <p>Fill in your details and choose Test category to begin.</p>
             </div>
 
             <div class="form-group">
@@ -4245,7 +4244,7 @@
         <div class="exam-sidebar">
             <div class="sidebar-card">
                 <div class="sidebar-card-header">
-                    <span>📋</span> Answer Sheet
+                    <span></span> Answer Sheet
                 </div>
                 <div class="sidebar-card-body">
                     <div id="omr-container"></div>
@@ -4277,7 +4276,7 @@
         <div class="peo-mobile-top-wrapper">
             <!-- Graph panel: collapsed (0 width) unless the active question has a chart -->
             <section class="peo-graph-panel" id="peo-graph-panel">
-                <h4 class="peo-graph-title">📊 Reference Diagram</h4>
+                <h4 class="peo-graph-title"> Graph </h4>
                 <div class="peo-graph-image-box">
                     <img id="peo-graph-img" src="" alt="Data exhibit" decoding="async">
                 </div>
@@ -4294,14 +4293,14 @@
                     <div class="peo-options-container" id="peo-options-wrapper"></div>
                 </div>
                 <footer class="peo-footer-nav">
-                    <button type="button" class="peo-btn-prev" id="peo-btn-prev" onclick="peoNavigateBack()">← Previous</button>
+                    <button type="button" class="peo-btn-prev" id="peo-btn-prev" onclick="peoNavigateBack()"> Previous</button>
                 </footer>
             </main>
         </div>
 
         <!-- OMR sheet: always visible, same column on desktop, sticky strip on mobile -->
         <aside class="peo-omr-panel">
-            <div class="peo-omr-header">📋 OMR Sheet</div>
+            <div class="peo-omr-header"> OMR Sheet</div>
             <div class="peo-omr-rows-container" id="peo-omr-rows"></div>
             <div class="peo-omr-footer-area">
                 <div class="peo-omr-summary-bar">
@@ -4309,7 +4308,7 @@
                     <div>Remaining: <span class="peo-summary-val" id="peo-count-remaining">20</span></div>
                 </div>
                 <div class="peo-submit-btn-container" id="peo-submit-block" style="display:none;">
-                    <button type="button" class="peo-btn-submit" onclick="peoSubmitOnlineTest()">Submit Exam ✓</button>
+                    <button type="button" class="peo-btn-submit" onclick="peoSubmitOnlineTest()">Submit </button>
                 </div>
             </div>
         </aside>
@@ -4329,21 +4328,21 @@
                 </div>
             </div>
             <div class="results-title" id="result-title">Test Complete</div>
-            <div class="results-subtitle" id="result-subtitle">Thank you for completing your Test.</div>
+            <div class="results-subtitle" id="result-subtitle">Thank you for completing </div>
         </div>
 
         <div class="results-stats">
             <div class="result-stat-card correct">
                 <div class="num" id="res-correct">0</div>
-                <div class="lbl">✓ Correct</div>
+                <div class="lbl"> Correct</div>
             </div>
             <div class="result-stat-card wrong">
                 <div class="num" id="res-wrong">0</div>
-                <div class="lbl">✕ Incorrect</div>
+                <div class="lbl"> Incorrect</div>
             </div>
             <div class="result-stat-card skipped">
                 <div class="num" id="res-skipped">0</div>
-                <div class="lbl">— Skipped</div>
+                <div class="lbl"> Skipped</div>
             </div>
         </div>
 
@@ -4351,8 +4350,8 @@
         <div id="review-container"></div>
 
         <div class="results-actions">
-            <button type="button" class="btn btn-navy result-action-btn" id="pe-return-online-btn" onclick="returnToPEOnlineTestPage()" style="display:none;">↺ Return to PE Test Page</button>
-            <button type="button" class="btn btn-navy result-action-btn" onclick="retakeExam()">🏠 Return to Home</button>
+            <button type="button" class="btn btn-navy result-action-btn" id="pe-return-online-btn" onclick="returnToPEOnlineTestPage()" style="display:none;"> Back to PE </button>
+            <button type="button" class="btn btn-navy result-action-btn" onclick="retakeExam()"> Return Home</button>
         </div>
     </div>
 
@@ -4375,7 +4374,7 @@
                                 </label>
                                 <label class="radio-pill" id="pill-pe">
                                     <input type="radio" name="dest-mode" value="pe" onchange="onDestModeChange()">
-                                    📚 PE (Practice Engine)
+                                     PE Pages
                                 </label>
                             </div>
                         </div>
@@ -4394,7 +4393,7 @@
                                 </label>
                                 <label class="radio-pill" id="pill-pe-di">
                                     <input type="radio" name="pe-type" value="Data Interpretation" onchange="onPeTypeChange()">
-                                    📊 Data Interpretation
+                                     Data Interpretation
                                 </label>
                             </div>
                             <div style="margin-top:10px;">
@@ -4402,7 +4401,7 @@
                                 <input type="text" id="adm-pe-topic" class="form-control" placeholder="e.g., Problems on Trains, RCSC 2024 Paper 1">
                             </div>
                             <div id="pe-di-note" style="display:none;margin-top:10px;font-size:12px;color:var(--ink-muted);background:var(--cream);border-left:3px solid var(--gold);padding:10px 12px;border-radius:6px;line-height:1.5;">
-                                📊 <strong>Data Interpretation set:</strong> upload the chart/graph in the <strong>Illustration / Image</strong> field below — every question you save under this same Set Name will share that chart in a split-screen view (chart fixed on the left, questions on the right). Add each question for this chart one at a time, keeping the same Set Name.
+                                  <strong>Data Interpretation set:</strong> upload the chart/graph <strong>Illustration / Image</strong> field below, every question you save under this same Set Name will share that chart in a split-screen view. Add each question for this chart one at a time, keeping the same Set Name.
                             </div>
                         </div>
 
@@ -4411,20 +4410,20 @@
                             <div class="cat-mode-row" id="cat-mode-row">
 	                                <label class="radio-pill active" id="pill-exist">
 	                                    <input type="radio" name="cat-mode" value="exist" checked onchange="onCatModeChange()">
-	                                    Existing Category
+	                                    Existing 
 	                                </label>
 	                                <label class="radio-pill" id="pill-new">
 	                                    <input type="radio" name="cat-mode" value="new" onchange="onCatModeChange()">
-	                                    New Category
+	                                    New 
 	                                </label>
                             </div>
                             <div class="category-box">
                                 <div id="exist-wrap">
-                                    <label style="font-size:12px;color:var(--ink-muted);font-weight:600;display:block;margin-bottom:6px;">Select Track</label>
+                                    <label style="font-size:12px;color:var(--ink-muted);font-weight:600;display:block;margin-bottom:6px;">Select Category</label>
                                     <select id="adm-cat-select" class="form-control"></select>
                                 </div>
                                 <div id="new-wrap" style="display:none;">
-                                    <label style="font-size:12px;color:var(--ink-muted);font-weight:600;display:block;margin-bottom:6px;">New Track Name</label>
+                                    <label style="font-size:12px;color:var(--ink-muted);font-weight:600;display:block;margin-bottom:6px;">New Name</label>
                                     <input type="text" id="adm-cat-input" class="form-control" placeholder="e.g., Biology, History">
                                 </div>
                             </div>
@@ -4436,14 +4435,14 @@
                         </div>
 
                         <div class="form-group">
-                            <label>Illustration / Image (Optional)</label>
+                            <label>Illustration / Image </label>
                             <input type="file" id="adm-img-file" accept="image/*" class="form-control" style="padding:8px;" onchange="handleImageUpload(this)">
                             <input type="hidden" id="adm-img-b64">
                             <img id="adm-img-preview" class="img-preview" alt="Preview" decoding="async">
                         </div>
 
                         <div class="form-group">
-                            <label>Music / Audio Question (Optional)</label>
+                            <label>Music / Audio Question </label>
                             <input type="file" id="adm-audio-file" accept="audio/*" class="form-control" style="padding:8px;" onchange="handleAudioUpload(this)">
                             <input type="hidden" id="adm-audio-b64">
                             <audio id="adm-audio-preview" class="q-audio" controls style="display:none;"></audio>
@@ -4479,26 +4478,26 @@
                         </div>
 
                         <div class="form-group">
-                            <label>Explanation / Solution (Optional)</label>
+                            <label>Explanation / Solution </label>
                             <textarea id="adm-explanation" class="form-control" placeholder="Provide detailed explanation or solution… (shown only on PE page)" style="min-height:80px;"></textarea>
                         </div>
 
-	                        <button type="submit" class="btn btn-green btn-full" id="admin-submit-btn">+ Save to Database</button>
+	                        <button type="submit" class="btn btn-green btn-full" id="admin-submit-btn"> Save to Database</button>
 	                        <button type="button" class="btn btn-outline btn-full" id="cancel-edit-btn" style="display:none;margin-top:10px;" onclick="cancelQuestionEdit()">Cancel Edit</button>
 	                    </form>
 	                </div>
 
                 <div class="panel caf-admin-panel admin-editor-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
-                    <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Current Affair Flashcard Admin</div>
-                    <p class="form-help">Add sticky-note current affair flashcards for the PE Current Affair page. Data is saved to Supabase when the table is available.</p>
+                    <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Current Affair Admin</div>
+                    <p class="form-help">Add sticky-note current affair flashcards. Data is saved to Supabase .</p>
 
                     <form id="caf-admin-form" onsubmit="event.preventDefault(); cafSaveAdminCard();">
                         <div class="caf-admin-form-grid">
                             <div class="form-group">
-                                <label>Focus Domain Scope</label>
+                                <label>Focus Header</label>
                                 <select id="caf-admin-scope" class="form-control" onchange="cafPopulateAdminCategories()">
-                                    <option value="Bhutan">Bhutan Focus</option>
-                                    <option value="International">International Focus</option>
+                                    <option value="Bhutan">Bhutan </option>
+                                    <option value="International">International </option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -4506,20 +4505,20 @@
                                 <select id="caf-admin-category" class="form-control"></select>
                             </div>
                             <div class="form-group caf-admin-wide">
-                                <label>Display Date Stamp</label>
+                                <label> Date Stamp</label>
                                 <input type="text" id="caf-admin-date" class="form-control" placeholder="26 June 2026" required>
                             </div>
                             <div class="form-group caf-admin-wide">
-                                <label>Question Statement</label>
+                                <label>Question </label>
                                 <textarea id="caf-admin-question" class="form-control" placeholder="Enter flashcard prompt text..." required></textarea>
                             </div>
                             <div class="form-group caf-admin-wide">
-                                <label>Verified Answer Summary</label>
+                                <label>Verified Answer </label>
                                 <textarea id="caf-admin-answer" class="form-control" placeholder="Enter solution outcome details..." required></textarea>
                             </div>
                         </div>
                         <div class="caf-admin-actions">
-                            <button type="submit" class="btn btn-green">Save Flashcard onto Board</button>
+                            <button type="submit" class="btn btn-green">Save Flashcard </button>
                             <button type="button" class="btn btn-outline" onclick="cafResetAdminForm()">Clear</button>
                         </div>
                     </form>
@@ -4529,7 +4528,7 @@
 
                 <div class="panel admin-editor-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
                     <div class="panel-title" style="margin-bottom:14px;">Daily Quotes Admin</div>
-                    <p class="form-help">Publish English and Dzongkha text to all visitors for 24 hours. Each language is shown separately.</p>
+                    <p class="form-help">Publish English and Dzongkha text for 24 hours. Each language is shown separately.</p>
 
                     <form id="quote-admin-form" onsubmit="event.preventDefault(); saveDailyQuote();">
                         <div class="form-group">
@@ -4586,7 +4585,7 @@
                     </div>
 
                     <div class="panel bulk-import-box" style="margin:0;">
-                        <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Bulk Append Questions</div>
+                        <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Bulk Append </div>
                         <p class="form-help">
                             Paste each question as up to 15 lines: question text can use multiple lines, followed by A, B, C, D, and Answer. Leave one blank line between questions.
                         </p>
@@ -4597,22 +4596,15 @@
                             <div class="form-group">
                                 <label>Bulk Question List</label>
                                 <textarea id="bulk-questions" class="form-control bulk-textarea" placeholder="Example:
-This is a long question.
+
 You can continue the question on another line.
 A. First option
 B. Second option
 C. Third option
 D. Fourth option
-Answer: C
-
-Capital of Bhutan?
-A. Thimphu
-B. Paro
-C. Punakha
-D. Wangdue
-Answer: A"></textarea>
+Answer: C" ></textarea>
                             </div>
-                            <button type="submit" class="btn btn-navy btn-full">Append Bulk Questions</button>
+                            <button type="submit" class="btn btn-navy btn-full">Append Bulk </button>
                         </form>
                     </div>
 
@@ -4676,8 +4668,8 @@ Answer: A"></textarea>
 
                 <!-- HOME: overview of all PE topics, grouped -->
                 <div id="pe-home-panel" class="pe-section active">
-                    <h1>📚 Practice Engine</h1>
-                    <p class="pe-section-desc">Browse Mock tests and past PE examination questions with step-by-step solutions.</p>
+                    <h1> Practice and Learn </h1>
+                    <p class="pe-section-desc"> Current Affair & PE examination questions with step-by-step solutions.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
                         <input type="text" id="pe-home-search" class="pe-filter-input" placeholder="Filter topics…" oninput="renderPEHomeGrid()">
@@ -4695,7 +4687,7 @@ Answer: A"></textarea>
                                     <div class="caf-region-box" id="caf-intl-box" onclick="cafSelectRegion('International')">International Focus</div>
                                 </div>
                                 <div class="caf-sub-filter">
-                                    <label id="caf-dropdown-label" for="caf-category-dropdown">Select Category Area:</label>
+                                    <label id="caf-dropdown-label" for="caf-category-dropdown">Select Category:</label>
                                     <select id="caf-category-dropdown" onchange="cafFilterData()"></select>
                                 </div>
                             </div>
@@ -4712,8 +4704,8 @@ Answer: A"></textarea>
 
                 <!-- MOCK TEST: topic folders for Mock only -->
                 <div id="pe-mock-panel" class="pe-section">
-                    <h1>📝 Mock Tests</h1>
-                    <p class="pe-section-desc">Pick a topic below to start a mock practice set.</p>
+                    <h1> Mock Paper</h1>
+                    <p class="pe-section-desc">Pick a topic and start a mock practice.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
                         <input type="text" id="pe-mock-search" class="pe-filter-input" placeholder="Filter topics…" oninput="renderPEMockGrid()">
@@ -4723,8 +4715,8 @@ Answer: A"></textarea>
 
                 <!-- PE PAST PAPER: topic folders for Past Paper only -->
                 <div id="pe-past-panel" class="pe-section">
-                    <h1>📄 PE Past Question Papers</h1>
-                    <p class="pe-section-desc">Pick a paper below to review past PE examination questions.</p>
+                    <h1> PE Past Papers(Q)</h1>
+                    <p class="pe-section-desc">Pick a topic and start a your practice.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
                         <input type="text" id="pe-past-search" class="pe-filter-input" placeholder="Filter papers…" oninput="renderPEPastGrid()">
@@ -4734,8 +4726,8 @@ Answer: A"></textarea>
 
                 <!-- DATA INTERPRETATION: chart sets, opens the split-screen viewer -->
                 <div id="pe-di-panel" class="pe-section">
-                    <h1>📊 Data Interpretation</h1>
-                    <p class="pe-section-desc">Pick a chart set below — the chart stays fixed on the left while you work through its questions on the right.</p>
+                    <h1> Data Interpretation</h1>
+                    <p class="pe-section-desc">Pick a chart set below and start a your practice.</p>
                     <div class="pe-filter-bar">
                         <span class="pe-filter-icon">☰</span>
                         <input type="text" id="pe-di-search" class="pe-filter-input" placeholder="Filter chart sets…" oninput="renderPEDIGrid()">
@@ -4745,8 +4737,8 @@ Answer: A"></textarea>
 
                 <!-- ONLINE TEST: timed full-length simulation, 2h 30m -->
                 <div id="pe-online-panel" class="pe-section">
-                    <h1>💻 Online Test</h1>
-                    <p class="pe-section-desc">A timed simulation built from up to 100 questions: 30 Mock, 30 Past Paper, and 20 Current Affairs flashcard questions shuffled together, followed by 20 Data Interpretation questions (in whole chart sets) at the very end. If any pool is short, the test simply uses whatever is available.</p>
+                    <h1> Online Test</h1>
+                    <p class="pe-section-desc"> 100 questions: 30 Mock, 30 Past Paper, 20 Current Affairs questions and, 20 Data Interpretation questions with 1min 5sec as per BCSE PE Time allocation</p>
                     <div class="pe-online-card">
                         <div class="pe-online-stat">
                             <i class="bi bi-clock-history"></i>
@@ -4759,26 +4751,26 @@ Answer: A"></textarea>
                             <i class="bi bi-question-circle"></i>
                             <div>
                                 <div class="pe-online-stat-val" id="pe-online-qcount">0</div>
-                                <div class="pe-online-stat-lbl">Questions selected for this test</div>
+                                <div class="pe-online-stat-lbl"> Total Questions selected </div>
                             </div>
                         </div>
                         <div class="pe-online-breakdown" id="pe-online-breakdown" style="font-size:12.5px;color:#8a92a6;margin:-4px 0 18px;">
-                            Mock available: <span id="pe-online-mock-count">0</span> &nbsp;•&nbsp; Past Paper available: <span id="pe-online-past-count">0</span> &nbsp;•&nbsp; Data Interpretation available: <span id="pe-online-di-count">0</span> &nbsp;•&nbsp; Current Affairs available: <span id="pe-online-ca-count">0</span>
+                            Mock : <span id="pe-online-mock-count">0</span> &nbsp;•&nbsp; Past Paper : <span id="pe-online-past-count">0</span> &nbsp;•&nbsp; Data Interpretation: <span id="pe-online-di-count">0</span> &nbsp;•&nbsp; Current Affairs available: <span id="pe-online-ca-count">0</span>
                         </div>
-                        <p class="pe-online-note">Make sure your name is entered on the home screen before starting — your result is saved under that name. Once started, the timer cannot be paused.</p>
-                        <button type="button" class="pe-online-start-btn" onclick="startPEOnlineTest()">▶ Start Online Test</button>
+                        <p class="pe-online-note">Make sure to check time Limit. Best of Luck.</p>
+                        <button type="button" class="pe-online-start-btn" onclick="startPEOnlineTest()"> Start Online Test</button>
                     </div>
                 </div>
 
                 <!-- QUESTION ATTEMPT SCREEN (shared by Home/Mock/Past Paper panels) -->
                 <div id="pe-question-screen" class="pe-section">
-                    <button type="button" class="pe-back-link" onclick="showPEFolderScreen()">← Back to Topics</button>
+                    <button type="button" class="pe-back-link" onclick="showPEFolderScreen()"> Back </button>
                     <div id="pe-questions-container"></div>
                 </div>
 
                 <!-- DI SPLIT-SCREEN VIEWER: chart fixed left, one question at a time right -->
                 <div id="pe-di-viewer-screen" class="pe-section">
-                    <button type="button" class="pe-back-link" onclick="closePEDIViewer()">← Back to Chart Sets</button>
+                    <button type="button" class="pe-back-link" onclick="closePEDIViewer()"> Back </button>
                     <div class="pe-di-split">
                         <div class="pe-di-split-left">
                             <div class="pe-di-chart-wrap">
@@ -6822,10 +6814,8 @@ const PE_ONLINE_CA_QUESTION_COUNT = 20;   // Current Affair flashcard questions
 
 // Turns saved Current Affair flashcards (Admin > Current Affair Flashcard
 // Admin, table CurrentAffairFlashcards) into MCQ-style PE questions: the
-// flashcard's own answer is the correct option (option 1 / index 0), and
-// the other three options are answers borrowed from OTHER flashcards, so
-// they read as plausible current-affairs facts rather than something
-// obviously wrong. Options get shuffled later by prepareRandomizedQuestion,
+// flashcard's own answer is the correct option (option 1 / index 0), and // the other three options are answers borrowed from OTHER flashcards, so
+// they read as plausible current-affairs facts rather than something// obviously wrong. Options get shuffled later by prepareRandomizedQuestion,
 // same as every other PE question, so the correct one isn't always first.
 function buildPEOnlineCurrentAffairQuestions(targetCount) {
     const pool = (cafNotes || []).filter(note => note.examFocus && note.answer);
@@ -6853,10 +6843,8 @@ function buildPEOnlineCurrentAffairQuestions(targetCount) {
 }
 
 // Picks whole Data Interpretation chart-sets (shuffled order, each set's own
-// question order preserved) and keeps adding sets until the running total
-// reaches targetCount — a set is never split apart, since its questions
-// share one chart in the split-screen view. May slightly overshoot the
-// target on the final set, or fall short if there simply aren't enough DI
+// question order preserved) and keeps adding sets until the running total // reaches targetCount — a set is never split apart, since its questions
+// share one chart in the split-screen view. May slightly overshoot the // target on the final set, or fall short if there simply aren't enough DI
 // sets in the database — either way, nothing errors.
 function buildPEOnlineDataInterpretationQuestions(targetCount) {
     const peQuestions = getPEQuestions();
@@ -6911,14 +6899,11 @@ function formatPEOnlineDuration(totalSeconds) {
 }
 
 // Builds a 100-question Online Test: 20 Data Interpretation + 20 Current
-// Affairs + the remaining 60 split evenly between Mock and Past Paper (30
-// each). If Mock or Past Paper can't fill its half, the shortfall is
+// Affairs + the remaining 60 split evenly between Mock and Past Paper (30 // each). If Mock or Past Paper can't fill its half, the shortfall is
 // backfilled from the other one (as long as it has spare questions left),
-// so the test still gets as close to 100 as the combined Mock + Past Paper
-// pool allows. Data Interpretation is always appended last, as its own
+// so the test still gets as close to 100 as the combined Mock + Past Paper // pool allows. Data Interpretation is always appended last, as its own
 // contiguous block, after Mock/Past/Current Affairs (which are shuffled
-// together) — and every pool simply uses whatever it has if it's short of
-// its target; nothing blocks the test from starting.
+// together) — and every pool simply uses whatever it has if it's short of // its target; nothing blocks the test from starting.
 function buildPEOnlineTestSet() {
     const peQuestions = getPEQuestions();
     const mockPool = peQuestions.filter(q => parsePECategory(q.category).peType === "Mock");
@@ -7004,14 +6989,11 @@ async function startPEOnlineTest() {
     startTimer();
 }
 
-// ════════════════════════════════════════════════════════
 // PE ONLINE TEST — SPLIT-SCREEN WORKSPACE RENDERER
-// Mirrors the OMR-Driven Sticky Mobile Testing Engine reference exactly:
-// the graph panel is collapsed by default and expands into a 60/40 split
-// only when the active question carries a chart image (Data Interpretation
-// questions). Operates on the same activeData/responses/currentIdx state
+// Mirrors the OMR-Driven Sticky Mobile Testing Engine reference exactly: // the graph panel is collapsed by default and expands into a 60/40 split
+// only when the active question carries a chart image (Data Interpretation // questions). Operates on the same activeData/responses/currentIdx state
 // the normal exam flow uses, so submitExam() works unmodified.
-// ════════════════════════════════════════════════════════
+	
 function peoInitOMRSheet() {
     const wrapper = document.getElementById("peo-omr-rows");
     wrapper.innerHTML = "";
@@ -7033,8 +7015,7 @@ function peoInitOMRSheet() {
             bubble.className = "peo-bubble";
             bubble.textContent = letter;
             bubble.id = `peo-bubble-${index}-${letterIdx}`;
-            // A bubble only records an answer when it belongs to the
-            // selected row. If the row is not currently open, jump there and
+            // A bubble only records an answer when it belongs to the // selected row. If the row is not currently open, jump there and
             // save the clicked option in the same click.
             bubble.onclick = () => {
                 currentIdx = index;
@@ -7063,8 +7044,7 @@ function peoSyncWorkspaceView() {
 
     if (graphSource) {
         if (imgNode.getAttribute("src") !== graphSource) {
-            // Cross-fade when the chart image itself actually changes
-            // (moving between two different DI sets), rather than just
+            // Cross-fade when the chart image itself actually changes // (moving between two different DI sets), rather than just
             // swapping the src instantly mid-transition.
             imgNode.style.opacity = "0";
             setTimeout(() => {
@@ -7111,10 +7091,8 @@ function peoSyncWorkspaceView() {
         optionsWrapper.appendChild(row);
     });
 
-    // Re-trigger the question-content fade-in on every render (new question
-    // or a split-mode switch) by removing and re-adding the element from
-    // the DOM flow — toggling a class alone won't restart a CSS animation
-    // that's already finished, but a reflow via offsetWidth will.
+    // Re-trigger the question-content fade-in on every render (new question// or a split-mode switch) by removing and re-adding the element from
+    // the DOM flow — toggling a class alone won't restart a CSS animation // that's already finished, but a reflow via offsetWidth will.
     const contentBlock = document.getElementById("peo-question-content");
     if (contentBlock) {
         contentBlock.style.animation = "none";
@@ -7123,8 +7101,7 @@ function peoSyncWorkspaceView() {
     }
 
     // Make sure every OMR bubble reflects the ACTUAL saved answer for its
-    // row (not just whatever was last clicked) — this runs on every render
-    // so navigating around the sheet never shows stale or leftover highlights.
+    // row (not just whatever was last clicked) — this runs on every render // so navigating around the sheet never shows stale or leftover highlights.
     for (let i = 0; i < activeData.length; i++) {
         for (let letterIdx = 0; letterIdx < ALPHA.length; letterIdx++) {
             const bubble = document.getElementById(`peo-bubble-${i}-${letterIdx}`);
@@ -7145,8 +7122,7 @@ function peoSelectOption(qIdx, choiceIdx) {
     peoUpdateCounters();
 
     // Immediate visual feedback so the click feels responsive even before
-    // the full re-render runs (matters most during the auto-advance delay
-    // below, so the person can see their answer register).
+    // the full re-render runs (matters most during the auto-advance delay // below, so the person can see their answer register).
     for (let i = 0; i < ALPHA.length; i++) {
         const bubble = document.getElementById(`peo-bubble-${qIdx}-${i}`);
         if (bubble) bubble.classList.toggle("active", i === choiceIdx);
@@ -7186,7 +7162,6 @@ function peoSubmitOnlineTest() {
     submitExam(); // shared scoring/save/results logic — operates on the same activeData/responses
 }
 
-
 // ─── Opening a topic → question attempt screen ─────────────
 function openPETopic(peType, topic) {
     if (peType === "Data Interpretation") {
@@ -7219,8 +7194,7 @@ function showPEFolderScreen() {
 
 // ─── DATA INTERPRETATION: split-screen viewer ──────────────────
 // Chart pane stays fixed on the left (position: sticky) while the
-// question pane on the right shows one question at a time with
-// Next/Previous — same model GMAT/GRE/CAT use for chart-based sets.
+// question pane on the right shows one question at a time with // Next/Previous — same model GMAT/GRE/CAT use for chart-based sets.
 let peDIActiveSet = null; // the set/topic name currently open in the viewer
 let peDIQuestionIdx = 0;  // which question within that set is showing
 
@@ -7249,7 +7223,7 @@ function renderPEDIGrid() {
                 ${thumb}
                 <div class="pe-card-info">
                     <div class="pe-card-title">${escapePEHtml(s.topic)}</div>
-                    <div class="pe-card-meta">📊 ${s.count} question${s.count === 1 ? "" : "s"}</div>
+                    <div class="pe-card-meta"> ${s.count} question${s.count === 1 ? "" : "s"}</div>
                 </div>
             </div>
         `;
