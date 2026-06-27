@@ -3854,6 +3854,82 @@
         @media (max-width: 560px) {
             .pe-content:has(#pe-current-affair-panel.active) .caf-root { height: 100%; }
         }
+
+        /* Compact public header so every entry action remains visible on phones. */
+        @media (max-width: 560px) {
+            body { padding-top: 50px; }
+
+            header {
+                height: 50px;
+                padding: 0 6px;
+                gap: 5px;
+            }
+
+            .header-brand {
+                gap: 6px;
+                min-width: 0;
+                flex: 0 1 auto;
+            }
+
+            .brand-icon {
+                width: 28px;
+                height: 28px;
+                border-radius: 6px;
+                font-size: 14px;
+            }
+
+            .brand-text { min-width: 0; }
+
+            .brand-text h1 {
+                font-size: 14px;
+                line-height: 1.05;
+                letter-spacing: 0;
+            }
+
+            .brand-text p {
+                max-width: 82px;
+                margin-top: 2px;
+                font-size: 7.5px;
+                line-height: 1.15;
+                letter-spacing: 0.35px;
+            }
+
+            .header-right {
+                gap: 4px;
+                flex: 0 0 auto;
+            }
+
+            .header-right .btn {
+                min-height: 30px;
+                padding: 5px 7px;
+                gap: 3px;
+                border-radius: 5px;
+                font-size: 10px;
+                letter-spacing: 0;
+            }
+
+            .timer-badge {
+                gap: 4px;
+                padding: 5px 7px;
+                font-size: 11px;
+                letter-spacing: 0.4px;
+            }
+
+            #setup-view,
+            #pe-view,
+            .peo-test-workspace {
+                inset: 50px 0 0 0;
+            }
+
+            .exam-layout.show {
+                inset: 50px 0 0 0 !important;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .brand-text p { display: none; }
+            .header-right .btn { padding-left: 6px; padding-right: 6px; }
+        }
     </style>
 </head>
 <body>
@@ -3955,7 +4031,7 @@
     </div>
 </header>
 
-<div class="site-copyright" id="site-copyright">© 2026 ExamPortal</div>
+<div class="site-copyright" id="site-copyright">© 2026</div>
 
 <div class="page-content">
 
@@ -4607,7 +4683,7 @@ let editingQuestionIndex = null;
         localStorage.removeItem("exam_theme_mode");
         applyThemeMode("light");
         const copyrightEl = document.getElementById("site-copyright");
-        if (copyrightEl) copyrightEl.textContent = `© ${new Date().getFullYear()} ExamPortal`;
+        if (copyrightEl) copyrightEl.textContent = `© ${new Date().getFullYear()}`;
         await loadDailyQuotes();
         renderDailyQuoteTicker();
         await caLoadState();
