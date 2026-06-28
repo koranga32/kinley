@@ -5913,6 +5913,7 @@ async function submitExam() {
     const pct   = Math.round((correct/total)*100);
 
     // Submit through the same-origin API so validation and rate limits apply.
+    let cloudSaveError = null;
     try {
         await apiRequest("responses", {
             method: "POST",
@@ -5924,7 +5925,10 @@ async function submitExam() {
                 detailed_breakdown: breakdown
             }
         });
-    } catch (e) { console.error("Submit error:", e); }
+    } catch (e) {
+        cloudSaveError = e;
+        console.error("Submit error:", e);
+    }
 
     // Build results UI
     document.getElementById("result-fraction").textContent = `${correct}/${total}`;
@@ -5982,6 +5986,16 @@ async function submitExam() {
     document.getElementById("results-view").style.display = "";
     document.getElementById("results-view").classList.add("show");
     showLoading(false);
+    if (cloudSaveError) {
+        showToast(
+            cloudSaveError.status === 429
+                ? "Result shown, but cloud saving is temporarily rate-limited."
+                : "Result shown, but it could not be saved to the cloud.",
+            "error"
+        );
+    } else {
+        showToast("Exam result saved securely.", "success");
+    }
 
     // Animate ring after render
     setTimeout(() => { ring.style.strokeDashoffset = offset; }, 300);
@@ -6536,7 +6550,7 @@ function cafRenderAdminRegistry() {
             <strong>${escapePEHtml(item.scope)}</strong>
             <span>${escapePEHtml(item.category)}</span>
             <span>${escapePEHtml(item.examFocus)}</span>
-            <button type="button" class="btn-danger-sm" onclick="cafDeleteCard('${String(item.id || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'")}')">Delete</button>
+            <button type="button" class="btn-danger-sm" onclick="cafDeleteCard('${String(item.id || "").replace(/'/g, "\\'")}')">Delete</button>
         </div>
     `).join("");
 }
@@ -6660,7 +6674,7 @@ function renderDailyQuoteAdminRegistry() {
         <div class="quote-admin-row">
             <span>${escapePEHtml(item.english)}</span>
             <span class="quote-admin-dzongkha">${escapePEHtml(item.dzongkha)}</span>
-            <button type="button" class="btn-danger-sm" onclick='deleteDailyQuote(${JSON.stringify(String(item.id || ""))})'>Delete</button>
+            <button type="button" class="btn-danger-sm" onclick="deleteDailyQuote('${String(item.id || "").replace(/'/g, "\\'")}')">Delete</button>
         </div>
     `).join("");
 }
