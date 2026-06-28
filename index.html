@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://nwkfuluvgbsmyzomlpvw.supabase.co wss://nwkfuluvgbsmyzomlpvw.supabase.co https://formsubmit.co; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; manifest-src 'self'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://nwkfuluvgbsmyzomlpvw.supabase.co wss://nwkfuluvgbsmyzomlpvw.supabase.co; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; manifest-src 'self'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="description" content="ExamPortal is a cloud-linked practice and testing platform with exam question banks, PE practice, current-affair flashcards, timed online tests, and admin tools.">
     <meta name="robots" content="index, follow">
@@ -5116,6 +5116,24 @@ async function supabaseRequest(path, { method = "GET", body, useAdmin = false, p
     return text ? JSON.parse(text) : null;
 }
 
+async function apiRequest(path, { method = "GET", body } = {}) {
+    const response = await fetch(`/api/${path}`, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: "same-origin"
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+        const error = new Error(data?.error?.message || `Request failed (${response.status})`);
+        error.code = data?.error?.code || "request_failed";
+        error.status = response.status;
+        throw error;
+    }
+    return data;
+}
+
 // ─── EXPLANATION ENCODING ──────────────────────────────
 // Explanations are embedded directly inside the existing `question` text
 // column using a hidden delimiter, so NO new Supabase column is required.
@@ -5159,8 +5177,7 @@ async function fetchQuestions() {
     // Lightweight fetch — excludes image/audio columns, which can each hold
     // multi-megabyte base64 data. This keeps initial load fast; media is
     // fetched separately afterward without blocking first render.
-    const fields = "id,category,question,optionA,optionB,optionC,optionD,answer";
-    const rows = await supabaseRequest(`Exam?select=${fields}&order=id.asc`);
+    const rows = await apiRequest("questions?view=text");
     return mapExamRows(rows);
 }
 
@@ -5172,7 +5189,7 @@ async function fetchQuestions() {
 // very little benefit, since rows with no media just return empty strings.
 async function fetchAndMergeQuestionMedia() {
     try {
-        const mediaRows = await supabaseRequest("Exam?select=id,image,audio");
+        const mediaRows = await apiRequest("questions?view=media");
         if (!mediaRows || mediaRows.length === 0) return;
 
         const changed = mergeMediaRowsIntoQuestions(questionPool, mediaRows);
@@ -5222,7 +5239,7 @@ async function fetchSelectedQuestionMedia(questions) {
 
     const mediaRows = [];
     for (const chunk of chunks) {
-        const rows = await supabaseRequest(`Exam?select=id,image,audio&id=in.(${chunk.join(",")})`);
+        const rows = await apiRequest(`questions?view=media&ids=${encodeURIComponent(chunk.join(","))}`);
         if (Array.isArray(rows)) mediaRows.push(...rows);
     }
     if (!mediaRows.length) return;
@@ -5895,11 +5912,10 @@ async function submitExam() {
     const total = activeData.length;
     const pct   = Math.round((correct/total)*100);
 
-    // Submit to Supabase
+    // Submit through the same-origin API so validation and rate limits apply.
     try {
-        await supabaseRequest("Response", {
+        await apiRequest("responses", {
             method: "POST",
-            prefer: "return=minimal",
             body: {
                 time_stamp: new Date().toISOString(),
                 student_name: document.getElementById("student-name").value.trim(),
@@ -6055,35 +6071,24 @@ async function submitContactForm() {
         email: document.getElementById("contact-email").value.trim(),
         subject,
         inquiry_type: document.getElementById("contact-type").value,
-        message: document.getElementById("contact-message").value.trim(),
-        _subject: `ExamPortal Contact: ${subject}`,
-        _template: "table"
+        message: document.getElementById("contact-message").value.trim()
     };
 
     submitBtn.disabled = true;
     submitBtn.textContent = "Sending...";
     try {
-        const response = await fetch("https://formsubmit.co/ajax/karmapeling25@gmail.com", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json"
-            },
-            body: JSON.stringify(payload)
-        });
-        const result = await response.json().catch(() => ({}));
-        const submissionAccepted = result.success === true || result.success === "true";
-        if (!response.ok || !submissionAccepted) {
-            throw new Error(result.message || "Message delivery failed");
-        }
+        await apiRequest("contact", { method: "POST", body: payload });
         form.reset();
         closeContactModal();
         showToast("Message submitted successfully.", "success");
     } catch (error) {
         console.error("Contact form error:", error);
         const needsActivation = /activation|activate form/i.test(String(error.message || ""));
+        const rateLimited = error.status === 429;
         showToast(
-            needsActivation
+            rateLimited
+                ? "Too many messages were sent. Please wait and try again."
+                : needsActivation
                 ? "Activate the contact form from the receiver email first."
                 : "Message could not be sent. Please try again.",
             "error"
@@ -6287,7 +6292,7 @@ function cafNormalizeRows(rows) {
 
 async function caLoadState() {
     try {
-        const rows = await supabaseRequest(`${CA_SUPABASE_TABLE}?select=id,scope,category,date_stamp,exam_focus,answer,created_at&order=created_at.desc`);
+        const rows = await apiRequest("flashcards");
         cafNotes = cafNormalizeRows(rows);
     } catch (e) {
         cafNotes = cafSeedNotes.map((item, idx) => ({ ...item, id: null, _seedIndex: idx }));
@@ -6579,10 +6584,7 @@ function renderDailyQuoteTicker() {
 
 async function loadDailyQuotes() {
     try {
-        const now = encodeURIComponent(new Date().toISOString());
-        const rows = await supabaseRequest(
-            `${DAILY_QUOTES_TABLE}?select=id,english_quote,dzongkha_quote,expires_at,created_at&expires_at=gt.${now}&order=created_at.desc`
-        );
+        const rows = await apiRequest("quotes");
         dailyQuotes = (rows || []).map(row => ({
             id: String(row.id),
             english: row.english_quote || "",
