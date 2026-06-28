@@ -6660,7 +6660,7 @@ function renderDailyQuoteAdminRegistry() {
         <div class="quote-admin-row">
             <span>${escapePEHtml(item.english)}</span>
             <span class="quote-admin-dzongkha">${escapePEHtml(item.dzongkha)}</span>
-            <button type="button" class="btn-danger-sm" onclick="deleteDailyQuote('${String(item.id || "").replace(/'/g, "\\'")}')">Delete</button>
+            <button type="button" class="btn-danger-sm" onclick='deleteDailyQuote(${JSON.stringify(String(item.id || ""))})'>Delete</button>
         </div>
     `).join("");
 }
