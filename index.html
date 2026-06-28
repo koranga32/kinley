@@ -5990,7 +5990,7 @@ async function submitExam() {
         showToast(
             cloudSaveError.status === 429
                 ? "Result shown, but cloud saving is temporarily rate-limited."
-                : "Result shown, but it could not be saved to the cloud.",
+                : `Result not saved: ${cloudSaveError.message}`,
             "error"
         );
     } else {
