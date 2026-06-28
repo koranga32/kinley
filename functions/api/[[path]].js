@@ -11,7 +11,7 @@ const POLICIES = {
     questions: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     flashcards: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     quotes: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
-    responses: { windowMs: HOUR, ipLimit: 5, sessionLimit: 3 },
+    responses: { windowMs: HOUR, ipLimit: 60, sessionLimit: 12 },
     contact: { windowMs: HOUR, ipLimit: 3, sessionLimit: 2 }
 };
 
