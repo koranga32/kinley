@@ -4805,7 +4805,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_I9WL1ChnlPJp2V_MSM4R5Q_RXQ48iBR
 const ADMIN_EMAIL = "koranga6265@gmail.com";
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
-const DB_CACHE_KEY = "supabase_exam_pool_v1";
+const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
 const SECONDS_PER_QUESTION = 30;
 const CA_SUPABASE_TABLE = "CurrentAffairFlashcards";
 const DAILY_QUOTES_TABLE = "daily_quotes";
@@ -4829,6 +4829,8 @@ let dailyQuoteTickerIndex = 0;
 let dailyQuoteExpiryTimer = null;
 let activeCategoryLabel = null; // overrides category-select value when set (e.g. PE Online Test)
 let audioQuestionTimer = null;  // tracks the 30s countdown for the current audio question
+let activeExamSessionId = "";
+let peOnlineQuestionPool = [];
 let adminAccessToken = sessionStorage.getItem("exam_admin_token") || "";
 let editingQuestionIndex = null;
 
@@ -4956,15 +4958,16 @@ let editingQuestionIndex = null;
 
 	function prepareRandomizedQuestion(question) {
 	    const { options, answerIndex } = cleanQuestionOptions(question);
+	    const hasAnswer = Number.isInteger(question.answer) && question.answer >= 0 && question.answer <= 3;
 	    const optionItems = options.map((text, index) => ({
 	        text,
-	        wasCorrect: index === answerIndex
+	        wasCorrect: hasAnswer && index === answerIndex
 	    }));
 	    const shuffledOptions = shuffleArray(optionItems);
 	    return {
 	        ...question,
 	        options: shuffledOptions.map(item => item.text),
-	        answer: shuffledOptions.findIndex(item => item.wasCorrect)
+	        answer: hasAnswer ? shuffledOptions.findIndex(item => item.wasCorrect) : -1
 	    };
 	}
 
@@ -5181,6 +5184,19 @@ async function fetchQuestions() {
     return mapExamRows(rows);
 }
 
+async function createExamSession(questions) {
+    const response = await apiRequest("exam-session", {
+        method: "POST",
+        body: {
+            items: questions.map(question => ({
+                id: String(question.id),
+                options: question.options
+            }))
+        }
+    });
+    activeExamSessionId = response.session_id;
+}
+
 // Fetches only image/audio for every row, then merges the result into the
 // already-rendered questionPool in place. Runs in the background after the
 // lightweight fetch above has already shown the UI, so it never blocks
@@ -5232,18 +5248,28 @@ function mergeMediaRowsIntoQuestions(questions, mediaRows) {
 }
 
 async function fetchSelectedQuestionMedia(questions) {
-    const ids = [...new Set((questions || []).map(q => q.id).filter(id => id !== null && id !== undefined))];
-    if (!ids.length) return;
-    const chunks = [];
-    for (let i = 0; i < ids.length; i += 80) chunks.push(ids.slice(i, i + 80));
-
     const mediaRows = [];
-    for (const chunk of chunks) {
+    const normalIds = [...new Set((questions || [])
+        .map(q => String(q.id || ""))
+        .filter(id => /^\d+$/.test(id)))];
+    const peOnlineIds = [...new Set((questions || [])
+        .map(q => String(q.id || ""))
+        .filter(id => /^peo:\d+$/.test(id))
+        .map(id => id.slice(4)))];
+
+    for (let i = 0; i < normalIds.length; i += 80) {
+        const chunk = normalIds.slice(i, i + 80);
         const rows = await apiRequest(`questions?view=media&ids=${encodeURIComponent(chunk.join(","))}`);
+        if (Array.isArray(rows)) mediaRows.push(...rows);
+    }
+    for (let i = 0; i < peOnlineIds.length; i += 80) {
+        const chunk = peOnlineIds.slice(i, i + 80);
+        const rows = await apiRequest(`pe-online-questions?view=media&ids=${encodeURIComponent(chunk.join(","))}`);
         if (Array.isArray(rows)) mediaRows.push(...rows);
     }
     if (!mediaRows.length) return;
     mergeMediaRowsIntoQuestions(questionPool, mediaRows);
+    mergeMediaRowsIntoQuestions(peOnlineQuestionPool, mediaRows);
     mergeMediaRowsIntoQuestions(questions, mediaRows);
     saveDatabaseCache(questionPool);
 }
@@ -5569,6 +5595,19 @@ async function startExam() {
 	    if (categoryQuestions.length === 0) { showToast("No questions in this category.", "error"); return; }
 	    activeData = shuffleArray(categoryQuestions).map(prepareRandomizedQuestion);
 
+    examPreparing = true;
+    showLoading(true, "Securing exam session…");
+    try {
+        await createExamSession(activeData);
+    } catch (error) {
+        examPreparing = false;
+        showLoading(false);
+        showToast(`Could not start secure exam: ${error.message}`, "error");
+        return;
+    }
+    examPreparing = false;
+    showLoading(false);
+
     responses  = new Array(activeData.length).fill(null);
     timeLeft   = getTestDurationSeconds(activeData.length);
     currentIdx = 0;
@@ -5594,6 +5633,7 @@ function retakeExam() {
     currentIdx = 0;
     timeLeft = 0;
     activeCategoryLabel = null;
+    activeExamSessionId = "";
 
     document.getElementById("results-view").classList.remove("show");
     document.getElementById("pe-return-online-btn") && (document.getElementById("pe-return-online-btn").style.display = "none");
@@ -5897,38 +5937,42 @@ async function submitExam() {
     document.getElementById("peo-workspace") && (document.getElementById("peo-workspace").style.display = "none");
     showLoading(true, "Processing results and saving to cloud…");
 
-    let correct = 0, wrong = 0, skipped = 0;
-    const breakdown = [];
-
-    activeData.forEach((q, i) => {
-        const ans = responses[i];
-        const isCorrect = ans !== null && ans === q.answer;
-        if (ans === null) skipped++;
-        else if (isCorrect) correct++;
-        else wrong++;
-        breakdown.push({ question: q.question, selected: ans !== null ? ALPHA[ans] : "Skipped", status: isCorrect ? "CORRECT" : (ans === null ? "SKIPPED" : "WRONG") });
-    });
-
-    const total = activeData.length;
-    const pct   = Math.round((correct/total)*100);
-
-    // Submit through the same-origin API so validation and rate limits apply.
-    let cloudSaveError = null;
+    let gradedResult;
     try {
-        await apiRequest("responses", {
+        const response = await apiRequest("responses", {
             method: "POST",
             body: {
+                session_id: activeExamSessionId,
                 time_stamp: new Date().toISOString(),
                 student_name: document.getElementById("student-name").value.trim(),
                 category_track: activeCategoryLabel || document.getElementById("category-select").value,
-                final_score: `${correct}/${total}`,
-                detailed_breakdown: breakdown
+                selections: responses
             }
         });
+        gradedResult = response.result;
     } catch (e) {
-        cloudSaveError = e;
         console.error("Submit error:", e);
+        if (activeCategoryLabel === "PE Online Test") {
+            document.getElementById("peo-workspace").style.display = "flex";
+        }
+        showLoading(false);
+        showToast(
+            e.status === 429
+                ? "Submission is temporarily rate-limited. Please try again shortly."
+                : `Result not saved: ${e.message}`,
+            "error"
+        );
+        return;
     }
+
+    gradedResult.grading.forEach((grade, index) => {
+        activeData[index].answer = grade.correctIndex;
+    });
+    const correct = gradedResult.correct;
+    const wrong = gradedResult.wrong;
+    const skipped = gradedResult.skipped;
+    const total = gradedResult.total;
+    const pct = Math.round((correct / total) * 100);
 
     // Build results UI
     document.getElementById("result-fraction").textContent = `${correct}/${total}`;
@@ -5986,16 +6030,7 @@ async function submitExam() {
     document.getElementById("results-view").style.display = "";
     document.getElementById("results-view").classList.add("show");
     showLoading(false);
-    if (cloudSaveError) {
-        showToast(
-            cloudSaveError.status === 429
-                ? "Result shown, but cloud saving is temporarily rate-limited."
-                : `Result not saved: ${cloudSaveError.message}`,
-            "error"
-        );
-    } else {
-        showToast("Exam result saved securely.", "success");
-    }
+    showToast("Exam graded and saved securely.", "success");
 
     // Animate ring after render
     setTimeout(() => { ring.style.strokeDashoffset = offset; }, 300);
@@ -6175,7 +6210,12 @@ async function authenticateAdmin() {
 async function showAdminPortal() {
     sessionStorage.setItem("exam_admin_active", "1");
     document.body.classList.add("admin-mode");
-    if (!databaseReady) await loadDatabase();
+    const adminRows = await supabaseRequest(
+        "Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer,image,audio&order=id.asc",
+        { useAdmin: true }
+    );
+    processData(mapExamRows(adminRows));
+    databaseReady = true;
     caHydrateAdminControls();
     caRenderAll();
     document.getElementById("setup-view").style.display = "none";
@@ -6192,11 +6232,14 @@ async function restoreAdminPortal() {
     await showAdminPortal();
 }
 
-function closeAdminPortal() {
+async function closeAdminPortal() {
     sessionStorage.removeItem("exam_admin_active");
     sessionStorage.removeItem("exam_admin_token");
     document.body.classList.remove("admin-mode");
     adminAccessToken = "";
+    clearDatabaseCache();
+    questionPool = [];
+    databaseReady = false;
     cancelQuestionEdit();
     document.getElementById("admin-view").style.display  = "none";
     document.getElementById("setup-view").style.display  = "block";
@@ -6208,6 +6251,7 @@ function closeAdminPortal() {
         setEntryActionButtons();
     }
     document.getElementById("admin-back-btn").style.display = "none";
+    await loadDatabase();
 }
 
 function onCatModeChange() {
@@ -6277,14 +6321,7 @@ const cafSubcategories = {
     International: ["Person", "Authors & Books", "Awards & Honor", "Sports"]
 };
 
-const cafSeedNotes = [
-    { scope: "Bhutan", category: "Sports", date: "25 June 2026", examFocus: "Which country won the SAFF U-19 Championship in 2026?", answer: "Bhutan secured the gold title by cleanly defeating Nepal in the championship final match." },
-    { scope: "Bhutan", category: "Sports", date: "24 June 2026", examFocus: "Where were the historic national archery league records registered?", answer: "The high compound tracking target records were set at the Changlimithang Stadium in Thimphu." },
-    { scope: "Bhutan", category: "Sports", date: "20 June 2026", examFocus: "What was the max target altitude ceiling scaling limit for the alpine mountain marathon?", answer: "Athletes successfully crossed high mountain tracks at altitudes exceeding 4,000 meters above sea level." },
-    { scope: "Bhutan", category: "Sports", date: "15 June 2026", examFocus: "How many regional boxing youth flyweight contenders advanced to the continental games?", answer: "Exactly three boxing youth flyweight fighters won dynamic qualifying match slots." },
-    { scope: "Bhutan", category: "Sports", date: "11 June 2026", examFocus: "What tactical quick game format was rolled out across the Thimphu Chess Masters League?", answer: "A rapid timed countdown system format was deployed to check student analytical speed traits." },
-    { scope: "Bhutan", category: "Sports", date: "05 June 2026", examFocus: "Which district sector areas received specialized priority for academy youth football turf funds?", answer: "Rural grassroots training outposts inside Eastern Dzongkhags were explicitly prioritized." }
-];
+const cafSeedNotes = [];
 
 let cafNotes = [];
 let cafSelectedScope = "Bhutan";
@@ -6301,7 +6338,7 @@ function cafNormalizeRows(rows) {
         answer: row.answer || "",
         created_at: row.created_at || "",
         _seedIndex: idx
-    })).filter(item => item.examFocus && item.answer);
+    })).filter(item => item.examFocus);
 }
 
 async function caLoadState() {
@@ -6414,8 +6451,22 @@ function cafPlayWooshSound() {
     } catch (e) {}
 }
 
-function cafCardFlipHandler(container, cardId) {
+async function cafCardFlipHandler(container, cardId, data, answerElement) {
     const wasFlipped = container.classList.contains("flipped");
+    if (!wasFlipped && !data.answer) {
+        if (!data.id) return;
+        container.style.pointerEvents = "none";
+        try {
+            const result = await apiRequest(`flashcard-answer?id=${encodeURIComponent(data.id)}`);
+            data.answer = result.answer || "";
+            answerElement.textContent = data.answer;
+        } catch (error) {
+            showToast(`Could not load answer: ${error.message}`, "error");
+            return;
+        } finally {
+            container.style.pointerEvents = "";
+        }
+    }
     const flipped = container.classList.toggle("flipped");
     if (!wasFlipped && flipped) cafPlayWooshSound();
     if (cafActiveTimers[cardId]) clearTimeout(cafActiveTimers[cardId]);
@@ -6453,7 +6504,6 @@ function cafRenderPageGrid() {
         const cardId = `caf-card-${globalIndex}`;
         const card = document.createElement("div");
         card.className = "caf-card-container caf-card-entry";
-        card.onclick = () => cafCardFlipHandler(card, cardId);
         card.innerHTML = `
             <div class="caf-hanging-card">
                 <div class="caf-card-face caf-card-front caf-note-color-${index % 6}">
@@ -6465,13 +6515,15 @@ function cafRenderPageGrid() {
                 </div>
                 <div class="caf-card-face caf-card-back caf-note-color-${index % 6}">
                     <div><div class="caf-card-number">Verified Answer</div></div>
-                    <div class="caf-answer-wrapper"><div class="caf-answer-text">${escapePEHtml(data.answer)}</div></div>
+                    <div class="caf-answer-wrapper"><div class="caf-answer-text">${escapePEHtml(data.answer || "")}</div></div>
                     <div>
                         <div class="caf-card-footer"><span>${escapePEHtml(data.date || "")}</span><span>${escapePEHtml(data.category)}</span></div>
                     </div>
                 </div>
             </div>
         `;
+        const answerElement = card.querySelector(".caf-answer-text");
+        card.onclick = () => cafCardFlipHandler(card, cardId, data, answerElement);
         wall.appendChild(card);
     });
     requestAnimationFrame(cafSyncScrollControls);
@@ -6689,6 +6741,7 @@ function renderDailyQuoteAdminRegistry() {
 // ════════════════════════════════════════════════════════
 let peActiveTopic = null;   // { peType, topic } while viewing questions; null while browsing
 let peSidebarWired = false;
+const pePracticeQuestionsByDomId = new Map();
 
 function wirePESidebar() {
     if (peSidebarWired) return; // only attach listeners once
@@ -6735,6 +6788,12 @@ function wirePESidebar() {
 
 async function openPEPortal() {
     if (!databaseReady) await loadDatabase();
+    try {
+        await loadPEOnlineQuestionBank();
+    } catch (error) {
+        peOnlineQuestionPool = [];
+        console.error("PE Online question bank load failed:", error);
+    }
     document.getElementById("setup-view").style.display = "none";
     document.getElementById("exam-view") && document.getElementById("exam-view").classList.remove("show");
     document.getElementById("results-view") && document.getElementById("results-view").classList.remove("show");
@@ -6834,36 +6893,18 @@ function renderPEPastGrid() {
 const PE_ONLINE_SECONDS_PER_QUESTION = 65; // 1 minute 5 seconds per PE Online Test question
 const PE_ONLINE_TOTAL_TARGET = 100;       // full test size when every pool has enough supply
 const PE_ONLINE_DI_TARGET_COUNT = 20;     // Data Interpretation questions (counted individually, not by set)
-const PE_ONLINE_CA_QUESTION_COUNT = 20;   // Current Affair flashcard questions
+const PE_ONLINE_CA_QUESTION_COUNT = 20;   // Current Affairs questions from PEOnlineExam
 
-// Turns saved Current Affair flashcards (Admin > Current Affair Flashcard
-// Admin, table CurrentAffairFlashcards) into MCQ-style PE questions: the
-// flashcard's own answer is the correct option (option 1 / index 0), and // the other three options are answers borrowed from OTHER flashcards, so
-// they read as plausible current-affairs facts rather than something// obviously wrong. Options get shuffled later by prepareRandomizedQuestion,
-// same as every other PE question, so the correct one isn't always first.
-function buildPEOnlineCurrentAffairQuestions(targetCount) {
-    const pool = (cafNotes || []).filter(note => note.examFocus && note.answer);
-    if (pool.length < 4) return []; // not enough flashcards yet to build 3 distinct distractors
+async function loadPEOnlineQuestionBank() {
+    const rows = await apiRequest("pe-online-questions?view=text");
+    peOnlineQuestionPool = mapExamRows(rows).filter(question => isPECategory(question.category));
+}
 
-    const picks = shuffleArray(pool).slice(0, targetCount);
-
-    return picks.map(pick => {
-        const otherAnswers = shuffleArray(pool.filter(note => note !== pick).map(note => note.answer));
-        const distractors = [];
-        for (const candidate of otherAnswers) {
-            if (candidate === pick.answer || distractors.includes(candidate)) continue;
-            distractors.push(candidate);
-            if (distractors.length === 3) break;
-        }
-        if (distractors.length < 3) return null; // couldn't find 3 unique wrong answers — skip this one
-
-        return {
-            question: pick.examFocus,
-            options: [pick.answer, ...distractors],
-            answer: 0,
-            category: "Current Affairs"
-        };
-    }).filter(Boolean);
+function getPEOnlineQuestions(peType) {
+    return peOnlineQuestionPool.filter(question => {
+        const info = parsePECategory(question.category);
+        return info && (!peType || info.peType === peType);
+    });
 }
 
 // Picks whole Data Interpretation chart-sets (shuffled order, each set's own
@@ -6871,8 +6912,7 @@ function buildPEOnlineCurrentAffairQuestions(targetCount) {
 // share one chart in the split-screen view. May slightly overshoot the // target on the final set, or fall short if there simply aren't enough DI
 // sets in the database — either way, nothing errors.
 function buildPEOnlineDataInterpretationQuestions(targetCount) {
-    const peQuestions = getPEQuestions();
-    const diPool = peQuestions.filter(q => parsePECategory(q.category).peType === "Data Interpretation");
+    const diPool = getPEOnlineQuestions("Data Interpretation");
 
     const diBySet = new Map();
     diPool.forEach(q => {
@@ -6890,11 +6930,10 @@ function buildPEOnlineDataInterpretationQuestions(targetCount) {
 }
 
 function updatePEOnlineCount() {
-    const peQuestions = getPEQuestions();
-    const mockCount = peQuestions.filter(q => parsePECategory(q.category).peType === "Mock").length;
-    const pastCount = peQuestions.filter(q => parsePECategory(q.category).peType === "Past Paper").length;
-    const diCount = peQuestions.filter(q => parsePECategory(q.category).peType === "Data Interpretation").length;
-    const caCount = (cafNotes || []).filter(note => note.examFocus && note.answer).length;
+    const mockCount = getPEOnlineQuestions("Mock").length;
+    const pastCount = getPEOnlineQuestions("Past Paper").length;
+    const diCount = getPEOnlineQuestions("Data Interpretation").length;
+    const caCount = getPEOnlineQuestions("Current Affairs").length;
 
     const mockEl = document.getElementById("pe-online-mock-count");
     const pastEl = document.getElementById("pe-online-past-count");
@@ -6929,12 +6968,11 @@ function formatPEOnlineDuration(totalSeconds) {
 // contiguous block, after Mock/Past/Current Affairs (which are shuffled
 // together) — and every pool simply uses whatever it has if it's short of // its target; nothing blocks the test from starting.
 function buildPEOnlineTestSet() {
-    const peQuestions = getPEQuestions();
-    const mockPool = peQuestions.filter(q => parsePECategory(q.category).peType === "Mock");
-    const pastPool = peQuestions.filter(q => parsePECategory(q.category).peType === "Past Paper");
+    const mockPool = getPEOnlineQuestions("Mock");
+    const pastPool = getPEOnlineQuestions("Past Paper");
 
     const diPicks = buildPEOnlineDataInterpretationQuestions(PE_ONLINE_DI_TARGET_COUNT);
-    const caPicks = buildPEOnlineCurrentAffairQuestions(PE_ONLINE_CA_QUESTION_COUNT);
+    const caPicks = shuffleArray(getPEOnlineQuestions("Current Affairs")).slice(0, PE_ONLINE_CA_QUESTION_COUNT);
 
     const remaining  = Math.max(PE_ONLINE_TOTAL_TARGET - diPicks.length - caPicks.length, 0);
     const mockTarget = Math.ceil(remaining / 2);
@@ -6971,14 +7009,27 @@ async function startPEOnlineTest() {
         return;
     }
 
-    const peQuestions = getPEQuestions();
-    const mockCount = peQuestions.filter(q => parsePECategory(q.category).peType === "Mock").length;
-    const pastCount = peQuestions.filter(q => parsePECategory(q.category).peType === "Past Paper").length;
+    examPreparing = true;
+    showLoading(true, "Loading secure PE Online question bank…");
+    try {
+        await loadPEOnlineQuestionBank();
+    } catch (error) {
+        peOnlineQuestionPool = [];
+        examPreparing = false;
+        showLoading(false);
+        showToast(`Could not load PE Online questions: ${error.message}`, "error");
+        return;
+    }
+
+    const mockCount = getPEOnlineQuestions("Mock").length;
+    const pastCount = getPEOnlineQuestions("Past Paper").length;
 
     const testSet = buildPEOnlineTestSet();
     if (testSet.length === 0) {
+        examPreparing = false;
+        showLoading(false);
         if (mockCount === 0 && pastCount === 0) {
-            showToast("No PE questions found in the database. Add some from the Admin panel first.", "error");
+            showToast("No questions found in the separate PE Online question bank.", "error");
         } else {
             showToast(`Found ${mockCount} Mock and ${pastCount} Past Paper, but the test set came out empty — please refresh and try again.`, "error");
         }
@@ -6991,16 +7042,22 @@ async function startPEOnlineTest() {
     currentIdx = 0;
     activeCategoryLabel = "PE Online Test";
     stopQuestionAudio();
-    examPreparing = true;
     const startBtn = document.querySelector(".pe-online-start-btn");
     if (startBtn) startBtn.disabled = true;
     try {
+        showLoading(true, "Securing PE online test…");
+        await createExamSession(activeData);
         if (!examMediaReadyAfterContinue) {
             await prepareExamAssetsBeforeTimer(activeData, "Preparing PE online test…");
         }
+    } catch (error) {
+        showToast(`Could not start secure PE test: ${error.message}`, "error");
+        showLoading(false);
+        return;
     } finally {
         examPreparing = false;
         if (startBtn) startBtn.disabled = false;
+        showLoading(false);
     }
 
     document.getElementById("pe-view").style.display = "none";
@@ -7302,22 +7359,23 @@ function renderPEDIQuestion() {
 
     const q = setQuestions[peDIQuestionIdx];
     const options = Array.isArray(q.options) ? q.options : [];
-    const answerIndex = Number.isInteger(q.answer) ? q.answer : parseInt(q.answer, 10);
     const qId = `pe-di-q-${peDIQuestionIdx}`;
+    pePracticeQuestionsByDomId.clear();
+    pePracticeQuestionsByDomId.set(qId, q);
 
     const optionsHtml = options.slice(0, 4).map((opt, i) => `
         <button type="button" class="pe-option" id="${qId}-opt-${i}"
-            onclick="answerPEQuestion('${qId}', ${i}, ${answerIndex})">
+            onclick="answerPEQuestion('${qId}', ${i})">
             ${ALPHA[i]}. ${escapePEHtml(opt || "")}
         </button>
     `).join("");
 
-    const explanationHtml = q.explanation ? `
+    const explanationHtml = `
         <div class="pe-solution-box" id="${qId}-solution" style="--clr:#9c27b0;">
             <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
             <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
         </div>
-    ` : "";
+    `;
 
     const navHtml = `
         <div class="pe-question-actions" style="margin-top:18px;justify-content:space-between;">
@@ -7338,7 +7396,7 @@ function renderPEDIQuestion() {
             <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
             <div class="pe-question-actions">
                 <div class="pe-feedback-msg" id="${qId}-feedback"></div>
-                <button type="button" class="pe-show-answer-btn" id="${qId}-show-btn" onclick="revealPEAnswer('${qId}', ${answerIndex})">Show Answer</button>
+                <button type="button" class="pe-show-answer-btn" id="${qId}-show-btn" onclick="revealPEAnswer('${qId}')">Show Answer</button>
             </div>
             ${explanationHtml}
         </div>
@@ -7369,28 +7427,29 @@ function renderPEQuestionList() {
         return;
     }
 
+    pePracticeQuestionsByDomId.clear();
     container.innerHTML = list.map((q, idx) => {
         const peInfo = parsePECategory(q.category);
         const options = Array.isArray(q.options) ? q.options : [];
-        const answerIndex = Number.isInteger(q.answer) ? q.answer : parseInt(q.answer, 10);
         const qId = `pe-q-${idx}`;
         const accent = peInfo.peType === "Past Paper" ? "#4caf50" : "#00bcd4";
+        pePracticeQuestionsByDomId.set(qId, q);
 
         // Options render as plain, un-revealed buttons — the correct
         // answer is never marked in the initial HTML.
         const optionsHtml = options.slice(0, 4).map((opt, i) => `
             <button type="button" class="pe-option" id="${qId}-opt-${i}"
-                onclick="answerPEQuestion('${qId}', ${i}, ${answerIndex})">
+                onclick="answerPEQuestion('${qId}', ${i})">
                 ${ALPHA[i]}. ${escapePEHtml(opt || "")}
             </button>
         `).join("");
 
-        const explanationHtml = q.explanation ? `
+        const explanationHtml = `
             <div class="pe-solution-box" id="${qId}-solution" style="--clr:${accent};">
                 <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
                 <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
             </div>
-        ` : "";
+        `;
 
         return `
             <div class="pe-question-card" style="--clr:${accent};">
@@ -7404,7 +7463,7 @@ function renderPEQuestionList() {
                 <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
                 <div class="pe-question-actions">
                     <div class="pe-feedback-msg" id="${qId}-feedback"></div>
-                    <button type="button" class="pe-show-answer-btn" id="${qId}-show-btn" onclick="revealPEAnswer('${qId}', ${answerIndex})">Show Answer</button>
+                    <button type="button" class="pe-show-answer-btn" id="${qId}-show-btn" onclick="revealPEAnswer('${qId}')">Show Answer</button>
                 </div>
                 ${explanationHtml}
             </div>
@@ -7419,7 +7478,43 @@ function lockPEOptions(qId) {
     });
 }
 
-function answerPEQuestion(qId, chosenIndex, answerIndex) {
+async function loadPEQuestionSolution(qId) {
+    const question = pePracticeQuestionsByDomId.get(qId);
+    if (!question) throw new Error("Question is no longer available.");
+    if (Number.isInteger(question.answer) && question.answer >= 0 && question.answer <= 3) return question;
+
+    const result = await apiRequest(`question-solution?id=${encodeURIComponent(question.id)}`);
+    if (!Number.isInteger(result.answerIndex) || result.answerIndex < 0 || result.answerIndex > 3) {
+        throw new Error("This question does not have a valid answer yet.");
+    }
+    question.answer = result.answerIndex;
+    question.explanation = result.explanation || "";
+    const solutionText = document.querySelector(`#${qId}-solution .pe-solution-text`);
+    if (solutionText) solutionText.textContent = question.explanation;
+    return question;
+}
+
+function setPEQuestionLoading(qId, loading) {
+    document.querySelectorAll(`#${qId}-options .pe-option`).forEach(button => {
+        button.disabled = loading;
+    });
+    const showButton = document.getElementById(`${qId}-show-btn`);
+    if (showButton) {
+        showButton.disabled = loading;
+        showButton.textContent = loading ? "Checking..." : "Show Answer";
+    }
+}
+
+async function answerPEQuestion(qId, chosenIndex) {
+    setPEQuestionLoading(qId, true);
+    let answerIndex;
+    try {
+        answerIndex = (await loadPEQuestionSolution(qId)).answer;
+    } catch (error) {
+        setPEQuestionLoading(qId, false);
+        showToast(`Could not check answer: ${error.message}`, "error");
+        return;
+    }
     lockPEOptions(qId);
     const chosenBtn = document.getElementById(`${qId}-opt-${chosenIndex}`);
     const correctBtn = document.getElementById(`${qId}-opt-${answerIndex}`);
@@ -7440,7 +7535,16 @@ function answerPEQuestion(qId, chosenIndex, answerIndex) {
     if (solutionBox) solutionBox.classList.add("open");
 }
 
-function revealPEAnswer(qId, answerIndex) {
+async function revealPEAnswer(qId) {
+    setPEQuestionLoading(qId, true);
+    let answerIndex;
+    try {
+        answerIndex = (await loadPEQuestionSolution(qId)).answer;
+    } catch (error) {
+        setPEQuestionLoading(qId, false);
+        showToast(`Could not reveal answer: ${error.message}`, "error");
+        return;
+    }
     lockPEOptions(qId);
     const correctBtn = document.getElementById(`${qId}-opt-${answerIndex}`);
     if (correctBtn) correctBtn.classList.add("pe-correct");
