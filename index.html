@@ -4792,8 +4792,16 @@ Answer: C" ></textarea>
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────
+/*
+ * SECURITY: This is a low-privilege Supabase PUBLISHABLE key, not a secret.
+ * Browser clients must send it, so it is intentionally visible and protected
+ * by Row Level Security and least-privilege database grants. Never place an
+ * sb_secret key, service_role key, database password, or private API token in
+ * this file. When the Cloudflare server proxy is added, all backend secrets
+ * must be stored only as encrypted environment variables on Cloudflare.
+ */
 const SUPABASE_URL = "https://nwkfuluvgbsmyzomlpvw.supabase.co";
-const SUPABASE_KEY = "sb_publishable_I9WL1ChnlPJp2V_MSM4R5Q_RXQ48iBR";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_I9WL1ChnlPJp2V_MSM4R5Q_RXQ48iBR";
 const ADMIN_EMAIL = "koranga6265@gmail.com";
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
@@ -5078,8 +5086,8 @@ function clearDatabaseCache() {
 
 function supabaseHeaders(useAdmin = false, extra = {}) {
     return {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${useAdmin && adminAccessToken ? adminAccessToken : SUPABASE_KEY}`,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${useAdmin && adminAccessToken ? adminAccessToken : SUPABASE_PUBLISHABLE_KEY}`,
         ...extra
     };
 }
@@ -6118,7 +6126,7 @@ async function authenticateAdmin() {
         const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
             method: "POST",
             headers: {
-                apikey: SUPABASE_KEY,
+                apikey: SUPABASE_PUBLISHABLE_KEY,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({ email: ADMIN_EMAIL, password: pw })
