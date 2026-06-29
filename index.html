@@ -8054,13 +8054,12 @@ async function editQuestion(idx) {
 	        audioCode: document.getElementById("adm-audio-b64").value
 	    };
 
+    const wasEditing = editingQuestionIndex !== null;
     try {
-        const wasEditing = editingQuestionIndex !== null;
         if (wasEditing) {
             const existing = questionPool[editingQuestionIndex];
             if (!existing || existing.id === undefined || existing.id === null) {
                 showToast("Question ID is missing. Refresh and try again.", "error");
-                showLoading(false);
                 return;
             }
             const table = getAdminTargetTable(existing);
@@ -8087,8 +8086,9 @@ async function editQuestion(idx) {
     } catch (e) {
         console.error("Save question error:", e);
         showToast(`Failed to save question: ${e.message || "Unknown error"}`, "error");
-	        showLoading(false);
-	    }
+    } finally {
+        showLoading(false);
+    }
 	}
 
 	function stripQuestionPrefix(text) {
