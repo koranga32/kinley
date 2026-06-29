@@ -15,6 +15,8 @@
     <title>ExamPortal </title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://nwkfuluvgbsmyzomlpvw.supabase.co" crossorigin>
+    <link rel="dns-prefetch" href="//nwkfuluvgbsmyzomlpvw.supabase.co">
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <script type="application/ld+json">
@@ -4856,10 +4858,9 @@ let editingQuestionIndex = null;
         applyThemeMode("light");
         const copyrightEl = document.getElementById("site-copyright");
         if (copyrightEl) copyrightEl.textContent = `© ${new Date().getFullYear()}`;
-        await loadDailyQuotes();
         renderDailyQuoteTicker();
         caHydrateAdminControls();
-        caLoadState({ render: false }).catch(() => {});
+        warmPublicStartupData();
 	    if (sessionStorage.getItem("exam_admin_active") === "1" && adminAccessToken) {
 	        restoreAdminPortal();
 	        return;
@@ -4867,6 +4868,25 @@ let editingQuestionIndex = null;
         setEntryActionButtons();
 	    document.getElementById("student-name").focus();
 	}
+
+    function warmPublicStartupData() {
+        const kickOff = () => {
+            loadDailyQuotes()
+                .then(() => {
+                    renderDailyQuoteTicker();
+                    renderDailyQuoteAdminRegistry();
+                })
+                .catch(() => {});
+            caLoadState({ render: false }).catch(() => {});
+            loadExamCatalog().catch(() => {});
+            loadPEOnlineQuestionBank().then(updatePEOnlineCount).catch(() => {});
+        };
+        if (typeof requestAnimationFrame === "function") {
+            requestAnimationFrame(() => setTimeout(kickOff, 0));
+        } else {
+            setTimeout(kickOff, 0);
+        }
+    }
 
     function applyThemeMode(mode) {
         const useDark = mode === "dark";
@@ -7010,7 +7030,6 @@ function wirePESidebar() {
 }
 
 async function openPEPortal() {
-    if (!databaseReady) await loadDatabase();
     document.getElementById("setup-view").style.display = "none";
     document.getElementById("exam-view") && document.getElementById("exam-view").classList.remove("show");
     document.getElementById("results-view") && document.getElementById("results-view").classList.remove("show");
@@ -7030,6 +7049,16 @@ async function openPEPortal() {
     });
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-home-panel").classList.add("active");
+
+    if (!databaseReady) {
+        showLoading(true, "Opening PE...");
+        const loaded = await loadDatabase();
+        showLoading(false);
+        if (!loaded) {
+            closePEPortal();
+            return;
+        }
+    }
 
     renderPEHomeGrid();
 
