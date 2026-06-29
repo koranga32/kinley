@@ -228,3 +228,95 @@ export function validateAdminOtpVerifyPayload(input) {
         })
     };
 }
+
+function optionalEntityId(value, label = "ID") {
+    if (value === undefined || value === null || value === "") return "";
+    return cleanText(String(value), label, { min: 1, max: 24, pattern: /^\d{1,12}$/ });
+}
+
+function requiredEnum(value, allowed, label) {
+    return allowedValue(cleanText(String(value), label, { min: 1, max: 80 }), allowed, label);
+}
+
+function validateQuestionOptions(value, label = "Options") {
+    if (!Array.isArray(value) || value.length !== 4) {
+        throw validationError("invalid_options", `${label} must contain exactly four options.`);
+    }
+    return value.map((option, index) => cleanText(option, `${label} ${index + 1}`, { min: 1, max: 2000 }));
+}
+
+function validateMediaDataUrl(value, label) {
+    if (value === undefined || value === null || value === "") return "";
+    const text = cleanText(String(value), label, { min: 5, max: 8 * 1024 * 1024 });
+    if (!/^data:(?:image|audio)\//.test(text)) {
+        throw validationError("invalid_media", `${label} must be a valid data URL.`);
+    }
+    return text;
+}
+
+export function validateAdminQuestionPayload(input) {
+    const value = exactObject(
+        input,
+        ["id", "table", "category", "question", "explanation", "options", "answer", "imageCode", "audioCode"],
+        "Admin question mutation"
+    );
+    const answer = Number(value.answer);
+    if (!Number.isInteger(answer) || answer < 0 || answer > 3) {
+        throw validationError("invalid_answer", "Answer must be 0, 1, 2, or 3.");
+    }
+    return {
+        id: optionalEntityId(value.id, "Question ID"),
+        table: requiredEnum(value.table, ["Exam", "PEOnlineExam"], "Question table"),
+        category: cleanText(value.category, "Category", { min: 1, max: 200 }),
+        question: cleanText(value.question, "Question", { min: 1, max: 12000 }),
+        explanation: value.explanation === undefined || value.explanation === null ? "" : cleanText(String(value.explanation), "Explanation", { min: 0, max: 12000 }),
+        options: validateQuestionOptions(value.options),
+        answer,
+        imageCode: validateMediaDataUrl(value.imageCode, "Image"),
+        audioCode: validateMediaDataUrl(value.audioCode, "Audio")
+    };
+}
+
+export function validateAdminBulkQuestionsPayload(input) {
+    const value = exactObject(input, ["table", "questions"], "Admin bulk questions mutation");
+    const table = requiredEnum(value.table, ["Exam", "PEOnlineExam"], "Question table");
+    if (!Array.isArray(value.questions) || value.questions.length < 1 || value.questions.length > 200) {
+        throw validationError("invalid_questions", "Bulk questions must contain 1-200 entries.");
+    }
+    return {
+        table,
+        questions: value.questions.map((question, index) => {
+            const parsed = validateAdminQuestionPayload({ ...question, table });
+            return { ...parsed, id: "" };
+        })
+    };
+}
+
+export function validateAdminQuestionDeletePayload(input) {
+    const value = exactObject(input, ["id", "table"], "Admin question delete");
+    return {
+        id: optionalEntityId(value.id, "Question ID"),
+        table: requiredEnum(value.table, ["Exam", "PEOnlineExam"], "Question table")
+    };
+}
+
+export function validateAdminFlashcardPayload(input) {
+    const value = exactObject(input, ["id", "scope", "category", "date_stamp", "exam_focus", "answer"], "Admin flashcard mutation");
+    return {
+        id: optionalEntityId(value.id, "Flashcard ID"),
+        scope: requiredEnum(value.scope, ["Bhutan", "International"], "Scope"),
+        category: cleanText(value.category, "Category", { min: 1, max: 120 }),
+        date_stamp: cleanText(value.date_stamp, "Date stamp", { min: 1, max: 80 }),
+        exam_focus: cleanText(value.exam_focus, "Question", { min: 1, max: 4000 }),
+        answer: cleanText(value.answer, "Answer", { min: 1, max: 4000 })
+    };
+}
+
+export function validateAdminQuotePayload(input) {
+    const value = exactObject(input, ["id", "english_quote", "dzongkha_quote"], "Admin quote mutation");
+    return {
+        id: optionalEntityId(value.id, "Quote ID"),
+        english_quote: cleanText(value.english_quote, "English quote", { min: 1, max: 4000 }),
+        dzongkha_quote: cleanText(value.dzongkha_quote, "Dzongkha quote", { min: 1, max: 4000 })
+    };
+}
