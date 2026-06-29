@@ -4197,7 +4197,7 @@
         <button type="button" class="btn btn-ghost" id="contact-btn" onclick="openContactModal()">Contact Us</button>
         <button type="button" class="btn btn-ghost" id="pe-btn" style="display:none;" onclick="openPEPortal()">📚 PE</button>
         <button type="button" class="btn btn-ghost" id="admin-btn" onclick="openAdminPortal()">⚙ Admin</button>
-        <button type="button" class="btn btn-ghost" id="admin-back-btn" style="display:none;" onclick="closeAdminPortal()"> Back</button>
+        <button type="button" class="btn btn-ghost" id="admin-back-btn" style="display:none;" onclick="closeAdminPortal()"> Logout</button>
         <button type="button" class="btn btn-ghost" id="pe-back-btn" style="display:none;" onclick="closePEPortal()"> Back</button>
     </div>
 </header>
@@ -4829,6 +4829,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_I9WL1ChnlPJp2V_MSM4R5Q_RXQ48iBR
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
+const ADMIN_SESSION_KEY = "examportal_admin_session_v1";
 const SECONDS_PER_QUESTION = 30;
 const CA_SUPABASE_TABLE = "CurrentAffairFlashcards";
 const DAILY_QUOTES_TABLE = "daily_quotes";
@@ -4885,6 +4886,20 @@ let editingQuestionIndex = null;
         caHydrateAdminControls();
         warmPublicStartupData();
         setEntryActionButtons();
+        if (restoreAdminSession()) {
+            showLoading(true, "Connecting...");
+            try {
+                await restoreAdminPortal();
+                showLoading(false);
+                return;
+            } catch (error) {
+                clearAdminSession();
+                adminAccessToken = "";
+                document.body.classList.remove("admin-mode");
+                showLoading(false);
+                showToast("Admin session expired. Please sign in again.", "info");
+            }
+        }
 	    document.getElementById("student-name").focus();
 	}
 
@@ -4917,6 +4932,33 @@ let editingQuestionIndex = null;
     function toggleThemeMode() {
         const nextMode = document.body.classList.contains("dark-theme") ? "light" : "dark";
         applyThemeMode(nextMode);
+    }
+
+    function persistAdminSession() {
+        if (!adminAccessToken) return;
+        try {
+            sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({
+                accessToken: adminAccessToken
+            }));
+        } catch (e) {}
+    }
+
+    function restoreAdminSession() {
+        try {
+            const raw = sessionStorage.getItem(ADMIN_SESSION_KEY);
+            if (!raw) return false;
+            const parsed = JSON.parse(raw);
+            const token = String(parsed?.accessToken || "");
+            if (!token) return false;
+            adminAccessToken = token;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function clearAdminSession() {
+        try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
     }
 
 	function shuffleArray(items) {
@@ -6472,6 +6514,7 @@ async function verifyAdminEmailOtp(code) {
     });
     adminAccessToken = String(result.access_token || "");
     adminOtpState = null;
+    persistAdminSession();
 }
 
 async function authenticateAdmin() {
@@ -6567,7 +6610,14 @@ async function authenticateAdmin() {
 
 async function showAdminPortal() {
     document.body.classList.add("admin-mode");
-    processData(await fetchAdminQuestions());
+    persistAdminSession();
+    clearPublicApiCache();
+    const [adminQuestions] = await Promise.all([
+        fetchAdminQuestions(),
+        caLoadState({ render: false, force: true }),
+        loadDailyQuotes()
+    ]);
+    processData(adminQuestions);
     databaseReady = true;
     document.getElementById("q-count").textContent = questionPool.length;
     caHydrateAdminControls();
@@ -6605,6 +6655,7 @@ async function closeAdminPortal() {
     document.body.classList.remove("admin-mode");
     adminAccessToken = "";
     adminOtpState = null;
+    clearAdminSession();
     clearDatabaseCache();
     questionPool = [];
     databaseReady = false;
