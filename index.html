@@ -2241,6 +2241,41 @@
             margin-bottom: 8px;
         }
 
+        .otp-box-row {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+        }
+
+        .otp-digit-input {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            min-height: 52px;
+            text-align: center;
+            padding: 0;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--ink);
+            background: var(--cream);
+            border: 1.5px solid var(--border);
+            border-radius: 9px;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+        }
+
+        .otp-digit-input:focus {
+            border-color: var(--navy);
+            background: var(--white);
+            box-shadow: 0 0 0 3px rgba(15,27,53,0.08);
+        }
+
+        .otp-digit-input.error-shake {
+            border-color: var(--red);
+            box-shadow: 0 0 0 3px rgba(192,57,43,0.1);
+            animation: shake 0.38s ease;
+        }
+
         .pw-input {
             width: 100%;
             padding: 13px 46px 13px 16px;
@@ -4091,17 +4126,15 @@
             <button class="pw-toggle" type="button" onclick="togglePwVisibility()" id="pw-eye" title="Show/hide password">👁</button>
         </div>
         <div class="pw-input-wrap" id="admin-mfa-wrap" style="display:none;">
-            <input
-                type="text"
-                id="admin-mfa-input"
-                class="pw-input"
-                placeholder="6-digit verification code"
-                inputmode="numeric"
-                maxlength="6"
-                autocomplete="one-time-code"
-                oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)"
-                onkeydown="if(event.key==='Enter') authenticateAdmin()"
-            >
+            <input type="hidden" id="admin-mfa-input" autocomplete="one-time-code">
+            <div class="otp-box-row">
+                <input type="text" class="otp-digit-input" data-otp-digit="0" inputmode="numeric" maxlength="1" autocomplete="one-time-code" oninput="handleAdminOtpDigitInput(event, 0)" onkeydown="handleAdminOtpDigitKeydown(event, 0)">
+                <input type="text" class="otp-digit-input" data-otp-digit="1" inputmode="numeric" maxlength="1" oninput="handleAdminOtpDigitInput(event, 1)" onkeydown="handleAdminOtpDigitKeydown(event, 1)">
+                <input type="text" class="otp-digit-input" data-otp-digit="2" inputmode="numeric" maxlength="1" oninput="handleAdminOtpDigitInput(event, 2)" onkeydown="handleAdminOtpDigitKeydown(event, 2)">
+                <input type="text" class="otp-digit-input" data-otp-digit="3" inputmode="numeric" maxlength="1" oninput="handleAdminOtpDigitInput(event, 3)" onkeydown="handleAdminOtpDigitKeydown(event, 3)">
+                <input type="text" class="otp-digit-input" data-otp-digit="4" inputmode="numeric" maxlength="1" oninput="handleAdminOtpDigitInput(event, 4)" onkeydown="handleAdminOtpDigitKeydown(event, 4)">
+                <input type="text" class="otp-digit-input" data-otp-digit="5" inputmode="numeric" maxlength="1" oninput="handleAdminOtpDigitInput(event, 5)" onkeydown="handleAdminOtpDigitKeydown(event, 5)">
+            </div>
         </div>
         <div class="pw-error-msg" id="pw-error">⚠ Incorrect password. Please try again.</div>
 
@@ -6337,6 +6370,7 @@ function resetAdminGateway() {
         otpInput.disabled = false;
         otpInput.classList.remove("error-shake");
     }
+    clearAdminOtpDigits();
     if (authBtn) authBtn.disabled = false;
     if (errMsg) {
         errMsg.textContent = "⚠ Incorrect password. Please try again.";
@@ -6362,21 +6396,34 @@ function setAdminAuthMode(mode) {
     if (passwordEye) passwordEye.style.display = isOtp ? "none" : "";
     if (otpWrap) otpWrap.style.display = isOtp ? "" : "none";
     if (otpInput) otpInput.disabled = !isOtp;
+    getAdminOtpDigitInputs().forEach(input => {
+        input.disabled = !isOtp;
+    });
 }
 
 function showAdminAuthError(message) {
     const modal = document.getElementById("admin-modal");
     const input = adminOtpState
-        ? document.getElementById("admin-mfa-input")
+        ? document.querySelector('.otp-digit-input')
         : document.getElementById("admin-pw-input");
     const errMsg = document.getElementById("pw-error");
     const authBtn = document.querySelector(".btn-modal-auth");
     if (input) {
-        input.value = "";
         input.disabled = false;
-        input.classList.remove("error-shake");
-        void input.offsetWidth;
-        input.classList.add("error-shake");
+        if (adminOtpState) {
+            clearAdminOtpDigits();
+            getAdminOtpDigitInputs().forEach(digitInput => {
+                digitInput.classList.remove("error-shake");
+                void digitInput.offsetWidth;
+                digitInput.classList.add("error-shake");
+                digitInput.disabled = false;
+            });
+        } else {
+            input.value = "";
+            input.classList.remove("error-shake");
+            void input.offsetWidth;
+            input.classList.add("error-shake");
+        }
     }
     if (authBtn) authBtn.disabled = false;
     if (errMsg) {
@@ -6489,6 +6536,71 @@ function togglePwVisibility() {
     input.focus();
 }
 
+function getAdminOtpDigitInputs() {
+    return Array.from(document.querySelectorAll(".otp-digit-input"));
+}
+
+function syncAdminOtpHiddenValue() {
+    const hiddenInput = document.getElementById("admin-mfa-input");
+    if (!hiddenInput) return;
+    hiddenInput.value = getAdminOtpDigitInputs().map(input => String(input.value || "").replace(/\D/g, "").slice(0, 1)).join("");
+}
+
+function focusAdminOtpDigit(index) {
+    const inputs = getAdminOtpDigitInputs();
+    const target = inputs[index];
+    if (target) target.focus();
+}
+
+function clearAdminOtpDigits() {
+    getAdminOtpDigitInputs().forEach(input => {
+        input.value = "";
+        input.classList.remove("error-shake");
+    });
+    syncAdminOtpHiddenValue();
+}
+
+function handleAdminOtpDigitInput(event, index) {
+    const input = event.target;
+    let value = String(input.value || "").replace(/\D/g, "");
+    if (value.length > 1) {
+        const digits = value.slice(0, 6).split("");
+        const inputs = getAdminOtpDigitInputs();
+        digits.forEach((digit, offset) => {
+            if (inputs[index + offset]) inputs[index + offset].value = digit;
+        });
+        value = digits[0] || "";
+    }
+    input.value = value.slice(0, 1);
+    syncAdminOtpHiddenValue();
+    if (input.value && index < 5) focusAdminOtpDigit(index + 1);
+    if (document.getElementById("admin-mfa-input")?.value.length === 6) {
+        focusAdminOtpDigit(5);
+    }
+}
+
+function handleAdminOtpDigitKeydown(event, index) {
+    const input = event.target;
+    if (event.key === "Backspace" && !input.value && index > 0) {
+        focusAdminOtpDigit(index - 1);
+        return;
+    }
+    if (event.key === "ArrowLeft" && index > 0) {
+        event.preventDefault();
+        focusAdminOtpDigit(index - 1);
+        return;
+    }
+    if (event.key === "ArrowRight" && index < 5) {
+        event.preventDefault();
+        focusAdminOtpDigit(index + 1);
+        return;
+    }
+    if (event.key === "Enter") {
+        event.preventDefault();
+        authenticateAdmin();
+    }
+}
+
 async function requestAdminEmailOtp(password) {
     const result = await apiRequest("admin-otp-request", {
         method: "POST",
@@ -6520,6 +6632,7 @@ async function verifyAdminEmailOtp(code) {
 async function authenticateAdmin() {
     const passwordInput  = document.getElementById("admin-pw-input");
     const otpInput = document.getElementById("admin-mfa-input");
+    const otpDigitInputs = getAdminOtpDigitInputs();
     const errMsg = document.getElementById("pw-error");
     const authBtn = document.querySelector(".btn-modal-auth");
     const activeInput = adminOtpState ? otpInput : passwordInput;
@@ -6538,6 +6651,7 @@ async function authenticateAdmin() {
     errMsg.classList.remove("visible");
     passwordInput.disabled = true;
     otpInput.disabled = true;
+    otpDigitInputs.forEach(input => { input.disabled = true; });
     if (authBtn) authBtn.disabled = true;
     closeAdminModal();
     showLoading(true, "Connecting...");
@@ -6570,6 +6684,7 @@ async function authenticateAdmin() {
             showLoading(false);
             passwordInput.disabled = false;
             otpInput.disabled = false;
+            otpDigitInputs.forEach(input => { input.disabled = false; });
             if (authBtn) authBtn.disabled = false;
         }
         return;
@@ -6583,9 +6698,10 @@ async function authenticateAdmin() {
             showLoading(false);
             passwordInput.disabled = false;
             otpInput.disabled = false;
+            otpDigitInputs.forEach(input => { input.disabled = false; });
             if (authBtn) authBtn.disabled = false;
             showToast("Verification code sent to email.", "success");
-            setTimeout(() => otpInput.focus(), 120);
+            setTimeout(() => focusAdminOtpDigit(0), 120);
             return;
         }
     } catch (error) {
@@ -6604,6 +6720,7 @@ async function authenticateAdmin() {
         showLoading(false);
         passwordInput.disabled = false;
         otpInput.disabled = false;
+        otpDigitInputs.forEach(input => { input.disabled = false; });
         if (authBtn) authBtn.disabled = false;
     }
 }
