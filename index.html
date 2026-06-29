@@ -6254,6 +6254,7 @@ function togglePwVisibility() {
 async function authenticateAdmin() {
     const input  = document.getElementById("admin-pw-input");
     const errMsg = document.getElementById("pw-error");
+    const authBtn = document.querySelector(".btn-modal-auth");
     const pw     = input.value;
     if (!pw) {
         input.classList.remove("error-shake");
@@ -6264,6 +6265,8 @@ async function authenticateAdmin() {
         input.focus();
         return;
     }
+    input.disabled = true;
+    if (authBtn) authBtn.disabled = true;
     let authData;
     try {
         const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -6285,15 +6288,30 @@ async function authenticateAdmin() {
         input.classList.add("error-shake");
         errMsg.textContent = "⚠ Supabase sign-in failed. Check the admin password.";
         errMsg.classList.add("visible");
+        input.disabled = false;
+        if (authBtn) authBtn.disabled = false;
         input.focus();
         return;
     }
     adminAccessToken = authData.access_token;
     sessionStorage.setItem("exam_admin_token", adminAccessToken);
-    // Authenticated
-    await showAdminPortal();
     closeAdminModal();
-    showToast("Admin access granted.", "success");
+    showLoading(true, "Opening admin portal...");
+    try {
+        await showAdminPortal();
+        showToast("Admin access granted.", "success");
+    } catch (error) {
+        sessionStorage.removeItem("exam_admin_active");
+        sessionStorage.removeItem("exam_admin_token");
+        adminAccessToken = "";
+        document.body.classList.remove("admin-mode");
+        showToast("Admin portal could not be opened. Please try again.", "error");
+        openAdminPortal();
+    } finally {
+        showLoading(false);
+        input.disabled = false;
+        if (authBtn) authBtn.disabled = false;
+    }
 }
 
 async function showAdminPortal() {
