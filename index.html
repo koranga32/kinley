@@ -4947,7 +4947,7 @@ let editingQuestionIndex = null;
 
     function warmPublicStartupData() {
         const kickOff = () => {
-            loadDailyQuotes()
+            loadDailyQuotes({ fresh: true })
                 .then(() => {
                     renderDailyQuoteTicker();
                     renderDailyQuoteAdminRegistry();
@@ -7222,7 +7222,7 @@ function renderDailyQuoteTicker() {
     strip.setAttribute("aria-hidden", "false");
     const nextExpiry = Math.min(...dailyQuotes.map(item => item.expiresAt));
     dailyQuoteExpiryTimer = setTimeout(() => {
-        loadDailyQuotes().then(() => {
+        loadDailyQuotes({ fresh: true }).then(() => {
             dailyQuoteTickerIndex = 0;
             renderDailyQuoteTicker();
             renderDailyQuoteAdminRegistry();
@@ -7241,9 +7241,10 @@ function renderDailyQuoteTicker() {
     };
 }
 
-async function loadDailyQuotes() {
+async function loadDailyQuotes({ fresh = false } = {}) {
     try {
-        const rows = await apiRequest("quotes");
+        const path = fresh ? `quotes?refresh=${Date.now()}` : "quotes";
+        const rows = await apiRequest(path);
         dailyQuotes = (rows || []).map(row => ({
             id: String(row.id),
             english: row.english_quote || "",
@@ -7303,14 +7304,15 @@ async function saveDailyQuote() {
             }
         });
         clearPublicApiCache();
-        await loadDailyQuotes();
+        await loadDailyQuotes({ fresh: true });
         dailyQuoteTickerIndex = 0;
         resetDailyQuoteForm();
         renderDailyQuoteTicker();
         renderDailyQuoteAdminRegistry();
         showToast(wasEditing ? "Quote updated successfully." : "Quote published for 24 hours.", "success");
     } catch (e) {
-        showToast("Could not publish the quote. Create the Supabase daily_quotes table and policies first.", "error");
+        const message = e?.message ? `Could not save quote: ${e.message}` : "Could not save quote.";
+        showToast(message, "error");
     }
 }
 
