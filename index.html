@@ -4836,6 +4836,9 @@ let peOnlineCatalog = {
     counts: { Mock: 0, "Past Paper": 0, "Data Interpretation": 0, "Current Affairs": 0 },
     total: 0
 };
+let questionMediaCache = new Map();
+let categoryMediaPrefetch = { category: "", promise: null };
+let peOnlineMediaPrefetchPromise = null;
 let adminAccessToken = sessionStorage.getItem("exam_admin_token") || "";
 let editingQuestionIndex = null;
 
@@ -5090,6 +5093,9 @@ function saveDatabaseCache(data) {
 function clearDatabaseCache() {
     try { sessionStorage.removeItem(DB_CACHE_KEY); } catch (e) {}
     try { localStorage.removeItem(DB_CACHE_KEY); } catch (e) {}
+    questionMediaCache = new Map();
+    categoryMediaPrefetch = { category: "", promise: null };
+    peOnlineMediaPrefetchPromise = null;
 }
 
 function supabaseHeaders(useAdmin = false, extra = {}) {
@@ -5253,27 +5259,58 @@ function mergeMediaRowsIntoQuestions(questions, mediaRows) {
     return changed;
 }
 
+function cacheMediaRows(mediaRows) {
+    (mediaRows || []).forEach(row => {
+        const id = String(row?.id || "").trim();
+        if (!id) return;
+        const current = questionMediaCache.get(id) || { id, image: "", audio: "" };
+        questionMediaCache.set(id, {
+            id,
+            image: typeof row.image === "string" ? row.image : current.image,
+            audio: typeof row.audio === "string" ? row.audio : current.audio
+        });
+    });
+}
+
+function getCachedMediaRows(ids) {
+    return ids
+        .map(id => questionMediaCache.get(String(id)))
+        .filter(Boolean);
+}
+
+function collectQuestionMediaIds(questions, matcher) {
+    return [...new Set((questions || [])
+        .map(q => String(q.id || ""))
+        .filter(id => matcher.test(id)))];
+}
+
 async function fetchSelectedQuestionMedia(questions) {
     const mediaRows = [];
-    const normalIds = [...new Set((questions || [])
-        .map(q => String(q.id || ""))
-        .filter(id => /^\d+$/.test(id)))];
-    const peOnlineIds = [...new Set((questions || [])
-        .map(q => String(q.id || ""))
-        .filter(id => /^peo:\d+$/.test(id))
-        .map(id => id.slice(4)))];
+    const normalIds = collectQuestionMediaIds(questions, /^\d+$/);
+    const peOnlinePrefixedIds = collectQuestionMediaIds(questions, /^peo:\d+$/);
 
-    for (let i = 0; i < normalIds.length; i += 80) {
-        const chunk = normalIds.slice(i, i + 80);
+    const cachedNormalRows = getCachedMediaRows(normalIds);
+    const cachedPEOnlineRows = getCachedMediaRows(peOnlinePrefixedIds);
+    if (cachedNormalRows.length) mediaRows.push(...cachedNormalRows);
+    if (cachedPEOnlineRows.length) mediaRows.push(...cachedPEOnlineRows);
+
+    const missingNormalIds = normalIds.filter(id => !questionMediaCache.has(id));
+    const missingPEOnlineIds = peOnlinePrefixedIds
+        .filter(id => !questionMediaCache.has(id))
+        .map(id => id.slice(4));
+
+    for (let i = 0; i < missingNormalIds.length; i += 80) {
+        const chunk = missingNormalIds.slice(i, i + 80);
         const rows = await apiRequest(`questions?view=media&ids=${encodeURIComponent(chunk.join(","))}`);
         if (Array.isArray(rows)) mediaRows.push(...rows);
     }
-    for (let i = 0; i < peOnlineIds.length; i += 80) {
-        const chunk = peOnlineIds.slice(i, i + 80);
+    for (let i = 0; i < missingPEOnlineIds.length; i += 80) {
+        const chunk = missingPEOnlineIds.slice(i, i + 80);
         const rows = await apiRequest(`pe-online-questions?view=media&ids=${encodeURIComponent(chunk.join(","))}`);
         if (Array.isArray(rows)) mediaRows.push(...rows);
     }
     if (!mediaRows.length) return;
+    cacheMediaRows(mediaRows);
     mergeMediaRowsIntoQuestions(questionPool, mediaRows);
     mergeMediaRowsIntoQuestions(questions, mediaRows);
     saveDatabaseCache(questionPool);
@@ -5322,7 +5359,7 @@ function preloadAudioAsset(src) {
     });
 }
 
-async function warmQuestionAssets(questions) {
+async function warmQuestionAssets(questions, { reportProgress = true } = {}) {
     const assets = [];
     (questions || []).forEach(q => {
         if (q.imageCode) assets.push(() => preloadImageAsset(q.imageCode));
@@ -5333,8 +5370,57 @@ async function warmQuestionAssets(questions) {
     const total = assets.length;
     for (let i = 0; i < total; i += 4) {
         await Promise.allSettled(assets.slice(i, i + 4).map(load => load()));
-        setLoaderProgress(Math.min(95, 45 + Math.round(((i + 4) / total) * 45)));
+        if (reportProgress) {
+            setLoaderProgress(Math.min(95, 45 + Math.round(((i + 4) / total) * 45)));
+        }
     }
+}
+
+async function warmMediaRows(mediaRows) {
+    const warmable = (mediaRows || []).map(row => ({
+        imageCode: typeof row.image === "string" ? row.image : "",
+        audioCode: typeof row.audio === "string" ? row.audio : ""
+    }));
+    await warmQuestionAssets(warmable, { reportProgress: false });
+}
+
+async function prefetchCategoryMedia(category, { blockForMs = 0 } = {}) {
+    const normalizedCategory = String(category || "").trim();
+    if (!normalizedCategory) return;
+
+    if (categoryMediaPrefetch.category !== normalizedCategory || !categoryMediaPrefetch.promise) {
+        categoryMediaPrefetch = {
+            category: normalizedCategory,
+            promise: (async () => {
+                const rows = await apiRequest(`questions?view=category-media&category=${encodeURIComponent(normalizedCategory)}`);
+                if (!Array.isArray(rows) || !rows.length) return;
+                cacheMediaRows(rows);
+                await warmMediaRows(rows.filter(row => row.image || row.audio));
+            })().catch(error => {
+                console.error("Category media prefetch failed:", error);
+            })
+        };
+    }
+
+    if (blockForMs > 0) {
+        await Promise.race([
+            categoryMediaPrefetch.promise,
+            new Promise(resolve => setTimeout(resolve, blockForMs))
+        ]);
+    }
+}
+
+function prefetchPEOnlineMedia() {
+    if (peOnlineMediaPrefetchPromise) return peOnlineMediaPrefetchPromise;
+    peOnlineMediaPrefetchPromise = (async () => {
+        const rows = await apiRequest("pe-online-questions?view=all-media");
+        if (!Array.isArray(rows) || !rows.length) return;
+        cacheMediaRows(rows);
+    })().catch(error => {
+        peOnlineMediaPrefetchPromise = null;
+        console.error("PE Online media prefetch failed:", error);
+    });
+    return peOnlineMediaPrefetchPromise;
 }
 
 async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam media…") {
@@ -5550,6 +5636,10 @@ function updateTestSummary() {
     const questionCount = getCategoryQuestionCount(select.value);
     const durationSeconds = getTestDurationSeconds(questionCount);
     summary.value = `${formatDurationLabel(durationSeconds)} / ${questionCount} Q`;
+
+    if (setupContinued) {
+        prefetchCategoryMedia(select.value).catch(() => {});
+    }
 }
 
 // ─── EXAM START ───────────────────────────────────────
@@ -5574,6 +5664,9 @@ async function startExam() {
         }
         try {
             showLoading(true, "Connecting...");
+            const selectedCategory = document.getElementById("category-select").value;
+            await prefetchCategoryMedia(selectedCategory, { blockForMs: 2500 });
+            prefetchPEOnlineMedia();
         } finally {
             setupContinued = true;
             document.getElementById("setup-options").style.display = "grid";
@@ -6786,6 +6879,7 @@ async function openPEPortal() {
     if (!databaseReady) await loadDatabase();
     try {
         await loadPEOnlineQuestionBank();
+        prefetchPEOnlineMedia();
     } catch (error) {
         peOnlineCatalog.total = 0;
         console.error("PE Online question bank load failed:", error);
