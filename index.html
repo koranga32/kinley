@@ -2435,7 +2435,7 @@
             width: 68px;
             min-height: 360px;
             background: #fff;
-            transition: 0.5s;
+            transition: width 0.18s ease, box-shadow 0.18s ease;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -2454,7 +2454,7 @@
         .pe-navigation-spacer {
             width: 100px;
             flex-shrink: 0;
-            transition: 0.5s;
+            transition: width 0.18s ease;
         }
 
         .pe-navigation-spacer.open {
@@ -4839,6 +4839,11 @@ let peOnlineCatalog = {
 let questionMediaCache = new Map();
 let categoryMediaPrefetch = { category: "", promise: null };
 let peOnlineMediaPrefetchPromise = null;
+let publicApiCache = new Map();
+let peQuestionsCache = [];
+let peTopicBuckets = new Map();
+let cafStateLoaded = false;
+let cafStatePromise = null;
 let adminAccessToken = sessionStorage.getItem("exam_admin_token") || "";
 let editingQuestionIndex = null;
 
@@ -4853,9 +4858,8 @@ let editingQuestionIndex = null;
         if (copyrightEl) copyrightEl.textContent = `© ${new Date().getFullYear()}`;
         await loadDailyQuotes();
         renderDailyQuoteTicker();
-        await caLoadState();
         caHydrateAdminControls();
-        caRenderAll();
+        caLoadState({ render: false }).catch(() => {});
 	    if (sessionStorage.getItem("exam_admin_active") === "1" && adminAccessToken) {
 	        restoreAdminPortal();
 	        return;
@@ -5096,6 +5100,7 @@ function clearDatabaseCache() {
     questionMediaCache = new Map();
     categoryMediaPrefetch = { category: "", promise: null };
     peOnlineMediaPrefetchPromise = null;
+    clearPublicApiCache();
 }
 
 function supabaseHeaders(useAdmin = false, extra = {}) {
@@ -5131,6 +5136,36 @@ async function supabaseRequest(path, { method = "GET", body, useAdmin = false, p
 }
 
 async function apiRequest(path, { method = "GET", body } = {}) {
+    const normalizedMethod = String(method || "GET").toUpperCase();
+    if (normalizedMethod === "GET") {
+        const ttlMs = getPublicApiCacheTTL(path);
+        if (ttlMs > 0) {
+            const now = Date.now();
+            const cached = publicApiCache.get(path);
+            if (cached?.data !== undefined && cached.expiresAt > now) {
+                return cached.data;
+            }
+            if (cached?.promise) return cached.promise;
+            const pending = fetchApiJson(path, { method: normalizedMethod, body })
+                .then(data => {
+                    publicApiCache.set(path, { data, expiresAt: Date.now() + ttlMs, promise: null });
+                    return data;
+                })
+                .catch(error => {
+                    publicApiCache.delete(path);
+                    throw error;
+                });
+            publicApiCache.set(path, { data: undefined, expiresAt: 0, promise: pending });
+            return pending;
+        }
+    } else {
+        clearPublicApiCache();
+    }
+
+    return fetchApiJson(path, { method: normalizedMethod, body });
+}
+
+async function fetchApiJson(path, { method = "GET", body } = {}) {
     const response = await fetch(`/api/${path}`, {
         method,
         headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -5146,6 +5181,23 @@ async function apiRequest(path, { method = "GET", body } = {}) {
         throw error;
     }
     return data;
+}
+
+function getPublicApiCacheTTL(path) {
+    if (path === "questions?view=catalog") return 5 * 60 * 1000;
+    if (path === "questions?view=pe-practice") return 5 * 60 * 1000;
+    if (path === "pe-online-questions?view=catalog") return 5 * 60 * 1000;
+    if (path === "pe-online-questions?view=all-media") return 10 * 60 * 1000;
+    if (path === "flashcards") return 60 * 1000;
+    if (path === "quotes") return 60 * 1000;
+    if (path.startsWith("questions?view=media&ids=")) return 10 * 60 * 1000;
+    if (path.startsWith("questions?view=category-media&category=")) return 10 * 60 * 1000;
+    if (path.startsWith("pe-online-questions?view=media&ids=")) return 10 * 60 * 1000;
+    return 0;
+}
+
+function clearPublicApiCache() {
+    publicApiCache = new Map();
 }
 
 // ─── EXPLANATION ENCODING ──────────────────────────────
@@ -5563,6 +5615,19 @@ async function loadDatabase() {
 
 function processData(data) {
     questionPool = data || [];
+    peQuestionsCache = questionPool.filter(q => isPECategory(q.category));
+    peTopicBuckets = new Map();
+    peQuestionsCache.forEach(q => {
+        const info = parsePECategory(q.category);
+        if (!info) return;
+        const typeKey = info.peType;
+        const allKey = `all::${info.topic}`;
+        const typeTopicKey = `${typeKey}::${info.topic}`;
+        if (!peTopicBuckets.has(allKey)) peTopicBuckets.set(allKey, { topic: info.topic, peType: typeKey, count: 0 });
+        if (!peTopicBuckets.has(typeTopicKey)) peTopicBuckets.set(typeTopicKey, { topic: info.topic, peType: typeKey, count: 0 });
+        peTopicBuckets.get(allKey).count += 1;
+        peTopicBuckets.get(typeTopicKey).count += 1;
+    });
     // Exam categories must exclude PE-tagged questions so the normal
     // exam flow (category select, start exam, counts) is unaffected.
     const examQuestions = questionPool.filter(q => !isPECategory(q.category));
@@ -6448,15 +6513,28 @@ function cafNormalizeRows(rows) {
     })).filter(item => item.examFocus);
 }
 
-async function caLoadState() {
-    try {
-        const rows = await apiRequest("flashcards");
-        cafNotes = cafNormalizeRows(rows);
-    } catch (e) {
-        cafNotes = cafSeedNotes.map((item, idx) => ({ ...item, id: null, _seedIndex: idx }));
+async function caLoadState({ render = true, force = false } = {}) {
+    if (!force && cafStatePromise) {
+        await cafStatePromise;
+        if (render) caRenderAll();
+        return;
     }
-    if (!cafNotes.length) cafNotes = [];
-    caRenderAll();
+    cafStatePromise = (async () => {
+        try {
+            const rows = await apiRequest("flashcards");
+            cafNotes = cafNormalizeRows(rows);
+        } catch (e) {
+            cafNotes = cafSeedNotes.map((item, idx) => ({ ...item, id: null, _seedIndex: idx }));
+        }
+        if (!cafNotes.length) cafNotes = [];
+        cafStateLoaded = true;
+    })();
+    try {
+        await cafStatePromise;
+        if (render) caRenderAll();
+    } finally {
+        cafStatePromise = null;
+    }
 }
 
 function caHydrateAdminControls() {
@@ -6670,6 +6748,7 @@ async function cafSaveAdminCard() {
             prefer: "return=representation",
             body: payload
         });
+        clearPublicApiCache();
         showToast("Current Affair flashcard saved.", "success");
         cafResetAdminForm();
         await caLoadState();
@@ -6690,6 +6769,7 @@ async function cafDeleteCard(id) {
             useAdmin: true,
             prefer: "return=minimal"
         });
+        clearPublicApiCache();
         showToast("Current Affair flashcard deleted.", "success");
         await caLoadState();
     } catch (e) {
@@ -6799,6 +6879,7 @@ async function saveDailyQuote() {
                 expires_at: new Date(Date.now() + DAILY_QUOTE_LIFETIME_MS).toISOString()
             }
         });
+        clearPublicApiCache();
         await loadDailyQuotes();
         dailyQuoteTickerIndex = 0;
         resetDailyQuoteForm();
@@ -6818,6 +6899,7 @@ async function deleteDailyQuote(id) {
             useAdmin: true,
             prefer: "return=minimal"
         });
+        clearPublicApiCache();
         await loadDailyQuotes();
         dailyQuoteTickerIndex = 0;
         renderDailyQuoteTicker();
@@ -6862,6 +6944,18 @@ let peActiveTopic = null;   // { peType, topic } while viewing questions; null w
 let peSidebarWired = false;
 const pePracticeQuestionsByDomId = new Map();
 
+function renderPEPanel(panelId) {
+    if (panelId === "pe-home-panel") renderPEHomeGrid();
+    else if (panelId === "pe-current-affair-panel") {
+        if (cafStateLoaded) caRenderAll();
+        else caLoadState().catch(() => {});
+    }
+    else if (panelId === "pe-mock-panel") renderPEMockGrid();
+    else if (panelId === "pe-past-panel") renderPEPastGrid();
+    else if (panelId === "pe-di-panel") renderPEDIGrid();
+    else if (panelId === "pe-online-panel") updatePEOnlineCount();
+}
+
 function wirePESidebar() {
     if (peSidebarWired) return; // only attach listeners once
     peSidebarWired = true;
@@ -6894,26 +6988,14 @@ function wirePESidebar() {
             // ☰ toggle should open/close it. Switching panels by clicking a
             // label must not force-collapse it.
 
-            // Refresh whichever folder grid this panel shows
-            if (targetPanelId === "pe-home-panel") renderPEHomeGrid();
-            else if (targetPanelId === "pe-current-affair-panel") caRenderAll();
-            else if (targetPanelId === "pe-mock-panel") renderPEMockGrid();
-            else if (targetPanelId === "pe-past-panel") renderPEPastGrid();
-            else if (targetPanelId === "pe-di-panel") renderPEDIGrid();
-            else if (targetPanelId === "pe-online-panel") updatePEOnlineCount();
+            // Let the panel switch paint first, then do any heavier rendering work.
+            requestAnimationFrame(() => renderPEPanel(targetPanelId));
         };
     });
 }
 
 async function openPEPortal() {
     if (!databaseReady) await loadDatabase();
-    try {
-        await loadPEOnlineQuestionBank();
-        prefetchPEOnlineMedia();
-    } catch (error) {
-        peOnlineCatalog.total = 0;
-        console.error("PE Online question bank load failed:", error);
-    }
     document.getElementById("setup-view").style.display = "none";
     document.getElementById("exam-view") && document.getElementById("exam-view").classList.remove("show");
     document.getElementById("results-view") && document.getElementById("results-view").classList.remove("show");
@@ -6935,11 +7017,16 @@ async function openPEPortal() {
     document.getElementById("pe-home-panel").classList.add("active");
 
     renderPEHomeGrid();
-    renderPEMockGrid();
-    renderPEPastGrid();
-    renderPEDIGrid();
-    caRenderAll();
-    updatePEOnlineCount();
+
+    loadPEOnlineQuestionBank()
+        .then(() => {
+            updatePEOnlineCount();
+            prefetchPEOnlineMedia();
+        })
+        .catch(error => {
+            peOnlineCatalog.total = 0;
+            console.error("PE Online question bank load failed:", error);
+        });
 }
 
 function closePEPortal() {
@@ -6952,25 +7039,15 @@ function closePEPortal() {
 }
 
 function getPEQuestions() {
-    return (questionPool || []).filter(q => isPECategory(q.category));
+    return peQuestionsCache || [];
 }
 
 // ─── Folder grid builders (one per panel) ──────────────────
 function buildPETopicList(peTypeFilter, searchTerm) {
-    const list = getPEQuestions().filter(q => {
-        const info = parsePECategory(q.category);
-        return peTypeFilter === "all" || info.peType === peTypeFilter;
-    });
-
-    const topicMap = new Map();
-    list.forEach(q => {
-        const info = parsePECategory(q.category);
-        const key = `${info.peType}::${info.topic}`;
-        if (!topicMap.has(key)) topicMap.set(key, { topic: info.topic, peType: info.peType, count: 0 });
-        topicMap.get(key).count++;
-    });
-
-    let topics = [...topicMap.values()];
+    const prefix = peTypeFilter === "all" ? "all::" : `${peTypeFilter}::`;
+    let topics = [...peTopicBuckets.entries()]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([, value]) => ({ ...value }));
     const term = (searchTerm || "").trim().toLowerCase();
     if (term) topics = topics.filter(t => t.topic.toLowerCase().includes(term));
     topics.sort((a, b) => a.topic.localeCompare(b.topic));
