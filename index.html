@@ -4379,6 +4379,10 @@
                                     <input type="radio" name="dest-mode" value="pe" onchange="onDestModeChange()">
                                      PE Pages
                                 </label>
+                                <label class="radio-pill" id="pill-pe-online">
+                                    <input type="radio" name="dest-mode" value="pe-online" onchange="onDestModeChange()">
+                                     PE Online
+                                </label>
                             </div>
                         </div>
 
@@ -5003,9 +5007,9 @@ let editingQuestionIndex = null;
 	    };
 	}
 
-	function getAdminCategory() {
+function getAdminCategory() {
 	    const destMode = document.querySelector("[name='dest-mode']:checked")?.value || "exam";
-	    if (destMode === "pe") {
+	    if (destMode === "pe" || destMode === "pe-online") {
 	        const peType = document.querySelector("[name='pe-type']:checked")?.value || "Mock";
 	        const topic = document.getElementById("adm-pe-topic").value.trim() || "General";
 	        return `__PE__::${peType}::${topic}`;
@@ -5015,6 +5019,12 @@ let editingQuestionIndex = null;
 	        ? document.getElementById("adm-cat-select").value
 	        : document.getElementById("adm-cat-input").value.trim();
 	}
+
+    function getAdminTargetTable(question = null) {
+        if (question?.sourceTable === "PEOnlineExam") return "PEOnlineExam";
+        const destMode = document.querySelector("[name='dest-mode']:checked")?.value || "exam";
+        return destMode === "pe-online" ? "PEOnlineExam" : "Exam";
+    }
 
 	// ─── PE CATEGORY ENCODING HELPERS ──────────────────
 	// PE questions are stored using the existing `category` column with a
@@ -5243,11 +5253,12 @@ function decodeQuestionWithExplanation(rawQuestion) {
     };
 }
 
-function mapExamRows(rows) {
+function mapExamRows(rows, sourceTable = "Exam") {
     return (rows || []).map(row => {
         const { question, explanation } = decodeQuestionWithExplanation(row.question);
         return {
             id: row.id,
+            sourceTable,
             category: row.category,
             question,
             explanation,
@@ -5276,13 +5287,32 @@ async function fetchQuestions() {
     // Lightweight fetch — excludes image/audio columns, which can each hold
     // multi-megabyte base64 data. This keeps initial load fast; media is
     // fetched separately afterward without blocking first render.
-    const rows = adminAccessToken
-        ? await supabaseRequest(
-            "Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer,image,audio&order=id.asc",
+    if (adminAccessToken) {
+        const rows = await supabaseRequest(
+            "Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer&order=id.asc",
+            { useAdmin: true }
+        );
+        return mapExamRows(rows).map(row => ({ ...row, _adminMediaLoaded: false }));
+    }
+    const rows = await apiRequest("questions?view=pe-practice");
+    return mapExamRows(rows);
+}
+
+async function fetchAdminQuestions() {
+    const [examRows, peOnlineRows] = await Promise.all([
+        supabaseRequest(
+            "Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer&order=id.asc",
+            { useAdmin: true }
+        ),
+        supabaseRequest(
+            "PEOnlineExam?select=id,category,question,optionA,optionB,optionC,optionD,answer&order=id.asc",
             { useAdmin: true }
         )
-        : await apiRequest("questions?view=pe-practice");
-    return mapExamRows(rows);
+    ]);
+    return [
+        ...mapExamRows(examRows, "Exam"),
+        ...mapExamRows(peOnlineRows, "PEOnlineExam")
+    ].map(row => ({ ...row, _adminMediaLoaded: false }));
 }
 
 async function loadExamCatalog() {
@@ -6374,7 +6404,7 @@ async function authenticateAdmin() {
     input.disabled = true;
     if (authBtn) authBtn.disabled = true;
     closeAdminModal();
-    showLoading(true, "Authenticating admin...");
+    showLoading(true, "Connecting...");
     let authData;
     try {
         const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -6396,7 +6426,6 @@ async function authenticateAdmin() {
     }
     adminAccessToken = authData.access_token;
     sessionStorage.setItem("exam_admin_token", adminAccessToken);
-    showLoading(true, "Opening admin portal...");
     try {
         await showAdminPortal();
         showToast("Admin access granted.", "success");
@@ -6417,12 +6446,9 @@ async function authenticateAdmin() {
 async function showAdminPortal() {
     sessionStorage.setItem("exam_admin_active", "1");
     document.body.classList.add("admin-mode");
-    const adminRows = await supabaseRequest(
-        "Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer,image,audio&order=id.asc",
-        { useAdmin: true }
-    );
-    processData(mapExamRows(adminRows));
+    processData(await fetchAdminQuestions());
     databaseReady = true;
+    document.getElementById("q-count").textContent = questionPool.length;
     caHydrateAdminControls();
     caRenderAll();
     document.getElementById("setup-view").style.display = "none";
@@ -6433,6 +6459,21 @@ async function showAdminPortal() {
     document.querySelectorAll("[name='dest-mode']")[0].checked = true;
     onDestModeChange();
     onCatModeChange();
+}
+
+async function loadAdminQuestionMedia(idx) {
+    const question = questionPool[idx];
+    if (!question || question._adminMediaLoaded || question.id === undefined || question.id === null) return question;
+    const table = question.sourceTable === "PEOnlineExam" ? "PEOnlineExam" : "Exam";
+    const rows = await supabaseRequest(
+        `${table}?select=id,image,audio&id=eq.${encodeURIComponent(question.id)}&limit=1`,
+        { useAdmin: true }
+    );
+    const media = rows?.[0] || {};
+    question.imageCode = typeof media.image === "string" ? media.image : "";
+    question.audioCode = typeof media.audio === "string" ? media.audio : "";
+    question._adminMediaLoaded = true;
+    return question;
 }
 
 async function restoreAdminPortal() {
@@ -6470,11 +6511,14 @@ function onCatModeChange() {
 }
 
 function onDestModeChange() {
-    const isPE = document.querySelector("[name='dest-mode']:checked").value === "pe";
+    const destMode = document.querySelector("[name='dest-mode']:checked").value;
+    const isPE = destMode === "pe" || destMode === "pe-online";
+    const isPEOnline = destMode === "pe-online";
     document.getElementById("pe-type-wrap").style.display = isPE ? "block" : "none";
     document.getElementById("exam-cat-wrap").style.display = isPE ? "none" : "block";
     document.getElementById("pill-exam").classList.toggle("active", !isPE);
-    document.getElementById("pill-pe").classList.toggle("active", isPE);
+    document.getElementById("pill-pe").classList.toggle("active", destMode === "pe");
+    document.getElementById("pill-pe-online").classList.toggle("active", isPEOnline);
     // Exam category fields are required only when targeting the exam bank
     document.getElementById("adm-cat-input").required = false;
     updateBulkDestinationBanner();
@@ -6500,10 +6544,10 @@ function updateBulkDestinationBanner() {
     const label = document.getElementById("bulk-destination-label");
     const banner = document.getElementById("bulk-destination-banner");
     if (!label || !banner) return;
-    const isPE = document.querySelector("[name='dest-mode']:checked")?.value === "pe";
-    if (isPE) {
+    const destMode = document.querySelector("[name='dest-mode']:checked")?.value || "exam";
+    if (destMode === "pe" || destMode === "pe-online") {
         const peType = document.querySelector("[name='pe-type']:checked")?.value || "Mock";
-        label.textContent = `📚 PE → ${peType}`;
+        label.textContent = destMode === "pe-online" ? `🧪 PE Online → ${peType}` : `📚 PE → ${peType}`;
         banner.style.background = "#e8f5e9";
         banner.style.borderColor = "#2f9e44";
         banner.style.color = "#1b5e20";
@@ -7817,16 +7861,27 @@ function cancelQuestionEdit() {
     resetAdminForm();
 }
 
-function editQuestion(idx) {
+async function editQuestion(idx) {
     const q = questionPool[idx];
     if (!q) return;
+
+    if (!q._adminMediaLoaded) {
+        showLoading(true, "Loading question media...");
+        try {
+            await loadAdminQuestionMedia(idx);
+        } catch (error) {
+            showToast("Question opened without media preview. Media can be re-uploaded if needed.", "info");
+        } finally {
+            showLoading(false);
+        }
+    }
 
     editingQuestionIndex = idx;
     const peInfo = parsePECategory(q.category);
 
     if (peInfo) {
-        // Editing a PE question
-        document.querySelector("[name='dest-mode'][value='pe']").checked = true;
+        const peDestination = q.sourceTable === "PEOnlineExam" ? "pe-online" : "pe";
+        document.querySelector(`[name='dest-mode'][value='${peDestination}']`).checked = true;
         onDestModeChange();
         document.querySelector(`[name='pe-type'][value='${peInfo.peType}']`).checked = true;
         onPeTypeChange();
@@ -7894,14 +7949,16 @@ function editQuestion(idx) {
                 showLoading(false);
                 return;
             }
-            await supabaseRequest(`Exam?id=eq.${encodeURIComponent(existing.id)}`, {
+            const table = getAdminTargetTable(existing);
+            await supabaseRequest(`${table}?id=eq.${encodeURIComponent(existing.id)}`, {
                 method: "PATCH",
                 body: toSupabaseQuestion(payload),
                 useAdmin: true,
                 prefer: "return=minimal"
             });
         } else {
-            await supabaseRequest("Exam", {
+            const table = getAdminTargetTable();
+            await supabaseRequest(table, {
                 method: "POST",
                 body: toSupabaseQuestion(payload),
                 useAdmin: true,
@@ -7911,7 +7968,7 @@ function editQuestion(idx) {
         resetAdminForm();
         clearDatabaseCache();
         databaseReady = false;
-        await loadDatabase();
+        await showAdminPortal();
         showToast(wasEditing ? "Question updated successfully!" : "Question saved successfully!", "success");
     } catch (e) {
         console.error("Save question error:", e);
@@ -8059,7 +8116,8 @@ function editQuestion(idx) {
 
 	    showLoading(true, `Saving ${questions.length} questions…`);
 	    try {
-	        const savedRows = await supabaseRequest("Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer,image,audio", {
+	        const table = getAdminTargetTable();
+	        const savedRows = await supabaseRequest(`${table}?select=id,category,question,optionA,optionB,optionC,optionD,answer,image,audio`, {
 	            method: "POST",
 	            body: questions.map(toSupabaseQuestion),
 	            useAdmin: true,
@@ -8068,15 +8126,19 @@ function editQuestion(idx) {
 
 	        document.getElementById("bulk-form").reset();
 	        clearDatabaseCache();
-	        questionPool = questionPool.concat(mapExamRows(savedRows));
+	        questionPool = questionPool.concat(mapExamRows(savedRows, table));
 	        const examQuestionsAfterBulk = questionPool.filter(q => !isPECategory(q.category));
 	        categories = [...new Set(examQuestionsAfterBulk.map(q => q.category).filter(Boolean))];
 	        updateCategorySelects();
 	        renderAdminTable();
-	        document.getElementById("q-count").textContent = examQuestionsAfterBulk.length;
+	        document.getElementById("q-count").textContent = questionPool.length;
 	        showLoading(false);
 	        const peInfo = parsePECategory(cat);
-	        const destinationLabel = peInfo ? `📚 PE → ${peInfo.peType} → ${peInfo.topic}` : `Exam category "${cat}"`;
+	        const destinationLabel = table === "PEOnlineExam"
+                ? `🧪 PE Online → ${peInfo?.peType || "General"} → ${peInfo?.topic || "General"}`
+                : peInfo
+                ? `📚 PE → ${peInfo.peType} → ${peInfo.topic}`
+                : `Exam category "${cat}"`;
 	        showToast(`${questions.length} questions appended to: ${destinationLabel}`, "success");
 	        if (document.getElementById("pe-view") && document.getElementById("pe-view").style.display !== "none") {
 	            renderPEHomeGrid();
@@ -8100,14 +8162,15 @@ function editQuestion(idx) {
 	    }
 	    showLoading(true, "Deleting question…");
 	    try {
-	        await supabaseRequest(`Exam?id=eq.${encodeURIComponent(question.id)}`, {
+	        const table = question.sourceTable === "PEOnlineExam" ? "PEOnlineExam" : "Exam";
+	        await supabaseRequest(`${table}?id=eq.${encodeURIComponent(question.id)}`, {
 	            method: "DELETE",
 	            useAdmin: true,
 	            prefer: "return=minimal"
 	        });
         clearDatabaseCache();
         databaseReady = false;
-        await loadDatabase();
+        await showAdminPortal();
         showToast("Question deleted.", "info");
     } catch (e) {
         console.error("Delete question error:", e);
@@ -8154,8 +8217,9 @@ function editQuestion(idx) {
     }
     tbody.innerHTML = questionPool.map((q, i) => {
         const peInfo = parsePECategory(q.category);
+        const isPEOnline = q.sourceTable === "PEOnlineExam";
         const badge = peInfo
-            ? `<span style="font-size:11px;font-weight:600;color:var(--navy);background:#e8edf7;padding:3px 8px;border-radius:4px;">📚 PE · ${escapeHTML(peInfo.peType)} · ${escapeHTML(peInfo.topic)}</span>`
+            ? `<span style="font-size:11px;font-weight:600;color:var(--navy);background:${isPEOnline ? "#ede7f6" : "#e8edf7"};padding:3px 8px;border-radius:4px;">${isPEOnline ? "🧪 PE Online" : "📚 PE"} · ${escapeHTML(peInfo.peType)} · ${escapeHTML(peInfo.topic)}</span>`
             : `<span style="font-size:11px;font-weight:600;color:var(--gold);background:var(--gold-pale);padding:3px 8px;border-radius:4px;">${escapeHTML(q.category)}</span>`;
         return `
 	        <tr>
