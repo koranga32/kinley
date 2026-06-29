@@ -3,7 +3,8 @@ import { enforceRateLimits, getSession, rejectCrossSiteRequest } from "../_share
 import { supabaseServerRequest } from "../_shared/supabase.js";
 import {
     validateContactPayload,
-    validateExamSessionPayload,
+    validateEmptyPayload,
+    validateExamStartPayload,
     validateGradedResponsePayload,
     validateMediaIds
 } from "../_shared/validation.js";
@@ -14,13 +15,14 @@ const HOUR = 60 * MINUTE;
 const POLICIES = {
     health: { windowMs: MINUTE, ipLimit: 30, sessionLimit: 30 },
     questions: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "exam-start": { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
     "question-solution": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 90 },
     "pe-online-questions": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-online-start": { windowMs: 10 * MINUTE, ipLimit: 30, sessionLimit: 20 },
     flashcards: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "flashcard-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 60 },
-    "exam-session": { windowMs: HOUR, ipLimit: 60, sessionLimit: 20 },
     quotes: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
-    responses: { windowMs: HOUR, ipLimit: 60, sessionLimit: 12 },
+    responses: { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
     contact: { windowMs: HOUR, ipLimit: 3, sessionLimit: 2 }
 };
 
@@ -33,17 +35,32 @@ async function handleQuestions(context) {
     if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
     const url = new URL(context.request.url);
     const view = url.searchParams.get("view") || "text";
-    if (view === "text") {
+    if (view === "catalog") {
+        const rows = await supabaseServerRequest(context.env, "Exam?select=category&order=id.asc");
+        const counts = new Map();
+        for (const row of rows || []) {
+            const category = String(row.category || "");
+            if (!category || category.startsWith("__PE__::")) continue;
+            counts.set(category, (counts.get(category) || 0) + 1);
+        }
+        return json([...counts].map(([category, count]) => ({ category, count })));
+    }
+    if (view === "text" || view === "pe-practice") {
         const fields = "id,category,question,optionA,optionB,optionC,optionD";
         const rows = await supabaseServerRequest(context.env, `Exam?select=${fields}&order=id.asc`);
-        return json((rows || []).map(row => ({ ...row, question: publicQuestionText(row.question) })));
+        return json((rows || [])
+            .filter(row => String(row.category || "").startsWith("__PE__::"))
+            .map(row => ({ ...row, question: publicQuestionText(row.question) })));
     }
     if (view === "media") {
         const ids = validateMediaIds(url.searchParams.get("ids"));
-        const filter = ids.length ? `&id=in.(${ids.join(",")})` : "";
-        return json(await supabaseServerRequest(context.env, `Exam?select=id,image,audio${filter}`));
+        if (!ids.length) return apiError(400, "missing_ids", "Question media IDs are required.");
+        return json(await supabaseServerRequest(
+            context.env,
+            `Exam?select=id,image,audio&id=in.(${ids.join(",")})`
+        ));
     }
-    return apiError(400, "invalid_view", "Question view must be text or media.");
+    return apiError(400, "invalid_view", "Question view must be catalog, pe-practice, or media.");
 }
 
 async function handleQuestionSolution(context) {
@@ -72,22 +89,25 @@ async function handlePEOnlineQuestions(context) {
     if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
     const url = new URL(context.request.url);
     const view = url.searchParams.get("view") || "text";
-    if (view === "text") {
-        const fields = "id,category,question,optionA,optionB,optionC,optionD";
-        const rows = await supabaseServerRequest(context.env, `PEOnlineExam?select=${fields}&order=id.asc`);
-        return json((rows || []).map(row => ({
-            ...row,
-            id: `peo:${row.id}`,
-            question: publicQuestionText(row.question)
-        })));
+    if (view === "catalog") {
+        const rows = await supabaseServerRequest(context.env, "PEOnlineExam?select=category&order=id.asc");
+        const counts = { Mock: 0, "Past Paper": 0, "Data Interpretation": 0, "Current Affairs": 0 };
+        for (const row of rows || []) {
+            const info = parsePECategory(row.category);
+            if (info && Object.hasOwn(counts, info.peType)) counts[info.peType] += 1;
+        }
+        return json({ counts, total: calculatePEOnlineTotal(counts) });
     }
     if (view === "media") {
         const ids = validateMediaIds(url.searchParams.get("ids"));
-        const filter = ids.length ? `&id=in.(${ids.join(",")})` : "";
-        const rows = await supabaseServerRequest(context.env, `PEOnlineExam?select=id,image,audio${filter}`);
+        if (!ids.length) return apiError(400, "missing_ids", "PE Online media IDs are required.");
+        const rows = await supabaseServerRequest(
+            context.env,
+            `PEOnlineExam?select=id,image,audio&id=in.(${ids.join(",")})`
+        );
         return json((rows || []).map(row => ({ ...row, id: `peo:${row.id}` })));
     }
-    return apiError(400, "invalid_view", "PE Online question view must be text or media.");
+    return apiError(400, "invalid_view", "PE Online question view must be catalog or media.");
 }
 
 async function handleFlashcards(context) {
@@ -113,6 +133,28 @@ function normalizeOption(value) {
     }).format(date);
 }
 
+function shuffled(values) {
+    const output = [...values];
+    for (let i = output.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [output[i], output[j]] = [output[j], output[i]];
+    }
+    return output;
+}
+
+function parsePECategory(value) {
+    const category = String(value || "");
+    if (!category.startsWith("__PE__::")) return null;
+    const parts = category.split("::");
+    return { peType: parts[1] || "Mock", topic: parts[2] || "General" };
+}
+
+function calculatePEOnlineTotal(counts) {
+    const di = Math.min(Number(counts["Data Interpretation"] || 0), 20);
+    const currentAffairs = Math.min(Number(counts["Current Affairs"] || 0), 20);
+    return Math.min(100, di + currentAffairs + Number(counts.Mock || 0) + Number(counts["Past Paper"] || 0));
+}
+
 function parseAnswerIndex(value) {
     const normalized = String(value || "").trim().toUpperCase();
     if (["A", "B", "C", "D"].includes(normalized)) return normalized.charCodeAt(0) - 65;
@@ -124,6 +166,89 @@ function parseAnswerIndex(value) {
 
 function publicQuestionText(raw) {
     return String(raw || "").split("\n§§EXPLAIN§§\n", 1)[0];
+}
+
+let examSessionSchemaReady = false;
+
+async function ensureExamSessionSchema(db) {
+    if (examSessionSchemaReady) return;
+    await db.prepare(`
+        create table if not exists exam_sessions (
+            session_id text primary key,
+            payload text not null,
+            expires_at integer not null,
+            used_at integer
+        )
+    `).run();
+    await db.prepare(`
+        create index if not exists exam_sessions_expiry_idx
+        on exam_sessions (expires_at)
+    `).run();
+    examSessionSchemaReady = true;
+}
+
+function buildSecureQuestions(rows, idPrefix = "") {
+    const prepared = [];
+    for (const row of rows || []) {
+        const storedOptions = [row.optionA, row.optionB, row.optionC, row.optionD].map(normalizeOption);
+        const answerIndex = parseAnswerIndex(row.answer);
+        if (answerIndex < 0 || storedOptions.some(option => !option)) continue;
+        const optionItems = shuffled(storedOptions.map((text, index) => ({ text, correct: index === answerIndex })));
+        const options = optionItems.map(item => item.text);
+        prepared.push({
+            publicQuestion: {
+                id: `${idPrefix}${row.id}`,
+                category: row.category,
+                question: publicQuestionText(row.question),
+                options
+            },
+            gradingItem: {
+                id: `${idPrefix}${row.id}`,
+                question: publicQuestionText(row.question),
+                options,
+                correctIndex: optionItems.findIndex(item => item.correct)
+            }
+        });
+    }
+    return prepared;
+}
+
+async function storeExamSession(db, gradingItems) {
+    await ensureExamSessionSchema(db);
+    const sessionId = crypto.randomUUID();
+    const now = Date.now();
+    await db.prepare(
+        "insert into exam_sessions (session_id, payload, expires_at, used_at) values (?1, ?2, ?3, null)"
+    ).bind(sessionId, JSON.stringify(gradingItems), now + 3 * HOUR).run();
+    return sessionId;
+}
+
+function selectPEOnlineRows(rows) {
+    const byType = type => (rows || []).filter(row => parsePECategory(row.category)?.peType === type);
+    const mockPool = shuffled(byType("Mock"));
+    const pastPool = shuffled(byType("Past Paper"));
+    const currentAffairs = shuffled(byType("Current Affairs")).slice(0, 20);
+
+    const diByTopic = new Map();
+    for (const row of byType("Data Interpretation")) {
+        const topic = parsePECategory(row.category).topic;
+        if (!diByTopic.has(topic)) diByTopic.set(topic, []);
+        diByTopic.get(topic).push(row);
+    }
+    const dataInterpretation = [];
+    for (const topic of shuffled([...diByTopic.keys()])) {
+        dataInterpretation.push(...diByTopic.get(topic));
+        if (dataInterpretation.length >= 20) break;
+    }
+
+    const remaining = Math.max(100 - dataInterpretation.length - currentAffairs.length, 0);
+    const mockTarget = Math.ceil(remaining / 2);
+    const pastTarget = remaining - mockTarget;
+    let mock = mockPool.slice(0, mockTarget);
+    let past = pastPool.slice(0, pastTarget);
+    if (mock.length < mockTarget) past = past.concat(pastPool.slice(past.length, past.length + mockTarget - mock.length));
+    if (past.length < pastTarget) mock = mock.concat(mockPool.slice(mock.length, mock.length + pastTarget - past.length));
+    return [...shuffled([...mock, ...past, ...currentAffairs]), ...dataInterpretation];
 }
 
 async function handleFlashcardAnswer(context) {
@@ -138,56 +263,41 @@ async function handleFlashcardAnswer(context) {
     return json({ id: String(rows[0].id), answer: rows[0].answer || "" });
 }
 
-async function buildGradingItems(env, requestedItems) {
-    const examIds = requestedItems.filter(item => /^\d+$/.test(item.id)).map(item => item.id);
-    const peOnlineIds = requestedItems.filter(item => item.id.startsWith("peo:")).map(item => item.id.slice(4));
-    const examRows = examIds.length
-        ? await supabaseServerRequest(env, `Exam?select=id,question,optionA,optionB,optionC,optionD,answer&id=in.(${examIds.join(",")})`)
-        : [];
-    const peOnlineRows = peOnlineIds.length
-        ? await supabaseServerRequest(env, `PEOnlineExam?select=id,question,optionA,optionB,optionC,optionD,answer&id=in.(${peOnlineIds.join(",")})`)
-        : [];
-    const examById = new Map((examRows || []).map(row => [String(row.id), row]));
-    const peOnlineById = new Map((peOnlineRows || []).map(row => [String(row.id), row]));
-
-    return requestedItems.map(item => {
-        const providedOptions = item.options.map(normalizeOption);
-        let question;
-        let correctText;
-        const isPEOnline = item.id.startsWith("peo:");
-        const row = isPEOnline ? peOnlineById.get(item.id.slice(4)) : examById.get(item.id);
-        if (!row) {
-            const label = isPEOnline ? "A PE Online question" : "An exam question";
-            throw Object.assign(new Error(`${label} no longer exists.`), { status: 400, code: "stale_question" });
-        }
-        {
-            const storedOptions = [row.optionA, row.optionB, row.optionC, row.optionD].map(normalizeOption);
-            const answerIndex = parseAnswerIndex(row.answer);
-            if (answerIndex < 0 || [...storedOptions].sort().join("\u0000") !== [...providedOptions].sort().join("\u0000")) {
-                throw Object.assign(new Error("Exam options are invalid."), { status: 400, code: "invalid_options" });
-            }
-            question = publicQuestionText(row.question);
-            correctText = storedOptions[answerIndex];
-        }
-        const correctIndex = providedOptions.indexOf(correctText);
-        if (correctIndex < 0) throw Object.assign(new Error("Correct option is missing."), { status: 400, code: "invalid_options" });
-        return { id: item.id, question, options: item.options, correctIndex };
-    });
+async function handleExamStart(context) {
+    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
+    const { category } = validateExamStartPayload(await readJson(context.request, 4096));
+    if (category.startsWith("__PE__::")) {
+        return apiError(400, "invalid_category", "Choose a normal exam category.");
+    }
+    const fields = "id,category,question,optionA,optionB,optionC,optionD,answer";
+    const rows = await supabaseServerRequest(
+        context.env,
+        `Exam?select=${fields}&category=eq.${encodeURIComponent(category)}&order=id.asc`
+    );
+    const prepared = buildSecureQuestions(shuffled(rows || []));
+    if (!prepared.length) return apiError(404, "no_questions", "No valid questions were found in this category.");
+    const sessionId = await storeExamSession(context.env.RATE_LIMIT_DB, prepared.map(item => item.gradingItem));
+    return json({
+        ok: true,
+        session_id: sessionId,
+        questions: prepared.map(item => item.publicQuestion)
+    }, 201);
 }
 
-async function handleExamSession(context) {
+async function handlePEOnlineStart(context) {
     if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    const payload = validateExamSessionPayload(await readJson(context.request, 512000));
-    const gradingItems = await buildGradingItems(context.env, payload.items);
-    const sessionId = crypto.randomUUID();
-    const now = Date.now();
-    await context.env.RATE_LIMIT_DB.prepare(
-        "insert into exam_sessions (session_id, payload, expires_at, used_at) values (?1, ?2, ?3, null)"
-    ).bind(sessionId, JSON.stringify(gradingItems), now + 3 * HOUR).run();
-    context.waitUntil?.(
-        context.env.RATE_LIMIT_DB.prepare("delete from exam_sessions where expires_at < ?1").bind(now).run().catch(() => {})
-    );
-    return json({ ok: true, session_id: sessionId }, 201);
+    validateEmptyPayload(await readJson(context.request, 1024), "PE Online start request");
+    const fields = "id,category,question,optionA,optionB,optionC,optionD,answer";
+    const rows = await supabaseServerRequest(context.env, `PEOnlineExam?select=${fields}&order=id.asc`);
+    const selected = selectPEOnlineRows(rows || []);
+    const prepared = buildSecureQuestions(selected, "peo:");
+    if (!prepared.length) return apiError(404, "no_questions", "No valid PE Online questions were found.");
+    const sessionId = await storeExamSession(context.env.RATE_LIMIT_DB, prepared.map(item => item.gradingItem));
+    return json({
+        ok: true,
+        session_id: sessionId,
+        questions: prepared.map(item => item.publicQuestion)
+    }, 201);
 }
 
 async function handleQuotes(context) {
@@ -202,6 +312,7 @@ async function handleQuotes(context) {
 async function handleResponses(context) {
     if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
     const submission = validateGradedResponsePayload(await readJson(context.request, 512000));
+    await ensureExamSessionSchema(context.env.RATE_LIMIT_DB);
     const session = await context.env.RATE_LIMIT_DB.prepare(
         "update exam_sessions set used_at = ?1 where session_id = ?2 and used_at is null and expires_at > ?1 returning payload"
     ).bind(Date.now(), submission.session_id).first();
@@ -293,11 +404,12 @@ export async function onRequest(context) {
         let response;
         if (name === "health") response = json({ ok: true, service: "ExamPortal API" });
         else if (name === "questions") response = await handleQuestions(context);
+        else if (name === "exam-start") response = await handleExamStart(context);
         else if (name === "question-solution") response = await handleQuestionSolution(context);
         else if (name === "pe-online-questions") response = await handlePEOnlineQuestions(context);
+        else if (name === "pe-online-start") response = await handlePEOnlineStart(context);
         else if (name === "flashcards") response = await handleFlashcards(context);
         else if (name === "flashcard-answer") response = await handleFlashcardAnswer(context);
-        else if (name === "exam-session") response = await handleExamSession(context);
         else if (name === "quotes") response = await handleQuotes(context);
         else if (name === "responses") response = await handleResponses(context);
         else if (name === "contact") response = await handleContact(context);

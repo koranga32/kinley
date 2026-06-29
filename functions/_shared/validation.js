@@ -64,6 +64,18 @@ export function validateContactPayload(input) {
     };
 }
 
+export function validateExamStartPayload(input) {
+    const value = exactObject(input, ["category"], "Exam start request");
+    return {
+        category: cleanText(value.category, "Category", { min: 1, max: 200 })
+    };
+}
+
+export function validateEmptyPayload(input, label = "Request") {
+    exactObject(input, [], label);
+    return {};
+}
+
 export function validateResponsePayload(input) {
     const value = exactObject(
         input,
