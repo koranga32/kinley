@@ -8480,33 +8480,6 @@ async function editQuestion(idx) {
 	    }
 	}
 
-	async function deleteQuestion(idx) {
-	    if (!confirm("Permanently delete this question from the database?")) return;
-	    const question = questionPool[idx];
-	    if (!question || question.id === undefined || question.id === null) {
-	        showToast("Question ID is missing. Refresh and try again.", "error");
-	        return;
-	    }
-	    showLoading(true, "Deleting question…");
-	    try {
-	        const table = question.sourceTable === "PEOnlineExam" ? "PEOnlineExam" : "Exam";
-	        await adminApiRequest("admin-question-delete", {
-                body: {
-                    id: String(question.id),
-                    table
-                }
-            });
-        clearDatabaseCache();
-        databaseReady = false;
-        await showAdminPortal();
-        showToast("Question deleted.", "info");
-    } catch (e) {
-        console.error("Delete question error:", e);
-        showToast("Failed to delete question.", "error");
-	        showLoading(false);
-	    }
-	}
-
 	function viewQuestion(idx) {
 	    const q = questionPool[idx];
 	    if (!q) return;
