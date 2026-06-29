@@ -4863,6 +4863,7 @@ const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
 const ADMIN_SESSION_KEY = "examportal_admin_session_v1";
+const ADMIN_SESSION_IDLE_MS = 20 * 60 * 1000;
 const SECONDS_PER_QUESTION = 30;
 const CA_SUPABASE_TABLE = "CurrentAffairFlashcards";
 const DAILY_QUOTES_TABLE = "daily_quotes";
@@ -4936,6 +4937,14 @@ let editingQuestionIndex = null;
 	    document.getElementById("student-name").focus();
 	}
 
+    document.addEventListener("pointerdown", () => {
+        touchAdminSession();
+    });
+
+    document.addEventListener("keydown", () => {
+        touchAdminSession();
+    });
+
     function warmPublicStartupData() {
         const kickOff = () => {
             loadDailyQuotes()
@@ -4971,7 +4980,8 @@ let editingQuestionIndex = null;
         if (!adminAccessToken) return;
         try {
             sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({
-                accessToken: adminAccessToken
+                accessToken: adminAccessToken,
+                lastActivityAt: Date.now()
             }));
         } catch (e) {}
     }
@@ -4982,7 +4992,11 @@ let editingQuestionIndex = null;
             if (!raw) return false;
             const parsed = JSON.parse(raw);
             const token = String(parsed?.accessToken || "");
-            if (!token) return false;
+            const lastActivityAt = Number(parsed?.lastActivityAt || 0);
+            if (!token || !Number.isFinite(lastActivityAt) || Date.now() - lastActivityAt > ADMIN_SESSION_IDLE_MS) {
+                clearAdminSession();
+                return false;
+            }
             adminAccessToken = token;
             return true;
         } catch (e) {
@@ -4992,6 +5006,11 @@ let editingQuestionIndex = null;
 
     function clearAdminSession() {
         try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
+    }
+
+    function touchAdminSession() {
+        if (!adminAccessToken || !document.body.classList.contains("admin-mode")) return;
+        persistAdminSession();
     }
 
 	function shuffleArray(items) {
@@ -5255,7 +5274,7 @@ async function supabaseRequest(path, { method = "GET", body, useAdmin = false, p
     return text ? JSON.parse(text) : null;
 }
 
-async function apiRequest(path, { method = "GET", body } = {}) {
+async function apiRequest(path, { method = "GET", body, headers = {} } = {}) {
     const normalizedMethod = String(method || "GET").toUpperCase();
     if (normalizedMethod === "GET") {
         const ttlMs = getPublicApiCacheTTL(path);
@@ -5266,7 +5285,7 @@ async function apiRequest(path, { method = "GET", body } = {}) {
                 return cached.data;
             }
             if (cached?.promise) return cached.promise;
-            const pending = fetchApiJson(path, { method: normalizedMethod, body })
+            const pending = fetchApiJson(path, { method: normalizedMethod, body, headers })
                 .then(data => {
                     publicApiCache.set(path, { data, expiresAt: Date.now() + ttlMs, promise: null });
                     return data;
@@ -5282,13 +5301,15 @@ async function apiRequest(path, { method = "GET", body } = {}) {
         clearPublicApiCache();
     }
 
-    return fetchApiJson(path, { method: normalizedMethod, body });
+    return fetchApiJson(path, { method: normalizedMethod, body, headers });
 }
 
-async function fetchApiJson(path, { method = "GET", body } = {}) {
+async function fetchApiJson(path, { method = "GET", body, headers = {} } = {}) {
+    const requestHeaders = { ...headers };
+    if (body) requestHeaders["Content-Type"] = "application/json";
     const response = await fetch(`/api/${path}`, {
         method,
-        headers: body ? { "Content-Type": "application/json" } : undefined,
+        headers: Object.keys(requestHeaders).length ? requestHeaders : undefined,
         body: body ? JSON.stringify(body) : undefined,
         credentials: "same-origin"
     });
@@ -5301,6 +5322,19 @@ async function fetchApiJson(path, { method = "GET", body } = {}) {
         throw error;
     }
     return data;
+}
+
+async function adminApiRequest(path, { method = "POST", body } = {}) {
+    if (!adminAccessToken) {
+        throw new Error("Admin session is missing. Please sign in again.");
+    }
+    return apiRequest(path, {
+        method,
+        body,
+        headers: {
+            Authorization: `Bearer ${adminAccessToken}`
+        }
+    });
 }
 
 function getPublicApiCacheTTL(path) {
@@ -7128,6 +7162,7 @@ function cafCancelEdit() {
 async function cafSaveAdminCard() {
     const wasEditing = Boolean(editingCafCardId);
     const payload = {
+        id: editingCafCardId || "",
         scope: document.getElementById("caf-admin-scope")?.value || "Bhutan",
         category: document.getElementById("caf-admin-category")?.value || "Sports",
         date_stamp: document.getElementById("caf-admin-date")?.value.trim(),
@@ -7139,21 +7174,7 @@ async function cafSaveAdminCard() {
         return;
     }
     try {
-        if (editingCafCardId) {
-            await supabaseRequest(`${CA_SUPABASE_TABLE}?id=eq.${encodeURIComponent(editingCafCardId)}`, {
-                method: "PATCH",
-                useAdmin: true,
-                prefer: "return=minimal",
-                body: payload
-            });
-        } else {
-            await supabaseRequest(CA_SUPABASE_TABLE, {
-                method: "POST",
-                useAdmin: true,
-                prefer: "return=representation",
-                body: payload
-            });
-        }
+        await adminApiRequest("admin-flashcard", { body: payload });
         clearPublicApiCache();
         showToast(wasEditing ? "Current Affair flashcard updated." : "Current Affair flashcard saved.", "success");
         cafResetAdminForm();
@@ -7281,26 +7302,13 @@ async function saveDailyQuote() {
     }
 
     try {
-        const body = {
-            english_quote: english,
-            dzongkha_quote: dzongkha,
-            expires_at: new Date(Date.now() + DAILY_QUOTE_LIFETIME_MS).toISOString()
-        };
-        if (editingQuoteId) {
-            await supabaseRequest(`${DAILY_QUOTES_TABLE}?id=eq.${encodeURIComponent(editingQuoteId)}`, {
-                method: "PATCH",
-                useAdmin: true,
-                prefer: "return=minimal",
-                body
-            });
-        } else {
-            await supabaseRequest(DAILY_QUOTES_TABLE, {
-                method: "POST",
-                useAdmin: true,
-                prefer: "return=minimal",
-                body
-            });
-        }
+        await adminApiRequest("admin-quote", {
+            body: {
+                id: editingQuoteId || "",
+                english_quote: english,
+                dzongkha_quote: dzongkha
+            }
+        });
         clearPublicApiCache();
         await loadDailyQuotes();
         dailyQuoteTickerIndex = 0;
@@ -8255,6 +8263,8 @@ async function editQuestion(idx) {
 
 	    showLoading(true, "Saving question to database…");
 	    const payload = {
+            id: "",
+            table: "",
 	        category: cat,
 	        question,
 	        explanation: document.getElementById("adm-explanation").value.trim(),
@@ -8272,22 +8282,12 @@ async function editQuestion(idx) {
                 showToast("Question ID is missing. Refresh and try again.", "error");
                 return;
             }
-            const table = getAdminTargetTable(existing);
-            await supabaseRequest(`${table}?id=eq.${encodeURIComponent(existing.id)}`, {
-                method: "PATCH",
-                body: toSupabaseQuestion(payload),
-                useAdmin: true,
-                prefer: "return=minimal"
-            });
+            payload.id = String(existing.id);
+            payload.table = getAdminTargetTable(existing);
         } else {
-            const table = getAdminTargetTable();
-            await supabaseRequest(table, {
-                method: "POST",
-                body: toSupabaseQuestion(payload),
-                useAdmin: true,
-                prefer: "return=minimal"
-            });
+            payload.table = getAdminTargetTable();
         }
+        await adminApiRequest("admin-question", { body: payload });
         resetAdminForm();
         clearDatabaseCache();
         databaseReady = false;
@@ -8441,22 +8441,25 @@ async function editQuestion(idx) {
 	    showLoading(true, `Saving ${questions.length} questions…`);
 	    try {
 	        const table = getAdminTargetTable();
-	        const savedRows = await supabaseRequest(`${table}?select=id,category,question,optionA,optionB,optionC,optionD,answer,image,audio`, {
-	            method: "POST",
-	            body: questions.map(toSupabaseQuestion),
-	            useAdmin: true,
-	            prefer: "return=representation"
-	        });
+	        await adminApiRequest("admin-bulk-questions", {
+                body: {
+                    table,
+                    questions: questions.map(question => ({
+                        category: question.category,
+                        question: question.question,
+                        explanation: question.explanation || "",
+                        options: question.options,
+                        answer: question.answer,
+                        imageCode: question.imageCode || "",
+                        audioCode: question.audioCode || ""
+                    }))
+                }
+            });
 
 	        document.getElementById("bulk-form").reset();
 	        clearDatabaseCache();
-	        questionPool = questionPool.concat(mapExamRows(savedRows, table));
-	        const examQuestionsAfterBulk = questionPool.filter(q => !isPECategory(q.category));
-	        categories = [...new Set(examQuestionsAfterBulk.map(q => q.category).filter(Boolean))];
-	        updateCategorySelects();
-	        renderAdminTable();
-	        document.getElementById("q-count").textContent = questionPool.length;
-	        showLoading(false);
+            databaseReady = false;
+            await showAdminPortal();
 	        const peInfo = parsePECategory(cat);
 	        const destinationLabel = table === "PEOnlineExam"
                 ? `🧪 PE Online → ${peInfo?.peType || "General"} → ${peInfo?.topic || "General"}`
@@ -8487,11 +8490,12 @@ async function editQuestion(idx) {
 	    showLoading(true, "Deleting question…");
 	    try {
 	        const table = question.sourceTable === "PEOnlineExam" ? "PEOnlineExam" : "Exam";
-	        await supabaseRequest(`${table}?id=eq.${encodeURIComponent(question.id)}`, {
-	            method: "DELETE",
-	            useAdmin: true,
-	            prefer: "return=minimal"
-	        });
+	        await adminApiRequest("admin-question-delete", {
+                body: {
+                    id: String(question.id),
+                    table
+                }
+            });
         clearDatabaseCache();
         databaseReady = false;
         await showAdminPortal();
