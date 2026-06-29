@@ -4822,7 +4822,6 @@ Answer: C" ></textarea>
  */
 const SUPABASE_URL = "https://nwkfuluvgbsmyzomlpvw.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_I9WL1ChnlPJp2V_MSM4R5Q_RXQ48iBR";
-const ADMIN_EMAIL = "koranga6265@gmail.com";
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
@@ -4864,7 +4863,7 @@ let peTopicBuckets = new Map();
 let cafStateLoaded = false;
 let cafStatePromise = null;
 let adminAccessToken = "";
-let adminMfaState = null;
+let adminOtpState = null;
 let editingQuestionIndex = null;
 
 	// ─── INIT ────────────────────────────────────────────
@@ -6275,9 +6274,9 @@ function closeAdminModal() {
 }
 
 function resetAdminGateway() {
-    adminMfaState = null;
+    adminOtpState = null;
     const passwordInput = document.getElementById("admin-pw-input");
-    const mfaInput = document.getElementById("admin-mfa-input");
+    const otpInput = document.getElementById("admin-mfa-input");
     const errMsg = document.getElementById("pw-error");
     const authBtn = document.querySelector(".btn-modal-auth");
     if (passwordInput) {
@@ -6285,10 +6284,10 @@ function resetAdminGateway() {
         passwordInput.disabled = false;
         passwordInput.classList.remove("error-shake");
     }
-    if (mfaInput) {
-        mfaInput.value = "";
-        mfaInput.disabled = false;
-        mfaInput.classList.remove("error-shake");
+    if (otpInput) {
+        otpInput.value = "";
+        otpInput.disabled = false;
+        otpInput.classList.remove("error-shake");
     }
     if (authBtn) authBtn.disabled = false;
     if (errMsg) {
@@ -6302,24 +6301,24 @@ function setAdminAuthMode(mode) {
     const passwordWrap = document.getElementById("admin-pw-wrap");
     const passwordInput = document.getElementById("admin-pw-input");
     const passwordEye = document.getElementById("pw-eye");
-    const mfaWrap = document.getElementById("admin-mfa-wrap");
-    const mfaInput = document.getElementById("admin-mfa-input");
-    const isMfa = mode === "mfa";
+    const otpWrap = document.getElementById("admin-mfa-wrap");
+    const otpInput = document.getElementById("admin-mfa-input");
+    const isOtp = mode === "otp";
     if (subtitle) {
-        subtitle.textContent = isMfa
-            ? "Enter the 6-digit verification code"
+        subtitle.textContent = isOtp
+            ? `Enter the 6-digit code${adminOtpState?.destination ? ` sent to ${adminOtpState.destination}` : ""}`
             : "Enter password";
     }
-    if (passwordWrap) passwordWrap.style.display = isMfa ? "none" : "";
-    if (passwordInput) passwordInput.disabled = isMfa;
-    if (passwordEye) passwordEye.style.display = isMfa ? "none" : "";
-    if (mfaWrap) mfaWrap.style.display = isMfa ? "" : "none";
-    if (mfaInput) mfaInput.disabled = !isMfa;
+    if (passwordWrap) passwordWrap.style.display = isOtp ? "none" : "";
+    if (passwordInput) passwordInput.disabled = isOtp;
+    if (passwordEye) passwordEye.style.display = isOtp ? "none" : "";
+    if (otpWrap) otpWrap.style.display = isOtp ? "" : "none";
+    if (otpInput) otpInput.disabled = !isOtp;
 }
 
 function showAdminAuthError(message) {
     const modal = document.getElementById("admin-modal");
-    const input = adminMfaState
+    const input = adminOtpState
         ? document.getElementById("admin-mfa-input")
         : document.getElementById("admin-pw-input");
     const errMsg = document.getElementById("pw-error");
@@ -6442,94 +6441,45 @@ function togglePwVisibility() {
     input.focus();
 }
 
-function getVerifiedAdminFactor(payload) {
-    const allFactors = Array.isArray(payload?.all) ? payload.all : [];
-    const totpFactors = Array.isArray(payload?.totp) ? payload.totp : [];
-    const phoneFactors = Array.isArray(payload?.phone) ? payload.phone : [];
-    const factors = [...allFactors, ...totpFactors, ...phoneFactors];
-    return factors.find((factor) => {
-        const status = String(factor?.status || "").toLowerCase();
-        return factor?.id && status === "verified";
-    }) || null;
-}
-
-async function beginAdminMfaIfRequired(authData) {
-    const sessionToken = String(authData?.access_token || "");
-    if (!sessionToken) return null;
-    const factorResponse = await fetch(`${SUPABASE_URL}/auth/v1/factors`, {
-        headers: {
-            apikey: SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${sessionToken}`
-        }
-    });
-    const factorData = await factorResponse.json().catch(() => ({}));
-    if (!factorResponse.ok) {
-        throw new Error(factorData?.msg || factorData?.error_description || "Could not read MFA factors");
-    }
-    const verifiedFactor = getVerifiedAdminFactor(factorData);
-    const allFactors = Array.isArray(factorData?.all) ? factorData.all : [];
-    if (!verifiedFactor) {
-        if (allFactors.length > 0) {
-            throw new Error("MFA is enrolled but not fully verified yet.");
-        }
-        return null;
-    }
-    const challengeResponse = await fetch(`${SUPABASE_URL}/auth/v1/factors/${encodeURIComponent(verifiedFactor.id)}/challenge`, {
+async function requestAdminEmailOtp(password) {
+    const result = await apiRequest("admin-otp-request", {
         method: "POST",
-        headers: {
-            apikey: SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${sessionToken}`,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({})
+        body: { password }
     });
-    const challengeData = await challengeResponse.json().catch(() => ({}));
-    const challengeId = challengeData?.id || challengeData?.challenge?.id || "";
-    if (!challengeResponse.ok || !challengeId) {
-        throw new Error(challengeData?.msg || challengeData?.error_description || "Could not start MFA verification");
-    }
-    adminMfaState = {
-        accessToken: sessionToken,
-        refreshToken: String(authData?.refresh_token || ""),
-        factorId: String(verifiedFactor.id),
-        challengeId: String(challengeId)
+    adminOtpState = {
+        requestId: String(result.request_id || ""),
+        destination: String(result.destination || "")
     };
-    return adminMfaState;
+    return adminOtpState;
 }
 
-async function verifyAdminMfaCode(code) {
-    if (!adminMfaState?.factorId || !adminMfaState?.challengeId || !adminMfaState?.accessToken) {
-        throw new Error("MFA session expired");
+async function verifyAdminEmailOtp(code) {
+    if (!adminOtpState?.requestId) {
+        throw new Error("Verification session expired");
     }
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/factors/${encodeURIComponent(adminMfaState.factorId)}/verify`, {
+    const result = await apiRequest("admin-otp-verify", {
         method: "POST",
-        headers: {
-            apikey: SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${adminMfaState.accessToken}`,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ challenge_id: adminMfaState.challengeId, code })
+        body: {
+            request_id: adminOtpState.requestId,
+            code
+        }
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-        throw new Error(data?.msg || data?.error_description || "Verification failed");
-    }
-    adminAccessToken = String(data?.access_token || data?.session?.access_token || adminMfaState.accessToken || "");
-    adminMfaState = null;
+    adminAccessToken = String(result.access_token || "");
+    adminOtpState = null;
 }
 
 async function authenticateAdmin() {
     const passwordInput  = document.getElementById("admin-pw-input");
-    const mfaInput = document.getElementById("admin-mfa-input");
+    const otpInput = document.getElementById("admin-mfa-input");
     const errMsg = document.getElementById("pw-error");
     const authBtn = document.querySelector(".btn-modal-auth");
-    const activeInput = adminMfaState ? mfaInput : passwordInput;
-    const credentialValue = adminMfaState ? mfaInput.value.trim() : passwordInput.value;
+    const activeInput = adminOtpState ? otpInput : passwordInput;
+    const credentialValue = adminOtpState ? otpInput.value.trim() : passwordInput.value;
     if (!credentialValue) {
         activeInput.classList.remove("error-shake");
         void activeInput.offsetWidth;
         activeInput.classList.add("error-shake");
-        errMsg.textContent = adminMfaState
+        errMsg.textContent = adminOtpState
             ? "⚠ Please enter the 6-digit verification code."
             : "⚠ Please enter your password.";
         errMsg.classList.add("visible");
@@ -6538,13 +6488,13 @@ async function authenticateAdmin() {
     }
     errMsg.classList.remove("visible");
     passwordInput.disabled = true;
-    mfaInput.disabled = true;
+    otpInput.disabled = true;
     if (authBtn) authBtn.disabled = true;
     closeAdminModal();
     showLoading(true, "Connecting...");
-    if (adminMfaState) {
+    if (adminOtpState) {
         try {
-            await verifyAdminMfaCode(credentialValue);
+            await verifyAdminEmailOtp(credentialValue);
             try {
                 await showAdminPortal();
             } catch (portalError) {
@@ -6554,66 +6504,57 @@ async function authenticateAdmin() {
         } catch (error) {
             adminAccessToken = "";
             document.body.classList.remove("admin-mode");
-            const message = /portal/i.test(String(error?.message || ""))
+            const errorText = String(error?.message || "");
+            const message = /portal/i.test(errorText)
                 ? "⚠ Admin portal could not be opened. Please try again."
+                : /expired/i.test(errorText) || /session/i.test(errorText)
+                ? "⚠ Verification expired. Please enter password again."
+                : error?.status === 429 || /attempt/i.test(errorText)
+                ? "⚠ Too many incorrect codes. Please enter password again."
                 : "⚠ Incorrect verification code. Please try again.";
+            if (/expired|session|attempt/i.test(errorText) || error?.status === 429) {
+                resetAdminGateway();
+                setAdminAuthMode("password");
+            }
             showAdminAuthError(message);
         } finally {
             showLoading(false);
             passwordInput.disabled = false;
-            mfaInput.disabled = false;
+            otpInput.disabled = false;
             if (authBtn) authBtn.disabled = false;
         }
         return;
     }
-    let authData;
     try {
-        const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-            method: "POST",
-            headers: {
-                apikey: SUPABASE_PUBLISHABLE_KEY,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ email: ADMIN_EMAIL, password: credentialValue })
-        });
-        authData = await response.json();
-        if (!response.ok || !authData.access_token) {
-            throw new Error(authData.error_description || authData.msg || "Authentication failed");
-        }
-        const pendingMfa = await beginAdminMfaIfRequired(authData);
-        if (pendingMfa) {
-            setAdminAuthMode("mfa");
+        const pendingOtp = await requestAdminEmailOtp(credentialValue);
+        if (pendingOtp?.requestId) {
+            setAdminAuthMode("otp");
             const modal = document.getElementById("admin-modal");
             modal.classList.add("open");
             showLoading(false);
             passwordInput.disabled = false;
-            mfaInput.disabled = false;
+            otpInput.disabled = false;
             if (authBtn) authBtn.disabled = false;
-            setTimeout(() => mfaInput.focus(), 120);
+            showToast("Verification code sent to email.", "success");
+            setTimeout(() => otpInput.focus(), 120);
             return;
         }
-        adminAccessToken = authData.access_token;
-        try {
-            await showAdminPortal();
-        } catch (portalError) {
-            throw new Error("Admin portal open failed");
-        }
-        showToast("Admin access granted.", "success");
     } catch (error) {
         adminAccessToken = "";
-        adminMfaState = null;
+        adminOtpState = null;
         document.body.classList.remove("admin-mode");
         const errorText = String(error?.message || "");
-        const message = /MFA/i.test(errorText)
-            ? "⚠ MFA setup is incomplete. Verify the factor in Supabase and try again."
-            : /portal/i.test(errorText)
-            ? "⚠ Admin portal could not be opened. Please try again."
-            : "⚠ Supabase sign-in failed. Check the admin password.";
+        const errorCode = String(error?.code || "");
+        const message = errorCode === "security_not_configured"
+            ? "⚠ Admin email verification is not configured yet."
+            : errorCode === "otp_delivery_failed" || /delivery/i.test(errorText)
+            ? "⚠ Verification code could not be sent. Please try again."
+            : "⚠ Admin password is incorrect. Please try again.";
         showAdminAuthError(message);
     } finally {
         showLoading(false);
         passwordInput.disabled = false;
-        mfaInput.disabled = false;
+        otpInput.disabled = false;
         if (authBtn) authBtn.disabled = false;
     }
 }
@@ -6657,6 +6598,7 @@ async function restoreAdminPortal() {
 async function closeAdminPortal() {
     document.body.classList.remove("admin-mode");
     adminAccessToken = "";
+    adminOtpState = null;
     clearDatabaseCache();
     questionPool = [];
     databaseReady = false;
