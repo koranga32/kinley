@@ -6214,6 +6214,27 @@ function closeAdminModal() {
     document.getElementById("admin-modal").classList.remove("open");
 }
 
+function showAdminAuthError(message) {
+    const modal = document.getElementById("admin-modal");
+    const input = document.getElementById("admin-pw-input");
+    const errMsg = document.getElementById("pw-error");
+    const authBtn = document.querySelector(".btn-modal-auth");
+    if (input) {
+        input.value = "";
+        input.disabled = false;
+        input.classList.remove("error-shake");
+        void input.offsetWidth;
+        input.classList.add("error-shake");
+    }
+    if (authBtn) authBtn.disabled = false;
+    if (errMsg) {
+        errMsg.textContent = message;
+        errMsg.classList.add("visible");
+    }
+    modal.classList.add("open");
+    setTimeout(() => input?.focus(), 120);
+}
+
 function handleModalBackdropClick(e) {
     if (e.target === document.getElementById("admin-modal")) closeAdminModal();
 }
@@ -6332,6 +6353,8 @@ async function authenticateAdmin() {
     }
     input.disabled = true;
     if (authBtn) authBtn.disabled = true;
+    closeAdminModal();
+    showLoading(true, "Authenticating admin...");
     let authData;
     try {
         const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -6347,20 +6370,12 @@ async function authenticateAdmin() {
             throw new Error(authData.error_description || authData.msg || "Authentication failed");
         }
     } catch (e) {
-        input.value = "";
-        input.classList.remove("error-shake");
-        void input.offsetWidth;
-        input.classList.add("error-shake");
-        errMsg.textContent = "⚠ Supabase sign-in failed. Check the admin password.";
-        errMsg.classList.add("visible");
-        input.disabled = false;
-        if (authBtn) authBtn.disabled = false;
-        input.focus();
+        showLoading(false);
+        showAdminAuthError("⚠ Supabase sign-in failed. Check the admin password.");
         return;
     }
     adminAccessToken = authData.access_token;
     sessionStorage.setItem("exam_admin_token", adminAccessToken);
-    closeAdminModal();
     showLoading(true, "Opening admin portal...");
     try {
         await showAdminPortal();
@@ -6371,7 +6386,7 @@ async function authenticateAdmin() {
         adminAccessToken = "";
         document.body.classList.remove("admin-mode");
         showToast("Admin portal could not be opened. Please try again.", "error");
-        openAdminPortal();
+        showAdminAuthError("⚠ Admin portal could not be opened. Please try again.");
     } finally {
         showLoading(false);
         input.disabled = false;
