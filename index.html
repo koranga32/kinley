@@ -6691,9 +6691,15 @@ function cafRenderAdminRegistry() {
             <strong>${escapePEHtml(item.scope)}</strong>
             <span>${escapePEHtml(item.category)}</span>
             <span>${escapePEHtml(item.examFocus)}</span>
-            <button type="button" class="btn-danger-sm" onclick="cafDeleteCard('${String(item.id || "").replace(/'/g, "\\'")}')">Delete</button>
+            <button type="button" class="btn-danger-sm" data-caf-delete-id="${escapeHTML(String(item.id || ""))}">Delete</button>
         </div>
     `).join("");
+
+    registry.querySelectorAll("[data-caf-delete-id]").forEach(button => {
+        button.addEventListener("click", () => {
+            cafDeleteCard(button.dataset.cafDeleteId || "");
+        });
+    });
 }
 
 function renderDailyQuoteTicker() {
@@ -6815,9 +6821,15 @@ function renderDailyQuoteAdminRegistry() {
         <div class="quote-admin-row">
             <span>${escapePEHtml(item.english)}</span>
             <span class="quote-admin-dzongkha">${escapePEHtml(item.dzongkha)}</span>
-            <button type="button" class="btn-danger-sm" onclick="deleteDailyQuote('${String(item.id || "").replace(/'/g, "\\'")}')">Delete</button>
+            <button type="button" class="btn-danger-sm" data-quote-delete-id="${escapeHTML(String(item.id || ""))}">Delete</button>
         </div>
     `).join("");
+
+    registry.querySelectorAll("[data-quote-delete-id]").forEach(button => {
+        button.addEventListener("click", () => {
+            deleteDailyQuote(button.dataset.quoteDeleteId || "");
+        });
+    });
 }
 
 // PE (PRACTICE ENGINE) PAGE
@@ -6959,7 +6971,10 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
     }
 
     grid.innerHTML = topics.map(t => `
-        <div class="pe-card" style="--hover-clr:${escapeHTML(accentColor)};" onclick="openPETopic('${escapeHTML(escapeInlineJsString(t.peType))}', '${escapeHTML(escapeInlineJsString(t.topic))}')">
+        <div class="pe-card"
+             style="--hover-clr:${escapeHTML(accentColor)};"
+             data-pe-type="${escapeHTML(t.peType)}"
+             data-pe-topic="${escapeHTML(t.topic)}">
             <i class="bi bi-folder-fill pe-card-icon"></i>
             <div class="pe-card-info">
                 <div class="pe-card-title">${escapePEHtml(t.topic)}</div>
@@ -6967,6 +6982,12 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
             </div>
         </div>
     `).join("");
+
+    grid.querySelectorAll(".pe-card[data-pe-type][data-pe-topic]").forEach(card => {
+        card.addEventListener("click", () => {
+            openPETopic(card.dataset.peType || "", card.dataset.peTopic || "");
+        });
+    });
 }
 
 function renderPEHomeGrid() {
@@ -7324,7 +7345,7 @@ function renderPEDIGrid() {
             ? `<img src="${thumbnailSource}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;" alt="" loading="lazy" decoding="async">`
             : `<i class="bi bi-bar-chart-line pe-card-icon"></i>`;
         return `
-            <div class="pe-card" style="--hover-clr:#9c27b0;" onclick="openPEDIViewer('${escapeHTML(escapeInlineJsString(s.topic))}')">
+            <div class="pe-card" style="--hover-clr:#9c27b0;" data-di-topic="${escapeHTML(s.topic)}">
                 ${thumb}
                 <div class="pe-card-info">
                     <div class="pe-card-title">${escapePEHtml(s.topic)}</div>
@@ -7333,6 +7354,12 @@ function renderPEDIGrid() {
             </div>
         `;
     }).join("");
+
+    grid.querySelectorAll(".pe-card[data-di-topic]").forEach(card => {
+        card.addEventListener("click", () => {
+            openPEDIViewer(card.dataset.diTopic || "");
+        });
+    });
 }
 
 async function openPEDIViewer(setName) {
