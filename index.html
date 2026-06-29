@@ -4538,8 +4538,9 @@
                             </div>
                         </div>
                         <div class="caf-admin-actions">
-                            <button type="submit" class="btn btn-green">Save Flashcard </button>
+                            <button type="submit" class="btn btn-green" id="caf-admin-save-btn">Save Flashcard </button>
                             <button type="button" class="btn btn-outline" onclick="cafResetAdminForm()">Clear</button>
+                            <button type="button" class="btn btn-outline" id="caf-admin-cancel-btn" onclick="cafCancelEdit()" style="display:none;">Cancel Edit</button>
                         </div>
                     </form>
 
@@ -4559,7 +4560,10 @@
                             <label>Dzongkha Quote</label>
                             <textarea id="quote-admin-dzongkha" class="form-control" placeholder="Enter the Dzongkha quote..." required></textarea>
                         </div>
-                        <button type="submit" class="btn btn-green" style="margin:0 auto;display:flex;">Publish Quote</button>
+                        <div class="caf-admin-actions" style="justify-content:center;">
+                            <button type="submit" class="btn btn-green" id="quote-admin-save-btn" style="margin:0 auto;display:flex;">Publish Quote</button>
+                            <button type="button" class="btn btn-outline" id="quote-admin-cancel-btn" onclick="cancelDailyQuoteEdit()" style="display:none;">Cancel Edit</button>
+                        </div>
                     </form>
 
                     <div class="quote-admin-registry" id="quote-admin-registry"></div>
@@ -4864,6 +4868,8 @@ let cafStateLoaded = false;
 let cafStatePromise = null;
 let adminAccessToken = "";
 let adminOtpState = null;
+let editingCafCardId = "";
+let editingQuoteId = "";
 let editingQuestionIndex = null;
 
 	// ─── INIT ────────────────────────────────────────────
@@ -6917,12 +6923,42 @@ function cafPopulateAdminCategories() {
 function cafResetAdminForm() {
     const form = document.getElementById("caf-admin-form");
     if (form) form.reset();
+    editingCafCardId = "";
     const date = document.getElementById("caf-admin-date");
     if (date && !date.value) date.value = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Thimphu" }).format(new Date());
     cafPopulateAdminCategories();
+    const saveBtn = document.getElementById("caf-admin-save-btn");
+    const cancelBtn = document.getElementById("caf-admin-cancel-btn");
+    if (saveBtn) saveBtn.textContent = "Save Flashcard";
+    if (cancelBtn) cancelBtn.style.display = "none";
+}
+
+function cafStartEditCard(id) {
+    const card = cafNotes.find(item => String(item.id || "") === String(id || ""));
+    if (!card) {
+        showToast("Flashcard could not be loaded for editing.", "error");
+        return;
+    }
+    editingCafCardId = String(card.id || "");
+    document.getElementById("caf-admin-scope").value = card.scope || "Bhutan";
+    cafPopulateAdminCategories();
+    document.getElementById("caf-admin-category").value = card.category || "Sports";
+    document.getElementById("caf-admin-date").value = card.date || "";
+    document.getElementById("caf-admin-question").value = card.examFocus || "";
+    document.getElementById("caf-admin-answer").value = card.answer || "";
+    const saveBtn = document.getElementById("caf-admin-save-btn");
+    const cancelBtn = document.getElementById("caf-admin-cancel-btn");
+    if (saveBtn) saveBtn.textContent = "Update Flashcard";
+    if (cancelBtn) cancelBtn.style.display = "";
+    document.getElementById("caf-admin-form")?.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function cafCancelEdit() {
+    cafResetAdminForm();
 }
 
 async function cafSaveAdminCard() {
+    const wasEditing = Boolean(editingCafCardId);
     const payload = {
         scope: document.getElementById("caf-admin-scope")?.value || "Bhutan",
         category: document.getElementById("caf-admin-category")?.value || "Sports",
@@ -6935,38 +6971,27 @@ async function cafSaveAdminCard() {
         return;
     }
     try {
-        await supabaseRequest(CA_SUPABASE_TABLE, {
-            method: "POST",
-            useAdmin: true,
-            prefer: "return=representation",
-            body: payload
-        });
+        if (editingCafCardId) {
+            await supabaseRequest(`${CA_SUPABASE_TABLE}?id=eq.${encodeURIComponent(editingCafCardId)}`, {
+                method: "PATCH",
+                useAdmin: true,
+                prefer: "return=minimal",
+                body: payload
+            });
+        } else {
+            await supabaseRequest(CA_SUPABASE_TABLE, {
+                method: "POST",
+                useAdmin: true,
+                prefer: "return=representation",
+                body: payload
+            });
+        }
         clearPublicApiCache();
-        showToast("Current Affair flashcard saved.", "success");
+        showToast(wasEditing ? "Current Affair flashcard updated." : "Current Affair flashcard saved.", "success");
         cafResetAdminForm();
         await caLoadState();
     } catch (e) {
         showToast("Could not save Current Affair flashcard. Check Supabase table/policies.", "error");
-    }
-}
-
-async function cafDeleteCard(id) {
-    if (!id) {
-        showToast("Seed examples cannot be deleted from Supabase.", "info");
-        return;
-    }
-    if (!confirm("Delete this Current Affair flashcard?")) return;
-    try {
-        await supabaseRequest(`${CA_SUPABASE_TABLE}?id=eq.${encodeURIComponent(id)}`, {
-            method: "DELETE",
-            useAdmin: true,
-            prefer: "return=minimal"
-        });
-        clearPublicApiCache();
-        showToast("Current Affair flashcard deleted.", "success");
-        await caLoadState();
-    } catch (e) {
-        showToast("Could not delete Current Affair flashcard from Supabase.", "error");
     }
 }
 
@@ -6982,13 +7007,13 @@ function cafRenderAdminRegistry() {
             <strong>${escapePEHtml(item.scope)}</strong>
             <span>${escapePEHtml(item.category)}</span>
             <span>${escapePEHtml(item.examFocus)}</span>
-            <button type="button" class="btn-danger-sm" data-caf-delete-id="${escapeHTML(String(item.id || ""))}">Delete</button>
+            <button type="button" class="btn-view-sm" data-caf-edit-id="${escapeHTML(String(item.id || ""))}">Edit</button>
         </div>
     `).join("");
 
-    registry.querySelectorAll("[data-caf-delete-id]").forEach(button => {
+    registry.querySelectorAll("[data-caf-edit-id]").forEach(button => {
         button.addEventListener("click", () => {
-            cafDeleteCard(button.dataset.cafDeleteId || "");
+            cafStartEditCard(button.dataset.cafEditId || "");
         });
     });
 }
@@ -7051,9 +7076,35 @@ async function loadDailyQuotes() {
 function resetDailyQuoteForm() {
     const form = document.getElementById("quote-admin-form");
     if (form) form.reset();
+    editingQuoteId = "";
+    const saveBtn = document.getElementById("quote-admin-save-btn");
+    const cancelBtn = document.getElementById("quote-admin-cancel-btn");
+    if (saveBtn) saveBtn.textContent = "Publish Quote";
+    if (cancelBtn) cancelBtn.style.display = "none";
+}
+
+function startDailyQuoteEdit(id) {
+    const quote = dailyQuotes.find(item => String(item.id || "") === String(id || ""));
+    if (!quote) {
+        showToast("Daily quote could not be loaded for editing.", "error");
+        return;
+    }
+    editingQuoteId = String(quote.id || "");
+    document.getElementById("quote-admin-english").value = quote.english || "";
+    document.getElementById("quote-admin-dzongkha").value = quote.dzongkha || "";
+    const saveBtn = document.getElementById("quote-admin-save-btn");
+    const cancelBtn = document.getElementById("quote-admin-cancel-btn");
+    if (saveBtn) saveBtn.textContent = "Update Quote";
+    if (cancelBtn) cancelBtn.style.display = "";
+    document.getElementById("quote-admin-form")?.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function cancelDailyQuoteEdit() {
+    resetDailyQuoteForm();
 }
 
 async function saveDailyQuote() {
+    const wasEditing = Boolean(editingQuoteId);
     const english = document.getElementById("quote-admin-english")?.value.trim();
     const dzongkha = document.getElementById("quote-admin-dzongkha")?.value.trim();
     if (!english || !dzongkha) {
@@ -7062,44 +7113,35 @@ async function saveDailyQuote() {
     }
 
     try {
-        await supabaseRequest(DAILY_QUOTES_TABLE, {
-            method: "POST",
-            useAdmin: true,
-            prefer: "return=minimal",
-            body: {
-                english_quote: english,
-                dzongkha_quote: dzongkha,
-                expires_at: new Date(Date.now() + DAILY_QUOTE_LIFETIME_MS).toISOString()
-            }
-        });
+        const body = {
+            english_quote: english,
+            dzongkha_quote: dzongkha,
+            expires_at: new Date(Date.now() + DAILY_QUOTE_LIFETIME_MS).toISOString()
+        };
+        if (editingQuoteId) {
+            await supabaseRequest(`${DAILY_QUOTES_TABLE}?id=eq.${encodeURIComponent(editingQuoteId)}`, {
+                method: "PATCH",
+                useAdmin: true,
+                prefer: "return=minimal",
+                body
+            });
+        } else {
+            await supabaseRequest(DAILY_QUOTES_TABLE, {
+                method: "POST",
+                useAdmin: true,
+                prefer: "return=minimal",
+                body
+            });
+        }
         clearPublicApiCache();
         await loadDailyQuotes();
         dailyQuoteTickerIndex = 0;
         resetDailyQuoteForm();
         renderDailyQuoteTicker();
         renderDailyQuoteAdminRegistry();
-        showToast("Quote published for 24 hours.", "success");
+        showToast(wasEditing ? "Quote updated successfully." : "Quote published for 24 hours.", "success");
     } catch (e) {
         showToast("Could not publish the quote. Create the Supabase daily_quotes table and policies first.", "error");
-    }
-}
-
-async function deleteDailyQuote(id) {
-    if (!id || !confirm("Delete this daily quote?")) return;
-    try {
-        await supabaseRequest(`${DAILY_QUOTES_TABLE}?id=eq.${encodeURIComponent(id)}`, {
-            method: "DELETE",
-            useAdmin: true,
-            prefer: "return=minimal"
-        });
-        clearPublicApiCache();
-        await loadDailyQuotes();
-        dailyQuoteTickerIndex = 0;
-        renderDailyQuoteTicker();
-        renderDailyQuoteAdminRegistry();
-        showToast("Daily quote deleted.", "success");
-    } catch (e) {
-        showToast("Could not delete the daily quote.", "error");
     }
 }
 
@@ -7114,13 +7156,13 @@ function renderDailyQuoteAdminRegistry() {
         <div class="quote-admin-row">
             <span>${escapePEHtml(item.english)}</span>
             <span class="quote-admin-dzongkha">${escapePEHtml(item.dzongkha)}</span>
-            <button type="button" class="btn-danger-sm" data-quote-delete-id="${escapeHTML(String(item.id || ""))}">Delete</button>
+            <button type="button" class="btn-view-sm" data-quote-edit-id="${escapeHTML(String(item.id || ""))}">Edit</button>
         </div>
     `).join("");
 
-    registry.querySelectorAll("[data-quote-delete-id]").forEach(button => {
+    registry.querySelectorAll("[data-quote-edit-id]").forEach(button => {
         button.addEventListener("click", () => {
-            deleteDailyQuote(button.dataset.quoteDeleteId || "");
+            startDailyQuoteEdit(button.dataset.quoteEditId || "");
         });
     });
 }
