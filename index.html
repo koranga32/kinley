@@ -4290,6 +4290,7 @@
                         <div class="peo-cat-badge" id="peo-category-badge">MOCK</div>
                     </div>
                     <div class="peo-question-text" id="peo-question-text">Loading…</div>
+                    <div id="peo-question-audio"></div>
                     <div class="peo-options-container" id="peo-options-wrapper"></div>
                 </div>
                 <footer class="peo-footer-nav">
@@ -5233,10 +5234,12 @@ async function startSecureNormalExam(category) {
 }
 
 function mergeMediaRowsIntoQuestions(questions, mediaRows) {
-    const mediaById = new Map((mediaRows || []).map(r => [r.id, r]));
+    // Supabase commonly serializes bigint IDs as numbers, while secure exam
+    // IDs are strings. Normalize both sides or valid media silently misses.
+    const mediaById = new Map((mediaRows || []).map(r => [String(r.id), r]));
     let changed = false;
     (questions || []).forEach(q => {
-        const media = mediaById.get(q.id);
+        const media = mediaById.get(String(q.id));
         if (!media) return;
         if (typeof media.image === "string" && q.imageCode !== media.image) {
             q.imageCode = media.image;
@@ -7070,6 +7073,11 @@ function peoSyncWorkspaceView() {
     document.getElementById("peo-question-badge").textContent = `Question ${currentIdx + 1} / ${activeData.length}`;
     document.getElementById("peo-category-badge").textContent = peInfo ? peInfo.peType.toUpperCase() : (q.category || "");
     document.getElementById("peo-question-text").textContent = q.question;
+    const peoAudio = document.getElementById("peo-question-audio");
+    const audioSource = safeMediaSource(q.audioCode, "audio");
+    peoAudio.innerHTML = audioSource
+        ? `<div class="q-audio-wrap"><audio src="${audioSource}" class="q-audio" controls preload="metadata"></audio></div>`
+        : "";
 
     const optionsWrapper = document.getElementById("peo-options-wrapper");
     optionsWrapper.innerHTML = "";
@@ -7158,12 +7166,23 @@ function peoSubmitOnlineTest() {
 }
 
 // ─── Opening a topic → question attempt screen ─────────────
-function openPETopic(peType, topic) {
+async function openPETopic(peType, topic) {
     if (peType === "Data Interpretation") {
         openPEDIViewer(topic);
         return;
     }
     peActiveTopic = { peType, topic };
+
+    const topicQuestions = getPEQuestions().filter(q => {
+        const info = parsePECategory(q.category);
+        return info.peType === peType && info.topic === topic;
+    });
+    try {
+        await fetchSelectedQuestionMedia(topicQuestions);
+    } catch (error) {
+        console.error("PE topic media load failed:", error);
+        showToast("The questions loaded, but some media could not be downloaded.", "info");
+    }
 
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-question-screen").classList.add("active");
@@ -7225,14 +7244,21 @@ function renderPEDIGrid() {
     }).join("");
 }
 
-function openPEDIViewer(setName) {
+async function openPEDIViewer(setName) {
     peDIActiveSet = setName;
     peDIQuestionIdx = 0;
+
+    const setQuestions = getPEDISetQuestions(setName);
+    try {
+        await fetchSelectedQuestionMedia(setQuestions);
+    } catch (error) {
+        console.error("Data Interpretation media load failed:", error);
+        showToast("The questions loaded, but the graph could not be downloaded.", "info");
+    }
 
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-di-viewer-screen").classList.add("active");
 
-    const setQuestions = getPEDISetQuestions(setName);
     const chartImg = document.getElementById("pe-di-chart-img");
     chartImg.src = setQuestions[0] ? safeMediaURL(setQuestions[0].imageCode, "image") : "";
     document.getElementById("pe-di-set-title").textContent = setName;
@@ -7307,6 +7333,7 @@ function renderPEDIQuestion() {
                 <span class="pe-question-tag">${escapePEHtml(peDIActiveSet)}</span>
             </div>
             <div class="pe-question-text">${escapePEHtml(q.question || "")}</div>
+            ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
             <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
             <div class="pe-question-actions">
                 <div class="pe-feedback-msg" id="${qId}-feedback"></div>
@@ -7374,6 +7401,7 @@ function renderPEQuestionList() {
                 </div>
                 <div class="pe-question-text">${escapePEHtml(q.question || "")}</div>
                 ${safeMediaSource(q.imageCode, "image") ? `<img src="${safeMediaSource(q.imageCode, "image")}" class="pe-question-image" alt="Question image" loading="lazy" decoding="async">` : ""}
+                ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
                 <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
                 <div class="pe-question-actions">
                     <div class="pe-feedback-msg" id="${qId}-feedback"></div>
