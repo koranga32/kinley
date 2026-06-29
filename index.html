@@ -5423,16 +5423,9 @@ async function fetchQuestions() {
 }
 
 async function fetchAdminQuestions() {
-    const [examRows, peOnlineRows] = await Promise.all([
-        supabaseRequest(
-            "Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer&order=id.asc",
-            { useAdmin: true }
-        ),
-        supabaseRequest(
-            "PEOnlineExam?select=id,category,question,optionA,optionB,optionC,optionD,answer&order=id.asc",
-            { useAdmin: true }
-        )
-    ]);
+    const result = await adminApiRequest("admin-questions", { method: "GET" });
+    const examRows = result?.exam || [];
+    const peOnlineRows = result?.peOnline || [];
     return [
         ...mapExamRows(examRows, "Exam"),
         ...mapExamRows(peOnlineRows, "PEOnlineExam")
@@ -6787,9 +6780,9 @@ async function loadAdminQuestionMedia(idx) {
     const question = questionPool[idx];
     if (!question || question._adminMediaLoaded || question.id === undefined || question.id === null) return question;
     const table = question.sourceTable === "PEOnlineExam" ? "PEOnlineExam" : "Exam";
-    const rows = await supabaseRequest(
-        `${table}?select=id,image,audio&id=eq.${encodeURIComponent(question.id)}&limit=1`,
-        { useAdmin: true }
+    const rows = await adminApiRequest(
+        `admin-question-media?table=${encodeURIComponent(table)}&id=${encodeURIComponent(question.id)}`,
+        { method: "GET" }
     );
     const media = rows?.[0] || {};
     question.imageCode = typeof media.image === "string" ? media.image : "";
