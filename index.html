@@ -5341,9 +5341,8 @@ async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam m
     let mediaLoaderVisible = false;
     const mediaLoaderDelay = setTimeout(() => {
         mediaLoaderVisible = true;
-        showLoading(true, label);
+        showLoading(true, "Connecting...");
         setLoaderProgress(18);
-        document.getElementById("loading-text").textContent = "Checking exam images and audio…";
     }, 450);
 
     try {
@@ -5354,12 +5353,10 @@ async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam m
 
         if (!mediaLoaderVisible) {
             mediaLoaderVisible = true;
-            showLoading(true, label);
+            showLoading(true, "Connecting...");
             setLoaderProgress(18);
         }
-        document.getElementById("loading-text").textContent = "Loading exam images and audio…";
         setLoaderProgress(45);
-        document.getElementById("loading-text").textContent = "Warming media before timer starts…";
         await Promise.race([
             warmQuestionAssets(questions),
             new Promise(resolve => setTimeout(resolve, 12000))
@@ -5563,7 +5560,7 @@ async function startExam() {
 
     if (!examCatalogReady || !setupContinued) {
         examPreparing = true;
-        showLoading(true, "Loading secure exam categories…");
+        showLoading(true, "Connecting...");
         setLoaderProgress(10);
         const btn = document.getElementById("start-btn");
         btn.disabled = true;
@@ -5576,7 +5573,7 @@ async function startExam() {
             return;
         }
         try {
-            showLoading(true, "Preparing secure exam categories…");
+            showLoading(true, "Connecting...");
         } finally {
             setupContinued = true;
             document.getElementById("setup-options").style.display = "grid";
@@ -5594,7 +5591,7 @@ async function startExam() {
 	    activeCategoryLabel = null;
 
     examPreparing = true;
-    showLoading(true, "Securing exam session…");
+    showLoading(true, "Connecting...");
     try {
         activeData = await startSecureNormalExam(cat);
         await prepareExamAssetsBeforeTimer(activeData, "Preparing selected exam media…");
@@ -6938,7 +6935,7 @@ async function startPEOnlineTest() {
     }
 
     examPreparing = true;
-    showLoading(true, "Loading secure PE Online question bank…");
+    showLoading(true, "Connecting...");
     try {
         await loadPEOnlineQuestionBank();
     } catch (error) {
@@ -6957,7 +6954,7 @@ async function startPEOnlineTest() {
     const startBtn = document.querySelector(".pe-online-start-btn");
     if (startBtn) startBtn.disabled = true;
     try {
-        showLoading(true, "Securing PE online test…");
+        showLoading(true, "Connecting...");
         const response = await apiRequest("pe-online-start", { method: "POST", body: {} });
         activeExamSessionId = response.session_id;
         activeData = mapSecureExamRows(response.questions);
