@@ -4850,7 +4850,7 @@ let peQuestionsCache = [];
 let peTopicBuckets = new Map();
 let cafStateLoaded = false;
 let cafStatePromise = null;
-let adminAccessToken = sessionStorage.getItem("exam_admin_token") || "";
+let adminAccessToken = "";
 let editingQuestionIndex = null;
 
 	// ─── INIT ────────────────────────────────────────────
@@ -4865,10 +4865,6 @@ let editingQuestionIndex = null;
         renderDailyQuoteTicker();
         caHydrateAdminControls();
         warmPublicStartupData();
-	    if (sessionStorage.getItem("exam_admin_active") === "1" && adminAccessToken) {
-	        restoreAdminPortal();
-	        return;
-	    }
         setEntryActionButtons();
 	    document.getElementById("student-name").focus();
 	}
@@ -6425,13 +6421,10 @@ async function authenticateAdmin() {
         return;
     }
     adminAccessToken = authData.access_token;
-    sessionStorage.setItem("exam_admin_token", adminAccessToken);
     try {
         await showAdminPortal();
         showToast("Admin access granted.", "success");
     } catch (error) {
-        sessionStorage.removeItem("exam_admin_active");
-        sessionStorage.removeItem("exam_admin_token");
         adminAccessToken = "";
         document.body.classList.remove("admin-mode");
         showToast("Admin portal could not be opened. Please try again.", "error");
@@ -6444,7 +6437,6 @@ async function authenticateAdmin() {
 }
 
 async function showAdminPortal() {
-    sessionStorage.setItem("exam_admin_active", "1");
     document.body.classList.add("admin-mode");
     processData(await fetchAdminQuestions());
     databaseReady = true;
@@ -6481,8 +6473,6 @@ async function restoreAdminPortal() {
 }
 
 async function closeAdminPortal() {
-    sessionStorage.removeItem("exam_admin_active");
-    sessionStorage.removeItem("exam_admin_token");
     document.body.classList.remove("admin-mode");
     adminAccessToken = "";
     clearDatabaseCache();
