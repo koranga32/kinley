@@ -4821,16 +4821,20 @@ let timeLeft     = 0;
 let timerInterval= null;
 let databaseReady = false;
 let databaseLoading = false;
+let examCatalogReady = false;
+let examCategoryCounts = new Map();
 let setupContinued = false;
 let examPreparing = false;
-let examMediaReadyAfterContinue = false;
 let dailyQuotes = [];
 let dailyQuoteTickerIndex = 0;
 let dailyQuoteExpiryTimer = null;
 let activeCategoryLabel = null; // overrides category-select value when set (e.g. PE Online Test)
 let audioQuestionTimer = null;  // tracks the 30s countdown for the current audio question
 let activeExamSessionId = "";
-let peOnlineQuestionPool = [];
+let peOnlineCatalog = {
+    counts: { Mock: 0, "Past Paper": 0, "Data Interpretation": 0, "Current Affairs": 0 },
+    total: 0
+};
 let adminAccessToken = sessionStorage.getItem("exam_admin_token") || "";
 let editingQuestionIndex = null;
 
@@ -5176,57 +5180,56 @@ function mapExamRows(rows) {
     });
 }
 
+function mapSecureExamRows(rows) {
+    return (rows || []).map(row => ({
+        id: row.id,
+        category: row.category,
+        question: row.question || "",
+        explanation: "",
+        options: Array.isArray(row.options) ? row.options.slice(0, 4) : [],
+        answer: -1,
+        imageCode: "",
+        audioCode: ""
+    }));
+}
+
 async function fetchQuestions() {
     // Lightweight fetch — excludes image/audio columns, which can each hold
     // multi-megabyte base64 data. This keeps initial load fast; media is
     // fetched separately afterward without blocking first render.
-    const rows = await apiRequest("questions?view=text");
+    const rows = adminAccessToken
+        ? await supabaseRequest(
+            "Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer,image,audio&order=id.asc",
+            { useAdmin: true }
+        )
+        : await apiRequest("questions?view=pe-practice");
     return mapExamRows(rows);
 }
 
-async function createExamSession(questions) {
-    const response = await apiRequest("exam-session", {
-        method: "POST",
-        body: {
-            items: questions.map(question => ({
-                id: String(question.id),
-                options: question.options
-            }))
-        }
-    });
-    activeExamSessionId = response.session_id;
+async function loadExamCatalog() {
+    const rows = await apiRequest("questions?view=catalog");
+    examCategoryCounts = new Map((rows || []).map(row => [row.category, Number(row.count || 0)]));
+    categories = [...examCategoryCounts.keys()];
+    examCatalogReady = categories.length > 0;
+    updateCategorySelects();
+    const total = [...examCategoryCounts.values()].reduce((sum, count) => sum + count, 0);
+    document.getElementById("q-count").textContent = total;
+    const btn = document.getElementById("start-btn");
+    btn.disabled = !examCatalogReady;
+    btn.innerHTML = examCatalogReady
+        ? `<span>${setupContinued ? "Begin Examination" : "Continue"}</span> →`
+        : "No Questions Available";
+    return examCatalogReady;
 }
 
-// Fetches only image/audio for every row, then merges the result into the
-// already-rendered questionPool in place. Runs in the background after the
-// lightweight fetch above has already shown the UI, so it never blocks
-// first render. No filter is applied here (deliberately) — a value-based
-// PostgREST filter for "non-empty" risks subtle quoting/encoding bugs for
-// very little benefit, since rows with no media just return empty strings.
-async function fetchAndMergeQuestionMedia() {
-    try {
-        const mediaRows = await apiRequest("questions?view=media");
-        if (!mediaRows || mediaRows.length === 0) return;
-
-        const changed = mergeMediaRowsIntoQuestions(questionPool, mediaRows);
-
-        if (changed) {
-            saveDatabaseCache(questionPool);
-            // Re-render whichever view is currently visible so newly-arrived
-            // media actually appears without needing a manual refresh.
-            if (document.getElementById("pe-view") && document.getElementById("pe-view").style.display !== "none") {
-                if (peActiveTopic) renderPEQuestionList();
-            }
-            const examView = document.getElementById("exam-view");
-            if (examView && examView.classList.contains("show") && activeData.length) {
-                // Patch activeData in place too, since it's a separate array built from questionPool
-                mergeMediaRowsIntoQuestions(activeData, mediaRows);
-            }
-        }
-    } catch (e) {
-        console.error("Background media fetch failed:", e);
-        // Non-fatal — questions still work, just without images/audio until next load
+async function startSecureNormalExam(category) {
+    activeExamSessionId = "";
+    const response = await apiRequest("exam-start", { method: "POST", body: { category } });
+    if (!response || typeof response.session_id !== "string" || !Array.isArray(response.questions) || !response.questions.length) {
+        throw new Error("The server returned an incomplete exam session. Please redeploy the latest API files.");
     }
+    activeExamSessionId = response.session_id;
+    return mapSecureExamRows(response.questions);
 }
 
 function mergeMediaRowsIntoQuestions(questions, mediaRows) {
@@ -5269,7 +5272,6 @@ async function fetchSelectedQuestionMedia(questions) {
     }
     if (!mediaRows.length) return;
     mergeMediaRowsIntoQuestions(questionPool, mediaRows);
-    mergeMediaRowsIntoQuestions(peOnlineQuestionPool, mediaRows);
     mergeMediaRowsIntoQuestions(questions, mediaRows);
     saveDatabaseCache(questionPool);
 }
@@ -5370,17 +5372,6 @@ async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam m
     }
 }
 
-async function preloadExamMediaAfterContinue() {
-    if (examMediaReadyAfterContinue) return;
-    const examQuestions = questionPool.slice();
-    if (!examQuestions.length) {
-        examMediaReadyAfterContinue = true;
-        return;
-    }
-    await prepareExamAssetsBeforeTimer(examQuestions, "Preparing exam media…");
-    examMediaReadyAfterContinue = true;
-}
-
 function toSupabaseQuestion(question) {
     return {
         category: question.category,
@@ -5413,7 +5404,6 @@ async function loadDatabase() {
                 .then(data => {
                     saveDatabaseCache(data);
                     processData(data);
-                    fetchAndMergeQuestionMedia();
                 })
                 .catch(() => {}); // silent background refresh failure is OK
             return true;
@@ -5456,7 +5446,6 @@ async function loadDatabase() {
             if (!examPreparing) showLoading(false);
         }, 300);
         databaseLoading = false;
-        fetchAndMergeQuestionMedia(); // images/audio load separately, after the UI is already usable
         return true;
 
     } catch (e) {
@@ -5491,7 +5480,14 @@ function processData(data) {
     // Exam categories must exclude PE-tagged questions so the normal
     // exam flow (category select, start exam, counts) is unaffected.
     const examQuestions = questionPool.filter(q => !isPECategory(q.category));
-    categories = [...new Set(examQuestions.map(q => q.category).filter(Boolean))];
+    if (examQuestions.length) {
+        categories = [...new Set(examQuestions.map(q => q.category).filter(Boolean))];
+        examCategoryCounts = new Map(categories.map(category => [
+            category,
+            examQuestions.filter(question => question.category === category).length
+        ]));
+        examCatalogReady = categories.length > 0;
+    }
     updateCategorySelects();
     renderAdminTable();
     const noData = categories.length === 0;
@@ -5504,7 +5500,8 @@ function processData(data) {
     } else {
         btn.innerHTML = "<span>Continue</span> →";
     }
-    document.getElementById("q-count").textContent = examQuestions.length;
+    const catalogTotal = [...examCategoryCounts.values()].reduce((sum, count) => sum + count, 0);
+    document.getElementById("q-count").textContent = examQuestions.length || catalogTotal;
     if (document.getElementById("pe-view") && document.getElementById("pe-view").style.display !== "none") {
         renderPEHomeGrid();
         renderPEMockGrid();
@@ -5527,6 +5524,7 @@ function updateCategorySelects() {
 }
 
 function getCategoryQuestionCount(category) {
+    if (examCategoryCounts.has(category)) return examCategoryCounts.get(category);
     return questionPool.filter(q => q.category === category && !isPECategory(q.category)).length;
 }
 
@@ -5560,13 +5558,13 @@ async function startExam() {
     const name = document.getElementById("student-name").value.trim();
     if (!name) { showToast("Please enter your full name.", "error"); return; }
 
-    if (!databaseReady || !setupContinued) {
+    if (!examCatalogReady || !setupContinued) {
         examPreparing = true;
-        showLoading(true, "Checking exam images and audio…");
+        showLoading(true, "Loading secure exam categories…");
         setLoaderProgress(10);
         const btn = document.getElementById("start-btn");
         btn.disabled = true;
-        const loaded = databaseReady || await loadDatabase();
+        const loaded = examCatalogReady || await loadExamCatalog();
         if (!loaded || !categories.length) {
             examPreparing = false;
             showLoading(false);
@@ -5575,8 +5573,7 @@ async function startExam() {
             return;
         }
         try {
-            showLoading(true, "Checking exam images and audio…");
-            await preloadExamMediaAfterContinue();
+            showLoading(true, "Preparing secure exam categories…");
         } finally {
             setupContinued = true;
             document.getElementById("setup-options").style.display = "grid";
@@ -5591,14 +5588,13 @@ async function startExam() {
     }
 
 	    const cat = document.getElementById("category-select").value;
-	    const categoryQuestions = questionPool.filter(q => q.category === cat);
-	    if (categoryQuestions.length === 0) { showToast("No questions in this category.", "error"); return; }
-	    activeData = shuffleArray(categoryQuestions).map(prepareRandomizedQuestion);
+	    activeCategoryLabel = null;
 
     examPreparing = true;
     showLoading(true, "Securing exam session…");
     try {
-        await createExamSession(activeData);
+        activeData = await startSecureNormalExam(cat);
+        await prepareExamAssetsBeforeTimer(activeData, "Preparing selected exam media…");
     } catch (error) {
         examPreparing = false;
         showLoading(false);
@@ -6251,7 +6247,7 @@ async function closeAdminPortal() {
         setEntryActionButtons();
     }
     document.getElementById("admin-back-btn").style.display = "none";
-    await loadDatabase();
+    await loadExamCatalog();
 }
 
 function onCatModeChange() {
@@ -6602,7 +6598,7 @@ function cafRenderAdminRegistry() {
             <strong>${escapePEHtml(item.scope)}</strong>
             <span>${escapePEHtml(item.category)}</span>
             <span>${escapePEHtml(item.examFocus)}</span>
-            <button type="button" class="btn-danger-sm" onclick="cafDeleteCard('${String(item.id || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'")}')">Delete</button>
+            <button type="button" class="btn-danger-sm" onclick="cafDeleteCard('${String(item.id || "").replace(/'/g, "\\'")}')">Delete</button>
         </div>
     `).join("");
 }
@@ -6791,7 +6787,7 @@ async function openPEPortal() {
     try {
         await loadPEOnlineQuestionBank();
     } catch (error) {
-        peOnlineQuestionPool = [];
+        peOnlineCatalog.total = 0;
         console.error("PE Online question bank load failed:", error);
     }
     document.getElementById("setup-view").style.display = "none";
@@ -6891,49 +6887,19 @@ function renderPEPastGrid() {
 
 // ─── Online Test (timed full-length simulation) ─────────────
 const PE_ONLINE_SECONDS_PER_QUESTION = 65; // 1 minute 5 seconds per PE Online Test question
-const PE_ONLINE_TOTAL_TARGET = 100;       // full test size when every pool has enough supply
-const PE_ONLINE_DI_TARGET_COUNT = 20;     // Data Interpretation questions (counted individually, not by set)
-const PE_ONLINE_CA_QUESTION_COUNT = 20;   // Current Affairs questions from PEOnlineExam
-
 async function loadPEOnlineQuestionBank() {
-    const rows = await apiRequest("pe-online-questions?view=text");
-    peOnlineQuestionPool = mapExamRows(rows).filter(question => isPECategory(question.category));
-}
-
-function getPEOnlineQuestions(peType) {
-    return peOnlineQuestionPool.filter(question => {
-        const info = parsePECategory(question.category);
-        return info && (!peType || info.peType === peType);
-    });
-}
-
-// Picks whole Data Interpretation chart-sets (shuffled order, each set's own
-// question order preserved) and keeps adding sets until the running total // reaches targetCount — a set is never split apart, since its questions
-// share one chart in the split-screen view. May slightly overshoot the // target on the final set, or fall short if there simply aren't enough DI
-// sets in the database — either way, nothing errors.
-function buildPEOnlineDataInterpretationQuestions(targetCount) {
-    const diPool = getPEOnlineQuestions("Data Interpretation");
-
-    const diBySet = new Map();
-    diPool.forEach(q => {
-        const topic = parsePECategory(q.category).topic;
-        if (!diBySet.has(topic)) diBySet.set(topic, []);
-        diBySet.get(topic).push(q);
-    });
-
-    const picks = [];
-    for (const name of shuffleArray([...diBySet.keys()])) {
-        picks.push(...diBySet.get(name));
-        if (picks.length >= targetCount) break;
-    }
-    return picks;
+    const catalog = await apiRequest("pe-online-questions?view=catalog");
+    peOnlineCatalog = {
+        counts: { ...peOnlineCatalog.counts, ...(catalog.counts || {}) },
+        total: Number(catalog.total || 0)
+    };
 }
 
 function updatePEOnlineCount() {
-    const mockCount = getPEOnlineQuestions("Mock").length;
-    const pastCount = getPEOnlineQuestions("Past Paper").length;
-    const diCount = getPEOnlineQuestions("Data Interpretation").length;
-    const caCount = getPEOnlineQuestions("Current Affairs").length;
+    const mockCount = Number(peOnlineCatalog.counts.Mock || 0);
+    const pastCount = Number(peOnlineCatalog.counts["Past Paper"] || 0);
+    const diCount = Number(peOnlineCatalog.counts["Data Interpretation"] || 0);
+    const caCount = Number(peOnlineCatalog.counts["Current Affairs"] || 0);
 
     const mockEl = document.getElementById("pe-online-mock-count");
     const pastEl = document.getElementById("pe-online-past-count");
@@ -6944,12 +6910,11 @@ function updatePEOnlineCount() {
     const caEl = document.getElementById("pe-online-ca-count");
     if (caEl) caEl.textContent = caCount;
 
-    const testSet = buildPEOnlineTestSet();
     const el = document.getElementById("pe-online-qcount");
-    if (el) el.textContent = testSet.length;
+    if (el) el.textContent = peOnlineCatalog.total;
 
     const timeEl = document.getElementById("pe-online-time-limit");
-    if (timeEl) timeEl.textContent = formatPEOnlineDuration(testSet.length * PE_ONLINE_SECONDS_PER_QUESTION);
+    if (timeEl) timeEl.textContent = formatPEOnlineDuration(peOnlineCatalog.total * PE_ONLINE_SECONDS_PER_QUESTION);
 }
 
 function formatPEOnlineDuration(totalSeconds) {
@@ -6960,46 +6925,6 @@ function formatPEOnlineDuration(totalSeconds) {
     if (m === 0) return `${h}h`;
     return `${h}h ${m}m`;
 }
-
-// Builds a 100-question Online Test: 20 Data Interpretation + 20 Current
-// Affairs + the remaining 60 split evenly between Mock and Past Paper (30 // each). If Mock or Past Paper can't fill its half, the shortfall is
-// backfilled from the other one (as long as it has spare questions left),
-// so the test still gets as close to 100 as the combined Mock + Past Paper // pool allows. Data Interpretation is always appended last, as its own
-// contiguous block, after Mock/Past/Current Affairs (which are shuffled
-// together) — and every pool simply uses whatever it has if it's short of // its target; nothing blocks the test from starting.
-function buildPEOnlineTestSet() {
-    const mockPool = getPEOnlineQuestions("Mock");
-    const pastPool = getPEOnlineQuestions("Past Paper");
-
-    const diPicks = buildPEOnlineDataInterpretationQuestions(PE_ONLINE_DI_TARGET_COUNT);
-    const caPicks = shuffleArray(getPEOnlineQuestions("Current Affairs")).slice(0, PE_ONLINE_CA_QUESTION_COUNT);
-
-    const remaining  = Math.max(PE_ONLINE_TOTAL_TARGET - diPicks.length - caPicks.length, 0);
-    const mockTarget = Math.ceil(remaining / 2);
-    const pastTarget = remaining - mockTarget;
-
-    const shuffledMock = shuffleArray(mockPool);
-    const shuffledPast = shuffleArray(pastPool);
-
-    let mockPicks = shuffledMock.slice(0, mockTarget);
-    let pastPicks = shuffledPast.slice(0, pastTarget);
-
-    const mockShortfall = mockTarget - mockPicks.length;
-    const pastShortfall = pastTarget - pastPicks.length;
-    if (mockShortfall > 0) {
-        pastPicks = pastPicks.concat(shuffledPast.slice(pastPicks.length, pastPicks.length + mockShortfall));
-    }
-    if (pastShortfall > 0) {
-        mockPicks = mockPicks.concat(shuffledMock.slice(mockPicks.length, mockPicks.length + pastShortfall));
-    }
-
-    const shuffledRest = shuffleArray([...mockPicks, ...pastPicks, ...caPicks]);
-
-    // Data Interpretation always comes last, as its own contiguous block,
-    // so a chart stays paired with its own questions in the split-screen view.
-    return [...shuffledRest, ...diPicks];
-}
-
 
 async function startPEOnlineTest() {
     if (examPreparing) return;
@@ -7014,42 +6939,31 @@ async function startPEOnlineTest() {
     try {
         await loadPEOnlineQuestionBank();
     } catch (error) {
-        peOnlineQuestionPool = [];
         examPreparing = false;
         showLoading(false);
         showToast(`Could not load PE Online questions: ${error.message}`, "error");
         return;
     }
 
-    const mockCount = getPEOnlineQuestions("Mock").length;
-    const pastCount = getPEOnlineQuestions("Past Paper").length;
-
-    const testSet = buildPEOnlineTestSet();
-    if (testSet.length === 0) {
+    if (peOnlineCatalog.total === 0) {
         examPreparing = false;
         showLoading(false);
-        if (mockCount === 0 && pastCount === 0) {
-            showToast("No questions found in the separate PE Online question bank.", "error");
-        } else {
-            showToast(`Found ${mockCount} Mock and ${pastCount} Past Paper, but the test set came out empty — please refresh and try again.`, "error");
-        }
+        showToast("No questions found in the separate PE Online question bank.", "error");
         return;
     }
-
-    activeData = testSet.map(prepareRandomizedQuestion);
-    responses  = new Array(activeData.length).fill(null);
-    timeLeft   = activeData.length * PE_ONLINE_SECONDS_PER_QUESTION;
-    currentIdx = 0;
-    activeCategoryLabel = "PE Online Test";
-    stopQuestionAudio();
     const startBtn = document.querySelector(".pe-online-start-btn");
     if (startBtn) startBtn.disabled = true;
     try {
         showLoading(true, "Securing PE online test…");
-        await createExamSession(activeData);
-        if (!examMediaReadyAfterContinue) {
-            await prepareExamAssetsBeforeTimer(activeData, "Preparing PE online test…");
-        }
+        const response = await apiRequest("pe-online-start", { method: "POST", body: {} });
+        activeExamSessionId = response.session_id;
+        activeData = mapSecureExamRows(response.questions);
+        responses = new Array(activeData.length).fill(null);
+        timeLeft = activeData.length * PE_ONLINE_SECONDS_PER_QUESTION;
+        currentIdx = 0;
+        activeCategoryLabel = "PE Online Test";
+        stopQuestionAudio();
+        await prepareExamAssetsBeforeTimer(activeData, "Preparing PE online test…");
     } catch (error) {
         showToast(`Could not start secure PE test: ${error.message}`, "error");
         showLoading(false);
