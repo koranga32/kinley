@@ -2329,6 +2329,27 @@
             animation: shake 0.38s ease;
         }
 
+        @media (max-width: 560px) {
+            .modal-box {
+                padding: 28px 18px 24px;
+            }
+
+            .otp-box-row {
+                grid-template-columns: repeat(6, minmax(0, 1fr));
+                gap: 5px;
+                width: 100%;
+            }
+
+            .otp-digit-input {
+                min-width: 0;
+                min-height: 0;
+                height: 42px;
+                aspect-ratio: auto;
+                border-radius: 7px;
+                font-size: 18px;
+            }
+        }
+
         .pw-input {
             width: 100%;
             padding: 13px 46px 13px 16px;
@@ -3859,9 +3880,30 @@
         @media (max-width: 860px) {
             .pe-di-split { flex-direction: column; }
             .pe-di-split-left {
-                position: static;
-                max-height: none;
+                position: sticky;
+                top: 0;
+                z-index: 12;
+                max-height: 42vh;
                 width: 100%;
+                padding: 10px;
+                overflow: hidden;
+                box-shadow: 0 10px 24px rgba(0,0,0,0.28);
+            }
+
+            .pe-di-chart-wrap {
+                max-height: 32vh;
+                padding: 6px;
+                overflow: hidden;
+            }
+
+            .pe-di-chart-wrap img {
+                width: auto;
+                max-height: 30vh;
+                object-fit: contain;
+            }
+
+            .pe-di-set-title {
+                margin-top: 6px;
             }
         }
 
