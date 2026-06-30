@@ -828,7 +828,7 @@ function collectQuestionMediaIds(questions, matcher) {
         .filter(id => matcher.test(id)))];
 }
 
-async function fetchSelectedQuestionMedia(questions) {
+async function fetchSelectedQuestionMedia(questions, { persistCache = true } = {}) {
     const mediaRows = [];
     const normalIds = collectQuestionMediaIds(questions, /^\d+$/);
     const peOnlinePrefixedIds = collectQuestionMediaIds(questions, /^peo:\d+$/);
@@ -857,7 +857,7 @@ async function fetchSelectedQuestionMedia(questions) {
     cacheMediaRows(mediaRows);
     mergeMediaRowsIntoQuestions(questionPool, mediaRows);
     mergeMediaRowsIntoQuestions(questions, mediaRows);
-    saveDatabaseCache(questionPool);
+    if (persistCache) saveDatabaseCache(questionPool);
 }
 
 function preloadImageAsset(src) {
@@ -3389,21 +3389,33 @@ async function openPEDIViewer(setName) {
     peDIActiveSet = setName;
 
     const setQuestions = getPEDISetQuestions(setName);
-    try {
-        await fetchSelectedQuestionMedia(setQuestions);
-    } catch (error) {
-        console.error("Data Interpretation media load failed:", error);
-        showToast("The questions loaded, but the graph could not be downloaded.", "info");
-    }
-
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-di-viewer-screen").classList.add("active");
 
     const chartImg = document.getElementById("pe-di-chart-img");
-    chartImg.src = setQuestions[0] ? safeMediaURL(setQuestions[0].imageCode, "image") : "";
     document.getElementById("pe-di-set-title").textContent = setName;
-
     renderPEDIQuestion();
+
+    const sharedGraphQuestion = setQuestions[0];
+    const cachedGraph = sharedGraphQuestion ? safeMediaURL(sharedGraphQuestion.imageCode, "image") : "";
+    if (cachedGraph) chartImg.src = cachedGraph;
+    else chartImg.removeAttribute("src");
+
+    if (!sharedGraphQuestion || cachedGraph) return;
+    try {
+        // A DI set uses one shared graph. Fetching every row would download
+        // duplicate Base64 images and block the viewer unnecessarily.
+        await fetchSelectedQuestionMedia([sharedGraphQuestion], { persistCache: false });
+        if (peDIActiveSet !== setName) return;
+        const graphSource = safeMediaURL(sharedGraphQuestion.imageCode, "image");
+        if (graphSource) chartImg.src = graphSource;
+        else chartImg.removeAttribute("src");
+    } catch (error) {
+        console.error("Data Interpretation graph load failed:", error);
+        if (peDIActiveSet === setName) {
+            showToast("The questions opened, but the graph could not be downloaded.", "info");
+        }
+    }
 }
 
 function closePEDIViewer() {
