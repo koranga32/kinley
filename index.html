@@ -979,10 +979,70 @@
             .exam-sidebar {
                 position: static;
                 top: auto;
+                flex: 0 0 clamp(300px, 27vw, 360px);
                 height: calc(100% - 23px);
                 margin-top: 23px;
                 display: flex;
                 flex-direction: column;
+            }
+
+            .exam-main {
+                flex: 1 1 auto;
+            }
+
+            .exam-sidebar .sidebar-card-header {
+                padding: 10px 14px;
+            }
+
+            .exam-sidebar .omr-row {
+                display: grid;
+                grid-template-columns: 38px auto 8px;
+                justify-content: start;
+                gap: 8px;
+                padding: 7px 12px;
+            }
+
+            .exam-sidebar .omr-q-label {
+                width: auto;
+            }
+
+            .exam-sidebar .omr-bubbles {
+                flex: none;
+                gap: 5px;
+            }
+
+            .exam-sidebar .omr-bubble {
+                width: 28px;
+                height: 28px;
+                font-size: 10px;
+            }
+
+            .exam-sidebar .omr-status {
+                margin-left: 1px;
+            }
+
+            .exam-sidebar .stat-cell {
+                padding: 6px 8px;
+            }
+
+            .exam-sidebar .stat-num {
+                font-size: 15px;
+                line-height: 1.15;
+            }
+
+            .exam-sidebar .stat-lbl {
+                font-size: 9px;
+                line-height: 1.2;
+            }
+
+            .exam-sidebar .normal-sidebar-submit-wrap {
+                padding: 7px 10px 9px;
+            }
+
+            .exam-sidebar .normal-sidebar-submit-wrap .normal-submit-btn {
+                min-height: 38px;
+                padding: 7px 12px;
+                font-size: 14px;
             }
 
             .exam-sidebar .sidebar-card:first-child {
