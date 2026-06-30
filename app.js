@@ -1544,15 +1544,14 @@ function updateActiveNormalQuestionSelection(selectedOptionIndex) {
 
 function animateContentIn(element, {
     fromOpacity = 0.42,
-    fromY = 2,
     duration = 240,
     easing = "cubic-bezier(0.22, 1, 0.36, 1)"
 } = {}) {
     if (!element || typeof element.animate !== "function") return;
     element.animate(
         [
-            { opacity: fromOpacity, transform: `translateY(${fromY}px)` },
-            { opacity: 1, transform: "translateY(0)" }
+            { opacity: fromOpacity },
+            { opacity: 1 }
         ],
         { duration, easing }
     );
@@ -1560,7 +1559,6 @@ function animateContentIn(element, {
 
 async function animateContentOut(element, {
     toOpacity = 0.62,
-    toY = 1,
     duration = 110,
     easing = "cubic-bezier(0.4, 0, 0.2, 1)"
 } = {}) {
@@ -1568,8 +1566,8 @@ async function animateContentOut(element, {
     try {
         await element.animate(
             [
-                { opacity: 1, transform: "translateY(0)" },
-                { opacity: toOpacity, transform: `translateY(${toY}px)` }
+                { opacity: 1 },
+                { opacity: toOpacity }
             ],
             { duration, easing, fill: "forwards" }
         ).finished;
@@ -1617,7 +1615,6 @@ async function navigate(idx) {
     const outgoingCard = document.getElementById("normal-question-stage");
     await animateContentOut(outgoingCard, {
         toOpacity: 0.68,
-        toY: 1,
         duration: 105,
         easing: "cubic-bezier(0.4, 0, 0.2, 1)"
     });
@@ -1628,7 +1625,6 @@ async function navigate(idx) {
     const activeCard = document.getElementById("normal-question-stage");
     animateContentIn(activeCard, {
         fromOpacity: 0.46,
-        fromY: 2,
         duration: 235,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)"
     });
@@ -3216,7 +3212,6 @@ async function peoSyncWorkspaceView() {
         stage.style.animation = "";
         animateContentIn(stage, {
             fromOpacity: 0.5,
-            fromY: 1.5,
             duration: 220,
             easing: "cubic-bezier(0.22, 1, 0.36, 1)"
         });
