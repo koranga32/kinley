@@ -32,6 +32,7 @@ const POLICIES = {
     "question-solution": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 90 },
     "pe-online-questions": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "pe-online-start": { windowMs: 10 * MINUTE, ipLimit: 30, sessionLimit: 20 },
+    "pe-online-question": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 180 },
     flashcards: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "flashcard-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 60 },
     quotes: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
@@ -575,12 +576,51 @@ async function handlePEOnlineStart(context) {
     const selected = selectPEOnlineRows(rows || []);
     const prepared = buildSecureQuestions(selected, "peo:");
     if (!prepared.length) return apiError(404, "no_questions", "No valid PE Online questions were found.");
-    const sessionId = await storeExamSession(context.env.RATE_LIMIT_DB, prepared.map(item => item.gradingItem));
+    const publicQuestions = prepared.map(item => item.publicQuestion);
+    const sessionId = await storeRichExamSession(context.env.RATE_LIMIT_DB, {
+        version: 2,
+        publicQuestions,
+        gradingItems: prepared.map(item => item.gradingItem)
+    });
     return json({
         ok: true,
         session_id: sessionId,
-        questions: prepared.map(item => item.publicQuestion)
+        total: publicQuestions.length,
+        questions: buildQuestionWindow(publicQuestions, 0, 2)
     }, 201);
+}
+
+async function handlePEOnlineQuestion(context) {
+    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
+    const url = new URL(context.request.url);
+    const sessionId = String(url.searchParams.get("session_id") || "").trim();
+    const indexText = String(url.searchParams.get("index") || "").trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
+        return apiError(400, "invalid_exam_session", "PE Online session is invalid.");
+    }
+    if (!/^\d{1,3}$/.test(indexText)) {
+        return apiError(400, "invalid_index", "Question index is invalid.");
+    }
+    const index = Number.parseInt(indexText, 10);
+    await ensureExamSessionSchema(context.env.RATE_LIMIT_DB);
+    const session = await context.env.RATE_LIMIT_DB.prepare(
+        "select payload from exam_sessions where session_id = ?1 and expires_at > ?2 limit 1"
+    ).bind(sessionId, Date.now()).first();
+    if (!session?.payload) {
+        return apiError(404, "session_not_found", "PE Online session could not be found.");
+    }
+    const normalized = normalizeStoredExamSession(session.payload);
+    if (!normalized.publicQuestions.length) {
+        return apiError(409, "session_not_streamable", "This PE Online session does not support question streaming.");
+    }
+    if (index < 0 || index >= normalized.publicQuestions.length) {
+        return apiError(400, "invalid_index", "Question index is outside the exam range.");
+    }
+    return json({
+        ok: true,
+        total: normalized.publicQuestions.length,
+        questions: buildQuestionWindow(normalized.publicQuestions, index, 2)
+    }, 200);
 }
 
 async function handleQuotes(context) {
@@ -874,6 +914,7 @@ export async function onRequest(context) {
         else if (name === "question-solution") response = await handleQuestionSolution(context);
         else if (name === "pe-online-questions") response = await handlePEOnlineQuestions(context);
         else if (name === "pe-online-start") response = await handlePEOnlineStart(context);
+        else if (name === "pe-online-question") response = await handlePEOnlineQuestion(context);
         else if (name === "flashcards") response = await handleFlashcards(context);
         else if (name === "flashcard-answer") response = await handleFlashcardAnswer(context);
         else if (name === "quotes") response = await handleQuotes(context);
