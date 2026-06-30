@@ -115,6 +115,9 @@ function bindStaticUiEvents() {
         cafSaveAdminCard();
     });
     document.getElementById("caf-admin-scope")?.addEventListener("change", cafPopulateAdminCategories);
+    document.querySelectorAll('input[name="caf-cat-mode"]').forEach((input) => {
+        input.addEventListener("change", cafApplyAdminCategoryMode);
+    });
     document.getElementById("caf-admin-clear-btn")?.addEventListener("click", cafResetAdminForm);
     document.getElementById("caf-admin-cancel-btn")?.addEventListener("click", cafCancelEdit);
 
@@ -2333,6 +2336,23 @@ let cafSelectedScope = "Bhutan";
 let cafFilteredItems = [];
 let cafActiveTimers = {};
 
+function cafCategoriesForScope(scope) {
+    const categories = [
+        ...(cafSubcategories[scope] || []),
+        ...cafNotes
+            .filter(note => note.scope === scope)
+            .map(note => String(note.category || "").trim())
+            .filter(Boolean)
+    ];
+    const seen = new Set();
+    return categories.filter(category => {
+        const key = category.toLocaleLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 function cafNormalizeRows(rows) {
     return (rows || []).map((row, idx) => ({
         id: row.id || null,
@@ -2391,8 +2411,9 @@ function cafUpdateDropdownOptions(scope) {
     const dropdown = document.getElementById("caf-category-dropdown");
     if (!dropdown) return;
     const previous = dropdown.value;
-    dropdown.innerHTML = (cafSubcategories[scope] || []).map(cat => `<option value="${escapePEHtml(cat)}">${escapePEHtml(cat)}</option>`).join("");
-    if (previous && (cafSubcategories[scope] || []).includes(previous)) dropdown.value = previous;
+    const categoriesForScope = cafCategoriesForScope(scope);
+    dropdown.innerHTML = categoriesForScope.map(cat => `<option value="${escapePEHtml(cat)}">${escapePEHtml(cat)}</option>`).join("");
+    if (previous && categoriesForScope.includes(previous)) dropdown.value = previous;
 }
 
 function cafSelectRegion(region) {
@@ -2406,7 +2427,7 @@ function cafSelectRegion(region) {
 }
 
 function cafFilterData(resetPage = true) {
-    const selectedCategory = document.getElementById("caf-category-dropdown")?.value || (cafSubcategories[cafSelectedScope] || [])[0] || "";
+    const selectedCategory = document.getElementById("caf-category-dropdown")?.value || cafCategoriesForScope(cafSelectedScope)[0] || "";
     cafFilteredItems = cafNotes.filter(note => note.scope === cafSelectedScope && note.category === selectedCategory);
     cafClearAllTimers();
     cafRenderPageGrid();
@@ -2551,13 +2572,45 @@ function cafPopulateAdminCategories() {
     const scope = document.getElementById("caf-admin-scope")?.value || "Bhutan";
     const select = document.getElementById("caf-admin-category");
     if (!select) return;
-    select.innerHTML = (cafSubcategories[scope] || []).map(cat => `<option value="${escapePEHtml(cat)}">${escapePEHtml(cat)}</option>`).join("");
+    const previous = select.value;
+    const categoriesForScope = cafCategoriesForScope(scope);
+    select.innerHTML = categoriesForScope.map(cat => `<option value="${escapePEHtml(cat)}">${escapePEHtml(cat)}</option>`).join("");
+    if (previous && categoriesForScope.includes(previous)) select.value = previous;
+    cafApplyAdminCategoryMode();
+}
+
+function cafApplyAdminCategoryMode() {
+    const isNew = document.querySelector('[name="caf-cat-mode"]:checked')?.value === "new";
+    const existingWrap = document.getElementById("caf-exist-wrap");
+    const newWrap = document.getElementById("caf-new-wrap");
+    const existingPill = document.getElementById("caf-pill-exist");
+    const newPill = document.getElementById("caf-pill-new");
+    if (existingWrap) existingWrap.style.display = isNew ? "none" : "block";
+    if (newWrap) newWrap.style.display = isNew ? "block" : "none";
+    existingPill?.classList.toggle("active", !isNew);
+    newPill?.classList.toggle("active", isNew);
+}
+
+function cafSetAdminCategoryMode(mode) {
+    const input = document.querySelector(`[name="caf-cat-mode"][value="${mode}"]`);
+    if (input) input.checked = true;
+    cafApplyAdminCategoryMode();
+}
+
+function cafGetAdminCategory() {
+    const scope = document.getElementById("caf-admin-scope")?.value || "Bhutan";
+    const isNew = document.querySelector('[name="caf-cat-mode"]:checked')?.value === "new";
+    const entered = document.getElementById("caf-admin-category-new")?.value.trim() || "";
+    if (!isNew) return document.getElementById("caf-admin-category")?.value || "";
+    const existing = cafCategoriesForScope(scope).find(category => category.toLocaleLowerCase() === entered.toLocaleLowerCase());
+    return existing || entered;
 }
 
 function cafResetAdminForm() {
     const form = document.getElementById("caf-admin-form");
     if (form) form.reset();
     editingCafCardId = "";
+    cafSetAdminCategoryMode("exist");
     const date = document.getElementById("caf-admin-date");
     if (date && !date.value) date.value = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Thimphu" }).format(new Date());
     cafPopulateAdminCategories();
@@ -2576,6 +2629,7 @@ function cafStartEditCard(id) {
     editingCafCardId = String(card.id || "");
     document.getElementById("caf-admin-scope").value = card.scope || "Bhutan";
     cafPopulateAdminCategories();
+    cafSetAdminCategoryMode("exist");
     document.getElementById("caf-admin-category").value = card.category || "Sports";
     document.getElementById("caf-admin-date").value = card.date || "";
     document.getElementById("caf-admin-question").value = card.examFocus || "";
@@ -2596,13 +2650,13 @@ async function cafSaveAdminCard() {
     const payload = {
         id: editingCafCardId || "",
         scope: document.getElementById("caf-admin-scope")?.value || "Bhutan",
-        category: document.getElementById("caf-admin-category")?.value || "Sports",
+        category: cafGetAdminCategory(),
         date_stamp: document.getElementById("caf-admin-date")?.value.trim(),
         exam_focus: document.getElementById("caf-admin-question")?.value.trim(),
         answer: document.getElementById("caf-admin-answer")?.value.trim()
     };
-    if (!payload.date_stamp || !payload.exam_focus || !payload.answer) {
-        showToast("Fill date, question, and answer first.", "error");
+    if (!payload.category || !payload.date_stamp || !payload.exam_focus || !payload.answer) {
+        showToast("Choose or enter a category, then fill date, question, and answer.", "error");
         return;
     }
     try {
