@@ -1542,12 +1542,24 @@ function updateActiveNormalQuestionSelection(selectedOptionIndex) {
     });
 }
 
+function resetAnimatedPresentation(element) {
+    if (!element) return;
+    if (typeof element.getAnimations === "function") {
+        element.getAnimations().forEach((animation) => {
+            try { animation.cancel(); } catch {}
+        });
+    }
+    element.style.opacity = "";
+    element.style.transform = "";
+}
+
 function animateContentIn(element, {
     fromOpacity = 0.42,
     duration = 240,
     easing = "cubic-bezier(0.22, 1, 0.36, 1)"
 } = {}) {
     if (!element || typeof element.animate !== "function") return;
+    resetAnimatedPresentation(element);
     element.animate(
         [
             { opacity: fromOpacity },
@@ -1563,6 +1575,7 @@ async function animateContentOut(element, {
     easing = "cubic-bezier(0.4, 0, 0.2, 1)"
 } = {}) {
     if (!element || typeof element.animate !== "function") return;
+    resetAnimatedPresentation(element);
     try {
         await element.animate(
             [
