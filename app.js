@@ -1233,9 +1233,6 @@ function updateTestSummary() {
     const durationSeconds = getTestDurationSeconds(questionCount);
     summary.value = `${formatDurationLabel(durationSeconds)} / ${questionCount} Q`;
 
-    if (setupContinued) {
-        prefetchCategoryMedia(select.value).catch(() => {});
-    }
 }
 
 // ─── EXAM START ───────────────────────────────────────
@@ -1260,9 +1257,6 @@ async function startExam() {
         }
         try {
             showLoading(true, "Connecting...");
-            const selectedCategory = document.getElementById("category-select").value;
-            await prefetchCategoryMedia(selectedCategory, { blockForMs: 2500 });
-            prefetchPEOnlineMedia();
         } finally {
             setupContinued = true;
             document.getElementById("setup-options").style.display = "grid";
@@ -2924,7 +2918,6 @@ async function openPEPortal() {
     loadPEOnlineQuestionBank()
         .then(() => {
             updatePEOnlineCount();
-            prefetchPEOnlineMedia();
         })
         .catch(error => {
             peOnlineCatalog.total = 0;
