@@ -1424,15 +1424,37 @@ function renderActiveNormalQuestion() {
     const qContainer = document.getElementById("questions-container");
     const q = activeData[currentIdx];
     const cat = document.getElementById("category-select").value;
-    if (!q) {
+    let card = document.getElementById("normal-question-card");
+    if (!card) {
         qContainer.innerHTML = `
-            <div class="question-card active" id="q-${currentIdx}">
+            <div class="question-card active" id="normal-question-card">
                 <div class="q-meta">
-                    <span class="q-pill">Question ${currentIdx + 1} / ${activeData.length}</span>
-                    <span class="q-category-tag">${escapeHTML(cat)}</span>
+                    <span class="q-pill" id="normal-question-pill"></span>
+                    <span class="q-category-tag" id="normal-question-category"></span>
                 </div>
-                <div class="q-text">Loading question...</div>
+                <div id="normal-question-stage"></div>
+                <div class="mobile-question-omr">
+                    <div class="mobile-omr-title">Tap to save & go to next question</div>
+                    <div class="mobile-omr-row">
+                        <div class="mobile-omr-label" id="normal-mobile-label"></div>
+                        <div class="mobile-omr-bubbles" id="normal-mobile-bubbles"></div>
+                    </div>
+                </div>
+                <div class="nav-actions">
+                    <button type="button" class="btn btn-outline" id="normal-prev-btn"><- Previous</button>
+                    <div id="normal-nav-right"></div>
+                </div>
             </div>`;
+        card = document.getElementById("normal-question-card");
+        document.getElementById("normal-prev-btn")?.addEventListener("click", () => {
+            const idx = Number(document.getElementById("normal-prev-btn")?.dataset.navPrev || "-1");
+            void navigate(idx);
+        });
+    }
+    if (!q) {
+        document.getElementById("normal-question-pill").textContent = `Question ${currentIdx + 1} / ${activeData.length}`;
+        document.getElementById("normal-question-category").textContent = cat;
+        document.getElementById("normal-question-stage").innerHTML = `<div class="q-text">Loading question...</div>`;
         return;
     }
     const imageSource = safeMediaSource(q.imageCode, "image");
@@ -1467,45 +1489,32 @@ function renderActiveNormalQuestion() {
              ${label}
         </div>`).join("");
 
-    qContainer.innerHTML = `
-        <div class="question-card active ${q.imageCode ? "has-image" : ""}" id="q-${currentIdx}">
-            <div class="q-meta">
-                <span class="q-pill">Question ${currentIdx + 1} / ${activeData.length}</span>
-                <span class="q-category-tag">${escapeHTML(cat)}</span>
-            </div>
-            <div class="q-text">${escapeHTML(q.question)}</div>
-            ${imgHtml}
-            ${audioHtml}
-            <div class="options-grid">${opts}</div>
-
-            <div class="mobile-question-omr">
-                <div class="mobile-omr-title">Tap to save & go to next question</div>
-                <div class="mobile-omr-row">
-                    <div class="mobile-omr-label">Q. No ${currentIdx + 1}</div>
-                    <div class="mobile-omr-bubbles">
-                        ${mobileOmrBubblesHtml}
-                    </div>
-                </div>
-            </div>
-
-            <div class="nav-actions">
-                <button type="button" class="btn btn-outline" data-nav-prev="${currentIdx - 1}" ${currentIdx===0?'disabled':''}><- Previous</button>
-                ${navRight}
-            </div>
-        </div>`;
+    card.classList.toggle("has-image", Boolean(q.imageCode));
+    document.getElementById("normal-question-pill").textContent = `Question ${currentIdx + 1} / ${activeData.length}`;
+    document.getElementById("normal-question-category").textContent = cat;
+    document.getElementById("normal-question-stage").innerHTML = `
+        <div class="q-text">${escapeHTML(q.question)}</div>
+        ${imgHtml}
+        ${audioHtml}
+        <div class="options-grid">${opts}</div>`;
+    document.getElementById("normal-mobile-label").textContent = `Q. No ${currentIdx + 1}`;
+    document.getElementById("normal-mobile-bubbles").innerHTML = mobileOmrBubblesHtml;
+    const prevBtn = document.getElementById("normal-prev-btn");
+    if (prevBtn) {
+        prevBtn.dataset.navPrev = String(currentIdx - 1);
+        prevBtn.disabled = currentIdx === 0;
+    }
+    document.getElementById("normal-nav-right").innerHTML = navRight;
 
     qContainer.querySelectorAll("[data-submit-exam]").forEach((button) => {
         button.addEventListener("click", submitExam);
     });
-    qContainer.querySelectorAll("[data-mobile-bubble]").forEach((bubble) => {
+    document.getElementById("normal-mobile-bubbles")?.querySelectorAll("[data-mobile-bubble]").forEach((bubble) => {
         bubble.addEventListener("click", () => {
             const qIndex = Number(bubble.dataset.q);
             const optionIndex = Number(bubble.dataset.opt);
             selectMobileBubble(qIndex, optionIndex, bubble);
         });
-    });
-    qContainer.querySelectorAll("[data-nav-prev]").forEach((button) => {
-        button.addEventListener("click", () => { void navigate(Number(button.dataset.navPrev)); });
     });
     syncNormalSubmitVisibility();
 }
@@ -1523,7 +1532,7 @@ function refreshNormalOmrState() {
 }
 
 function updateActiveNormalQuestionSelection(selectedOptionIndex) {
-    const activeCard = document.getElementById(`q-${currentIdx}`);
+    const activeCard = document.getElementById("normal-question-stage");
     if (!activeCard) return;
     activeCard.querySelectorAll(".option-item").forEach((el, optionIndex) => {
         el.classList.toggle("selected", optionIndex === selectedOptionIndex);
@@ -1534,9 +1543,9 @@ function updateActiveNormalQuestionSelection(selectedOptionIndex) {
 }
 
 function animateContentIn(element, {
-    fromOpacity = 0.32,
-    fromY = 3,
-    duration = 220,
+    fromOpacity = 0.42,
+    fromY = 2,
+    duration = 240,
     easing = "cubic-bezier(0.22, 1, 0.36, 1)"
 } = {}) {
     if (!element || typeof element.animate !== "function") return;
@@ -1550,9 +1559,9 @@ function animateContentIn(element, {
 }
 
 async function animateContentOut(element, {
-    toOpacity = 0.45,
-    toY = 2,
-    duration = 140,
+    toOpacity = 0.62,
+    toY = 1,
+    duration = 110,
     easing = "cubic-bezier(0.4, 0, 0.2, 1)"
 } = {}) {
     if (!element || typeof element.animate !== "function") return;
@@ -1605,22 +1614,22 @@ async function navigate(idx) {
         syncNormalSubmitVisibility();
         return;
     }
-    const outgoingCard = document.getElementById(`q-${currentIdx}`);
+    const outgoingCard = document.getElementById("normal-question-stage");
     await animateContentOut(outgoingCard, {
-        toOpacity: 0.5,
-        toY: 2,
-        duration: 135,
+        toOpacity: 0.68,
+        toY: 1,
+        duration: 105,
         easing: "cubic-bezier(0.4, 0, 0.2, 1)"
     });
     await ensureNormalExamQuestionLoaded(idx);
     currentIdx = idx;
     renderActiveNormalQuestion();
     refreshNormalOmrState();
-    const activeCard = document.getElementById(`q-${currentIdx}`);
+    const activeCard = document.getElementById("normal-question-stage");
     animateContentIn(activeCard, {
-        fromOpacity: 0.34,
-        fromY: 3,
-        duration: 210,
+        fromOpacity: 0.46,
+        fromY: 2,
+        duration: 235,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)"
     });
     const optionsGrid = activeCard?.querySelector(".options-grid");
@@ -3131,6 +3140,18 @@ async function peoSyncWorkspaceView() {
     const q = activeData[currentIdx];
     const workspace = document.getElementById("peo-workspace");
     const imgNode = document.getElementById("peo-graph-img");
+    let stage = document.getElementById("peo-question-stage");
+    if (!stage) {
+        stage = document.createElement("div");
+        stage.id = "peo-question-stage";
+        const textNode = document.getElementById("peo-question-text");
+        const audioNode = document.getElementById("peo-question-audio");
+        const optionsNode = document.getElementById("peo-options-wrapper");
+        if (textNode) stage.appendChild(textNode);
+        if (audioNode) stage.appendChild(audioNode);
+        if (optionsNode) stage.appendChild(optionsNode);
+        document.getElementById("peo-question-content")?.appendChild(stage);
+    }
     const graphSource = safeMediaURL(q.imageCode, "image");
 
     if (graphSource) {
@@ -3189,15 +3210,14 @@ async function peoSyncWorkspaceView() {
 
     // Re-trigger the question-content fade-in on every render (new question// or a split-mode switch) by removing and re-adding the element from
     // the DOM flow — toggling a class alone won't restart a CSS animation // that's already finished, but a reflow via offsetWidth will.
-    const contentBlock = document.getElementById("peo-question-content");
-    if (contentBlock) {
-        contentBlock.style.animation = "none";
-        void contentBlock.offsetWidth; // force reflow
-        contentBlock.style.animation = "";
-        animateContentIn(contentBlock, {
-            fromOpacity: 0.38,
-            fromY: 2,
-            duration: 190,
+    if (stage) {
+        stage.style.animation = "none";
+        void stage.offsetWidth; // force reflow
+        stage.style.animation = "";
+        animateContentIn(stage, {
+            fromOpacity: 0.5,
+            fromY: 1.5,
+            duration: 220,
             easing: "cubic-bezier(0.22, 1, 0.36, 1)"
         });
     }
