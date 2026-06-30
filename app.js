@@ -1469,6 +1469,17 @@ function refreshNormalOmrState() {
     }
 }
 
+function updateActiveNormalQuestionSelection(selectedOptionIndex) {
+    const activeCard = document.getElementById(`q-${currentIdx}`);
+    if (!activeCard) return;
+    activeCard.querySelectorAll(".option-item").forEach((el, optionIndex) => {
+        el.classList.toggle("selected", optionIndex === selectedOptionIndex);
+    });
+    activeCard.querySelectorAll('.mobile-question-omr .omr-bubble[data-q]').forEach((el) => {
+        el.classList.toggle("filled", Number(el.dataset.opt) === selectedOptionIndex);
+    });
+}
+
 function syncNormalSubmitVisibility() {
     if (!activeData.length) return;
     const canSubmit = responses[activeData.length - 1] !== null;
@@ -1488,8 +1499,11 @@ function syncPEOSubmitVisibility() {
 
 // Called ONLY from OMR bubbles — selects answer + auto-advances
 async function omrSelect(qi, oi) {
+    if (qi !== currentIdx) {
+        await navigate(qi);
+    }
     responses[qi] = oi;
-    if (qi === currentIdx) renderActiveNormalQuestion();
+    if (qi === currentIdx) updateActiveNormalQuestionSelection(oi);
     refreshNormalOmrState();
     updateProgress();
     syncNormalSubmitVisibility();
@@ -3100,6 +3114,10 @@ function peoSyncWorkspaceView() {
 }
 
 function peoSelectOption(qIdx, choiceIdx) {
+    if (qIdx !== currentIdx) {
+        currentIdx = qIdx;
+        peoSyncWorkspaceView();
+    }
     responses[qIdx] = choiceIdx;
     peoUpdateCounters();
 
