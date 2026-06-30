@@ -41,6 +41,7 @@ let audioQuestionTimer = null;  // tracks the 30s countdown for the current audi
 let activeExamSessionId = "";
 let activeExamTotal = 0;
 let normalExamMode = false;
+let peOnlineMode = false;
 let peOnlineCatalog = {
     counts: { Mock: 0, "Past Paper": 0, "Data Interpretation": 0, "Current Affairs": 0 },
     total: 0
@@ -95,7 +96,7 @@ function bindStaticUiEvents() {
     document.getElementById("category-select")?.addEventListener("change", updateTestSummary);
     document.getElementById("start-btn")?.addEventListener("click", startExam);
 
-    document.getElementById("peo-btn-prev")?.addEventListener("click", peoNavigateBack);
+    document.getElementById("peo-btn-prev")?.addEventListener("click", () => { void peoNavigateBack(); });
     document.getElementById("peo-submit-btn")?.addEventListener("click", peoSubmitOnlineTest);
     document.getElementById("pe-return-online-btn")?.addEventListener("click", returnToPEOnlineTestPage);
     document.getElementById("results-return-home-btn")?.addEventListener("click", retakeExam);
@@ -771,6 +772,56 @@ async function prefetchNormalExamQuestion(index) {
     }
 }
 
+async function startSecurePEOnlineExam() {
+    activeExamSessionId = "";
+    activeExamTotal = 0;
+    const response = await apiRequest("pe-online-start", { method: "POST", body: {} });
+    if (!response || typeof response.session_id !== "string" || !Array.isArray(response.questions) || !response.questions.length) {
+        throw new Error("The server returned an incomplete PE Online session. Please redeploy the latest API files.");
+    }
+    activeExamSessionId = response.session_id;
+    activeExamTotal = Number(response.total || 0);
+    return {
+        total: activeExamTotal,
+        questions: mapSecureExamWindowRows(response.questions)
+    };
+}
+
+async function fetchPEOnlineQuestionWindow(index) {
+    const response = await apiRequest(
+        `pe-online-question?session_id=${encodeURIComponent(activeExamSessionId)}&index=${encodeURIComponent(index)}`
+    );
+    if (!response || !Array.isArray(response.questions)) {
+        throw new Error("The server returned an incomplete PE Online question window.");
+    }
+    const mapped = mapSecureExamWindowRows(response.questions);
+    mergeNormalExamWindow(mapped);
+    return mapped;
+}
+
+async function ensurePEOnlineQuestionLoaded(index) {
+    if (!peOnlineMode || activeData[index]) return activeData[index];
+    await fetchPEOnlineQuestionWindow(index);
+    if (activeData[index]) {
+        await fetchSelectedQuestionMedia([activeData[index]]);
+    }
+    return activeData[index];
+}
+
+async function prefetchPEOnlineQuestion(index) {
+    if (!peOnlineMode || index < 0 || index >= activeData.length || activeData[index]) return;
+    try {
+        const rows = await fetchPEOnlineQuestionWindow(index);
+        const warmable = rows.map(entry => entry.question).filter(Boolean);
+        if (warmable.length) {
+            await fetchSelectedQuestionMedia(warmable);
+            await warmQuestionAssets(warmable, { reportProgress: false });
+        }
+    } catch (error) {
+        console.error("PE Online prefetch failed:", error);
+    }
+}
+
 function mergeMediaRowsIntoQuestions(questions, mediaRows) {
     // Supabase commonly serializes bigint IDs as numbers, while secure exam
     // IDs are strings. Normalize both sides or valid media silently misses.
@@ -1228,6 +1279,7 @@ async function startExam() {
 	    const cat = document.getElementById("category-select").value;
 	    activeCategoryLabel = null;
         normalExamMode = true;
+        peOnlineMode = false;
 
     examPreparing = true;
     showLoading(true, "Connecting...");
@@ -1277,6 +1329,7 @@ function retakeExam() {
     activeExamSessionId = "";
     activeExamTotal = 0;
     normalExamMode = false;
+    peOnlineMode = false;
 
     document.getElementById("results-view").classList.remove("show");
     document.getElementById("pe-return-online-btn") && (document.getElementById("pe-return-online-btn").style.display = "none");
@@ -2997,17 +3050,20 @@ async function startPEOnlineTest() {
     if (startBtn) startBtn.disabled = true;
     try {
         showLoading(true, "Connecting...");
-        const response = await apiRequest("pe-online-start", { method: "POST", body: {} });
+        const session = await startSecurePEOnlineExam();
         normalExamMode = false;
-        activeExamTotal = 0;
-        activeExamSessionId = response.session_id;
-        activeData = mapSecureExamRows(response.questions);
+        peOnlineMode = true;
+        if (!session.total || !session.questions.length) {
+            throw new Error("The secure PE Online session did not include any questions.");
+        }
+        seedNormalExamQuestions(session.total, session.questions);
         responses = new Array(activeData.length).fill(null);
         timeLeft = activeData.length * PE_ONLINE_SECONDS_PER_QUESTION;
         currentIdx = 0;
         activeCategoryLabel = "PE Online Test";
         stopQuestionAudio();
-        await prepareExamAssetsBeforeTimer(activeData, "Preparing PE online test…");
+        const startupQuestions = session.questions.map(entry => entry.question).filter(Boolean);
+        await prepareExamAssetsBeforeTimer(startupQuestions, "Preparing PE online test…");
     } catch (error) {
         showToast(`Could not start secure PE test: ${error.message}`, "error");
         showLoading(false);
@@ -3024,7 +3080,7 @@ async function startPEOnlineTest() {
     document.getElementById("timer-badge").classList.add("show");
 
     document.getElementById("peo-workspace").style.display = "flex";
-    peoSyncWorkspaceView();
+    await peoSyncWorkspaceView();
     startTimer();
 }
 
@@ -3044,7 +3100,7 @@ function peoInitOMRSheet() {
         const label = document.createElement("div");
         label.className = "peo-omr-q-num";
         label.textContent = `Q${index + 1}`;
-        label.onclick = () => peoJumpToQuestion(index);
+        label.onclick = () => { void peoJumpToQuestion(index); };
 
         const bubblesContainer = document.createElement("div");
         bubblesContainer.className = "peo-omr-bubbles";
@@ -3054,9 +3110,7 @@ function peoInitOMRSheet() {
             bubble.className = "peo-bubble";
             bubble.textContent = letter;
             bubble.id = `peo-bubble-${index}-${letterIdx}`;
-            bubble.onclick = () => {
-                peoSelectOption(index, letterIdx);
-            };
+            bubble.onclick = () => { void peoSelectOption(index, letterIdx); };
             bubblesContainer.appendChild(bubble);
         });
 
@@ -3067,12 +3121,13 @@ function peoInitOMRSheet() {
     peoUpdateCounters();
 }
 
-function peoSyncWorkspaceView() {
+async function peoSyncWorkspaceView() {
     // Build the OMR sheet fresh the first time this is called for a session
     if (document.getElementById("peo-omr-rows").children.length !== activeData.length) {
         peoInitOMRSheet();
     }
 
+    await ensurePEOnlineQuestionLoaded(currentIdx);
     const q = activeData[currentIdx];
     const workspace = document.getElementById("peo-workspace");
     const imgNode = document.getElementById("peo-graph-img");
@@ -3161,12 +3216,12 @@ function peoSyncWorkspaceView() {
     syncPEOSubmitVisibility();
 
     stopQuestionAudio();
+    void prefetchPEOnlineQuestion(currentIdx + 1);
 }
 
-function peoSelectOption(qIdx, choiceIdx) {
+async function peoSelectOption(qIdx, choiceIdx) {
     if (qIdx !== currentIdx) {
-        currentIdx = qIdx;
-        peoSyncWorkspaceView();
+        await peoJumpToQuestion(qIdx);
     }
     responses[qIdx] = choiceIdx;
     peoUpdateCounters();
@@ -3186,19 +3241,23 @@ function peoSelectOption(qIdx, choiceIdx) {
     // stable and only reveal Submit instead of re-rendering the same question.
     if (qIdx === currentIdx && currentIdx < activeData.length - 1) {
         currentIdx++;
-        setTimeout(() => peoSyncWorkspaceView(), 90);
+        setTimeout(() => { void peoSyncWorkspaceView(); }, 90);
     } else {
         syncPEOSubmitVisibility();
     }
 }
 
-function peoNavigateBack() {
-    if (currentIdx > 0) { currentIdx--; peoSyncWorkspaceView(); }
+async function peoNavigateBack() {
+    if (currentIdx > 0) {
+        currentIdx--;
+        await peoSyncWorkspaceView();
+    }
 }
 
-function peoJumpToQuestion(targetIndex) {
+async function peoJumpToQuestion(targetIndex) {
+    await ensurePEOnlineQuestionLoaded(targetIndex);
     currentIdx = targetIndex;
-    peoSyncWorkspaceView();
+    await peoSyncWorkspaceView();
 }
 
 function peoUpdateCounters() {
