@@ -87,6 +87,7 @@ function bindStaticUiEvents() {
     });
     document.getElementById("category-select")?.addEventListener("change", updateTestSummary);
     document.getElementById("start-btn")?.addEventListener("click", startExam);
+    document.getElementById("normal-sidebar-submit-btn")?.addEventListener("click", submitExam);
 
     document.getElementById("peo-btn-prev")?.addEventListener("click", () => { void peoNavigateBack(); });
     document.getElementById("peo-submit-btn")?.addEventListener("click", peoSubmitOnlineTest);
@@ -1266,7 +1267,6 @@ async function startExam() {
     document.getElementById("exam-view").classList.add("show");
     document.getElementById("timer-badge").classList.add("show");
 
-    document.getElementById("stat-total").textContent = activeData.length;
     buildExam();
     startTimer();
 }
@@ -1433,7 +1433,7 @@ function renderActiveNormalQuestion() {
         ${currentIdx === activeData.length - 1 ? "" : `<button type="button" class="btn btn-outline btn-nav-hint normal-submit-hint" disabled title="Tick answer on OMR sheet →">
               <span style="opacity:0.5;font-size:12px;">← Mark answer on OMR sheet</span>
            </button>`}
-        <button type="button" class="btn btn-green normal-submit-btn" data-submit-exam style="display:none;">Submit Exam ✓</button>
+        <button type="button" class="btn btn-green normal-submit-btn normal-inline-submit-btn" data-submit-exam style="display:none;">Submit Exam ✓</button>
     `;
     const mobileOmrBubblesHtml = ALPHA.map((label, oi) => `
         <div class="omr-bubble ${responses[currentIdx] === oi ? "filled" : ""}"
@@ -1595,9 +1595,6 @@ async function navigate(idx) {
         duration: 235,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)"
     });
-    const optionsGrid = activeCard?.querySelector(".options-grid");
-    if (optionsGrid) optionsGrid.scrollTop = 0;
-
     if (window.innerWidth < 768 && activeCard) {
         activeCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
@@ -1672,7 +1669,6 @@ function updateProgress() {
     document.getElementById("progress-fill").style.width = pct + "%";
     document.getElementById("stat-answered").textContent  = answered;
     document.getElementById("stat-remaining").textContent = total - answered;
-    document.getElementById("stat-total").textContent     = total;
 }
 
 // ─── TIMER ────────────────────────────────────────────

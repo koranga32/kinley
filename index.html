@@ -598,6 +598,11 @@
             border-top-color: rgba(226,232,240,0.22);
         }
 
+        body.dark-theme:not(.admin-mode) .normal-sidebar-submit-wrap,
+        body.dark-theme:not(.admin-mode) #normal-question-card > .nav-actions {
+            background: rgba(17,24,39,0.96);
+        }
+
         body.dark-theme:not(.admin-mode) .stat-num {
             color: #ffffff;
         }
@@ -906,11 +911,31 @@
                 overflow: hidden;
             }
 
-            #questions-container .question-card.active .options-grid {
-                flex: 1;
+            #normal-question-stage {
+                flex: 1 1 auto;
                 min-height: 0;
-                overflow-y: auto;
-                padding-right: 4px;
+                overflow: hidden;
+            }
+
+            #normal-question-card > .q-meta,
+            #normal-question-card > .nav-actions {
+                flex: 0 0 auto;
+            }
+
+            #normal-question-card > .nav-actions {
+                margin-top: 10px;
+                padding-top: 12px;
+                background: var(--white);
+            }
+
+            .normal-inline-submit-btn,
+            .normal-submit-hint {
+                display: none !important;
+            }
+
+            #questions-container .question-card.active .options-grid {
+                flex: 0 0 auto;
+                overflow: visible;
             }
 
             #questions-container .question-card.has-image .q-image-wrap {
@@ -921,7 +946,7 @@
             }
 
             #questions-container .question-card.has-image .q-image {
-                max-height: clamp(210px, 32vh, 370px) !important;
+                max-height: clamp(200px, 28vh, 300px) !important;
                 object-fit: contain;
             }
 
@@ -930,9 +955,25 @@
             }
 
             #questions-container .question-card.has-image .option-item {
-                min-height: 40px;
-                padding: 7px 11px !important;
-                line-height: 1.3;
+                min-height: 34px;
+                padding: 4px 10px !important;
+                gap: 9px;
+                font-size: 13px;
+                line-height: 1.22;
+            }
+
+            #questions-container .question-card.has-image .option-alpha {
+                width: 30px;
+                height: 30px;
+                font-size: 12px;
+            }
+
+            #questions-container .question-card.has-image .q-meta {
+                margin-bottom: 8px;
+            }
+
+            #questions-container .question-card.has-image .q-text {
+                margin-bottom: 7px !important;
             }
 
             .exam-sidebar {
@@ -1506,10 +1547,22 @@
         /* ─── STATS MINI ────────────────────────────── */
         .stats-row {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 1px;
             background: var(--border);
             border-top: 1px solid var(--border);
+        }
+
+        .normal-sidebar-submit-wrap {
+            padding: 10px 12px 12px;
+            background: var(--white);
+        }
+
+        .normal-sidebar-submit-wrap .normal-submit-btn {
+            width: 100%;
+            min-height: 44px;
+            justify-content: center;
+            font-size: 15px;
         }
 
         .stat-cell {
@@ -4450,10 +4503,9 @@
                         <div class="stat-num" id="stat-remaining">0</div>
                         <div class="stat-lbl">Remaining</div>
                     </div>
-                    <div class="stat-cell">
-                        <div class="stat-num" id="stat-total">0</div>
-                        <div class="stat-lbl">Total</div>
-                    </div>
+                </div>
+                <div class="normal-sidebar-submit-wrap">
+                    <button type="button" class="btn btn-green normal-submit-btn" id="normal-sidebar-submit-btn" style="display:none;">Submit</button>
                 </div>
             </div>
         </div>
