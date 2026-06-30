@@ -288,7 +288,13 @@ async function sha256Hex(value) {
 }
 
 function generateOtpCode() {
-    return String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
+    const range = 1000000;
+    const ceiling = 0x100000000 - (0x100000000 % range);
+    const values = new Uint32Array(1);
+    do {
+        crypto.getRandomValues(values);
+    } while (values[0] >= ceiling);
+    return String(values[0] % range).padStart(6, "0");
 }
 
 function maskEmailAddress(email) {
