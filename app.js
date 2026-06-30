@@ -39,6 +39,8 @@ let dailyQuoteExpiryTimer = null;
 let activeCategoryLabel = null; // overrides category-select value when set (e.g. PE Online Test)
 let audioQuestionTimer = null;  // tracks the 30s countdown for the current audio question
 let activeExamSessionId = "";
+let activeExamTotal = 0;
+let normalExamMode = false;
 let peOnlineCatalog = {
     counts: { Mock: 0, "Past Paper": 0, "Data Interpretation": 0, "Current Affairs": 0 },
     total: 0
@@ -692,12 +694,81 @@ async function loadExamCatalog() {
 
 async function startSecureNormalExam(category) {
     activeExamSessionId = "";
+    activeExamTotal = 0;
     const response = await apiRequest("exam-start", { method: "POST", body: { category } });
     if (!response || typeof response.session_id !== "string" || !Array.isArray(response.questions) || !response.questions.length) {
         throw new Error("The server returned an incomplete exam session. Please redeploy the latest API files.");
     }
     activeExamSessionId = response.session_id;
-    return mapSecureExamRows(response.questions);
+    activeExamTotal = Number(response.total || 0);
+    return {
+        total: activeExamTotal,
+        questions: mapSecureExamWindowRows(response.questions)
+    };
+}
+
+function mapSecureExamWindowRows(rows) {
+    return (rows || [])
+        .map(entry => {
+            const index = Number(entry?.index);
+            if (!Number.isInteger(index) || index < 0 || !entry?.question) return null;
+            const mapped = mapSecureExamRows([entry.question])[0];
+            if (!mapped) return null;
+            return { index, question: mapped };
+        })
+        .filter(Boolean);
+}
+
+function seedNormalExamQuestions(total, rows) {
+    activeData = new Array(total).fill(null);
+    for (const entry of rows || []) {
+        if (entry && Number.isInteger(entry.index) && entry.index >= 0 && entry.index < total) {
+            activeData[entry.index] = entry.question;
+        }
+    }
+}
+
+function mergeNormalExamWindow(rows) {
+    for (const entry of rows || []) {
+        if (entry && Number.isInteger(entry.index) && entry.index >= 0 && entry.index < activeData.length) {
+            activeData[entry.index] = entry.question;
+        }
+    }
+}
+
+async function fetchNormalExamQuestionWindow(index) {
+    const response = await apiRequest(
+        `exam-question?session_id=${encodeURIComponent(activeExamSessionId)}&index=${encodeURIComponent(index)}`
+    );
+    if (!response || !Array.isArray(response.questions)) {
+        throw new Error("The server returned an incomplete question window.");
+    }
+    const mapped = mapSecureExamWindowRows(response.questions);
+    mergeNormalExamWindow(mapped);
+    return mapped;
+}
+
+async function ensureNormalExamQuestionLoaded(index) {
+    if (!normalExamMode || activeData[index]) return activeData[index];
+    await fetchNormalExamQuestionWindow(index);
+    if (activeData[index]) {
+        await fetchSelectedQuestionMedia([activeData[index]]);
+    }
+    return activeData[index];
+}
+
+async function prefetchNormalExamQuestion(index) {
+    if (!normalExamMode || index < 0 || index >= activeData.length || activeData[index]) return;
+    try {
+        const rows = await fetchNormalExamQuestionWindow(index);
+        const warmable = rows.map(entry => entry.question).filter(Boolean);
+        if (warmable.length) {
+            await fetchSelectedQuestionMedia(warmable);
+            await warmQuestionAssets(warmable, { reportProgress: false });
+        }
+    } catch (error) {
+        console.error("Normal exam prefetch failed:", error);
+    }
 }
 
 function mergeMediaRowsIntoQuestions(questions, mediaRows) {
@@ -1156,15 +1227,22 @@ async function startExam() {
 
 	    const cat = document.getElementById("category-select").value;
 	    activeCategoryLabel = null;
+        normalExamMode = true;
 
     examPreparing = true;
     showLoading(true, "Connecting...");
     try {
-        activeData = await startSecureNormalExam(cat);
-        await prepareExamAssetsBeforeTimer(activeData, "Preparing selected exam media…");
+        const session = await startSecureNormalExam(cat);
+        if (!session.total || !session.questions.length) {
+            throw new Error("The secure exam session did not include any questions.");
+        }
+        seedNormalExamQuestions(session.total, session.questions);
+        const startupQuestions = session.questions.map(entry => entry.question).filter(Boolean);
+        await prepareExamAssetsBeforeTimer(startupQuestions, "Preparing selected exam media…");
     } catch (error) {
         examPreparing = false;
         showLoading(false);
+        normalExamMode = false;
         showToast(`Could not start secure exam: ${error.message}`, "error");
         return;
     }
@@ -1197,6 +1275,8 @@ function retakeExam() {
     timeLeft = 0;
     activeCategoryLabel = null;
     activeExamSessionId = "";
+    activeExamTotal = 0;
+    normalExamMode = false;
 
     document.getElementById("results-view").classList.remove("show");
     document.getElementById("pe-return-online-btn") && (document.getElementById("pe-return-online-btn").style.display = "none");
@@ -1234,7 +1314,7 @@ function selectMobileBubble(questionIndex, optionIndex, element) {
     // progress counters, AND auto-advance to next question.
     // DO NOT call matchingOptionItem.click() — options are .option-readonly
     // (pointer-events:none) so click() is a silent no-op that loses all state.
-    omrSelect(questionIndex, optionIndex);
+    void omrSelect(questionIndex, optionIndex);
 }
 
 // ─── BUILD EXAM UI ────────────────────────────────────
@@ -1260,74 +1340,6 @@ function buildExam() {
     // END OF SECURITY INJECTION
     const qContainer   = document.getElementById("questions-container");
     const omrContainer = document.getElementById("omr-container");
-    const cat = document.getElementById("category-select").value;
-
-    // Questions: options are READ-ONLY display (no onclick). Answer only via OMR.
-    qContainer.innerHTML = activeData.map((q, i) => {
-        const imageSource = safeMediaSource(q.imageCode, "image");
-        const audioSource = safeMediaSource(q.audioCode, "audio");
-        const imgHtml = imageSource ? `<img src="${imageSource}" class="q-image" alt="Question image" loading="lazy" decoding="async">` : "";
-        const audioHtml = audioSource
-            ? `<div class="q-audio-wrap">
-                   <audio id="audio-${i}" src="${audioSource}" class="q-audio" controls></audio>
-                   <div class="q-audio-timer" id="audio-timer-${i}" style="display:none;">⏱ <span id="audio-timer-val-${i}">30</span>s remaining</div>
-               </div>`
-            : "";
-        const opts = q.options.map((o, oi) => `
-            <div class="option-item option-readonly" id="opt-${i}-${oi}">
-                <span class="option-alpha">${ALPHA[oi]}</span>
-                <span>${escapeHTML(o)}</span>
-            </div>`).join("");
-        // Nav: no Next button. Submit becomes available everywhere only after
-        // the last question has an OMR answer.
-        const navRight = `
-            ${i === activeData.length - 1 ? "" : `<button type="button" class="btn btn-outline btn-nav-hint normal-submit-hint" disabled title="Tick answer on OMR sheet →">
-                  <span style="opacity:0.5;font-size:12px;">← Mark answer on OMR sheet</span>
-               </button>`}
-            <button type="button" class="btn btn-green normal-submit-btn" data-submit-exam style="display:none;">Submit Exam ✓</button>
-        `;
-        let mobileOmrBubblesHtml = '';
-        ALPHA.forEach((label, oi) => {
-            // Keeps state highlighted if a user navigates back to a previously answered question
-            const isFilled = (typeof responses !== 'undefined' && responses[i] === oi) ? 'filled' : '';
-            
-            mobileOmrBubblesHtml += `
-                <div class="omr-bubble ${isFilled}" 
-                     data-q="${i}" 
-                     data-opt="${oi}" 
-                     data-mobile-bubble>
-                     ${label}
-                </div>`;
-        });
-
-        return `
-	            <div class="question-card ${i===0?'active':''} ${q.imageCode?'has-image':''}" id="q-${i}">
-                <div class="q-meta">
-                    <span class="q-pill">Question ${i+1} / ${activeData.length}</span>
-                    <span class="q-category-tag">${escapeHTML(cat)}</span>
-                </div>
-                <div class="q-text">${escapeHTML(q.question)}</div>
-                ${imgHtml}
-                ${audioHtml}
-                <div class="options-grid">${opts}</div>
-                
-                <div class="mobile-question-omr">
-                    <div class="mobile-omr-title">Tap to save & go to next question</div>
-                    <div class="mobile-omr-row">
-                        <div class="mobile-omr-label">Q. No ${i+1}</div>
-                        <div class="mobile-omr-bubbles">
-                            ${mobileOmrBubblesHtml}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="nav-actions">
-                    <button type="button" class="btn btn-outline" data-nav-prev="${i-1}" ${i===0?'disabled':''}><- Previous</button>
-                    ${navRight}
-                </div>
-            </div>`;
-    }).join("");
-
     // OMR sidebar: clicking a bubble selects answer AND auto-advances
     omrContainer.innerHTML = activeData.map((_, i) => `
         <div class="omr-row ${i===0?'active':''}" id="omr-${i}">
@@ -1337,6 +1349,97 @@ function buildExam() {
             </div>
             <div class="omr-status" id="omr-status-${i}"></div>
         </div>`).join("");
+
+    omrContainer.querySelectorAll("[data-nav-question]").forEach((label) => {
+        label.addEventListener("click", () => { void navigate(Number(label.dataset.navQuestion)); });
+    });
+    omrContainer.querySelectorAll("[data-omr-q]").forEach((bubble) => {
+        bubble.addEventListener("click", () => {
+            void omrSelect(Number(bubble.dataset.omrQ), Number(bubble.dataset.omrOpt));
+        });
+    });
+
+    renderActiveNormalQuestion();
+    refreshNormalOmrState();
+    updateProgress();
+    syncNormalSubmitVisibility();
+    handleQuestionAudio(0); // autoplay/timer for the first question if it has audio
+    void prefetchNormalExamQuestion(2);
+}
+
+function renderActiveNormalQuestion() {
+    const qContainer = document.getElementById("questions-container");
+    const q = activeData[currentIdx];
+    const cat = document.getElementById("category-select").value;
+    if (!q) {
+        qContainer.innerHTML = `
+            <div class="question-card active" id="q-${currentIdx}">
+                <div class="q-meta">
+                    <span class="q-pill">Question ${currentIdx + 1} / ${activeData.length}</span>
+                    <span class="q-category-tag">${escapeHTML(cat)}</span>
+                </div>
+                <div class="q-text">Loading question...</div>
+            </div>`;
+        return;
+    }
+    const imageSource = safeMediaSource(q.imageCode, "image");
+    const audioSource = safeMediaSource(q.audioCode, "audio");
+    const imgHtml = imageSource
+        ? `<div class="q-image-wrap">
+               <img src="${imageSource}" class="q-image" alt="Question image" loading="lazy" decoding="async">
+           </div>`
+        : "";
+    const audioHtml = audioSource
+        ? `<div class="q-audio-wrap">
+               <audio id="audio-${currentIdx}" src="${audioSource}" class="q-audio" controls></audio>
+               <div class="q-audio-timer" id="audio-timer-${currentIdx}" style="display:none;">⏱ <span id="audio-timer-val-${currentIdx}">30</span>s remaining</div>
+           </div>`
+        : "";
+    const opts = q.options.map((o, oi) => `
+        <div class="option-item option-readonly ${responses[currentIdx] === oi ? "selected" : ""}" id="opt-${currentIdx}-${oi}">
+            <span class="option-alpha">${ALPHA[oi]}</span>
+            <span>${escapeHTML(o)}</span>
+        </div>`).join("");
+    const navRight = `
+        ${currentIdx === activeData.length - 1 ? "" : `<button type="button" class="btn btn-outline btn-nav-hint normal-submit-hint" disabled title="Tick answer on OMR sheet →">
+              <span style="opacity:0.5;font-size:12px;">← Mark answer on OMR sheet</span>
+           </button>`}
+        <button type="button" class="btn btn-green normal-submit-btn" data-submit-exam style="display:none;">Submit Exam ✓</button>
+    `;
+    const mobileOmrBubblesHtml = ALPHA.map((label, oi) => `
+        <div class="omr-bubble ${responses[currentIdx] === oi ? "filled" : ""}"
+             data-q="${currentIdx}"
+             data-opt="${oi}"
+             data-mobile-bubble>
+             ${label}
+        </div>`).join("");
+
+    qContainer.innerHTML = `
+        <div class="question-card active ${q.imageCode ? "has-image" : ""}" id="q-${currentIdx}">
+            <div class="q-meta">
+                <span class="q-pill">Question ${currentIdx + 1} / ${activeData.length}</span>
+                <span class="q-category-tag">${escapeHTML(cat)}</span>
+            </div>
+            <div class="q-text">${escapeHTML(q.question)}</div>
+            ${imgHtml}
+            ${audioHtml}
+            <div class="options-grid">${opts}</div>
+
+            <div class="mobile-question-omr">
+                <div class="mobile-omr-title">Tap to save & go to next question</div>
+                <div class="mobile-omr-row">
+                    <div class="mobile-omr-label">Q. No ${currentIdx + 1}</div>
+                    <div class="mobile-omr-bubbles">
+                        ${mobileOmrBubblesHtml}
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-actions">
+                <button type="button" class="btn btn-outline" data-nav-prev="${currentIdx - 1}" ${currentIdx===0?'disabled':''}><- Previous</button>
+                ${navRight}
+            </div>
+        </div>`;
 
     qContainer.querySelectorAll("[data-submit-exam]").forEach((button) => {
         button.addEventListener("click", submitExam);
@@ -1349,20 +1452,21 @@ function buildExam() {
         });
     });
     qContainer.querySelectorAll("[data-nav-prev]").forEach((button) => {
-        button.addEventListener("click", () => navigate(Number(button.dataset.navPrev)));
+        button.addEventListener("click", () => { void navigate(Number(button.dataset.navPrev)); });
     });
-    omrContainer.querySelectorAll("[data-nav-question]").forEach((label) => {
-        label.addEventListener("click", () => navigate(Number(label.dataset.navQuestion)));
-    });
-    omrContainer.querySelectorAll("[data-omr-q]").forEach((bubble) => {
-        bubble.addEventListener("click", () => {
-            omrSelect(Number(bubble.dataset.omrQ), Number(bubble.dataset.omrOpt));
-        });
-    });
-
-    updateProgress();
     syncNormalSubmitVisibility();
-    handleQuestionAudio(0); // autoplay/timer for the first question if it has audio
+}
+
+function refreshNormalOmrState() {
+    for (let i = 0; i < activeData.length; i += 1) {
+        const row = document.getElementById(`omr-${i}`);
+        if (!row) continue;
+        row.classList.toggle("active", i === currentIdx);
+        row.querySelectorAll(".omr-bubble").forEach((el, optionIndex) => {
+            el.classList.toggle("filled", responses[i] === optionIndex);
+        });
+        document.getElementById(`omr-status-${i}`)?.classList.toggle("answered", responses[i] !== null);
+    }
 }
 
 function syncNormalSubmitVisibility() {
@@ -1376,58 +1480,43 @@ function syncNormalSubmitVisibility() {
     });
 }
 
-// Called ONLY from OMR bubbles — selects answer + auto-advances
-function omrSelect(qi, oi) {
-    responses[qi] = oi;
-    // Reflect selection on question card options (visual only)
-    const card = document.getElementById(`q-${qi}`);
-    card.querySelectorAll(".option-item").forEach(el => el.classList.remove("selected"));
-    document.getElementById(`opt-${qi}-${oi}`).classList.add("selected");
-    // Fill OMR bubble
-	    const row = document.getElementById(`omr-${qi}`);
-	    row.querySelectorAll(".omr-bubble").forEach(el => el.classList.remove("filled"));
-	    document.getElementById(`bbl-${qi}-${oi}`).classList.add("filled");
-	    document.getElementById(`omr-status-${qi}`).classList.add("answered");
-	    document.querySelectorAll(`.mobile-question-omr .omr-bubble[data-q="${qi}"]`).forEach(el => {
-	        el.classList.toggle("filled", parseInt(el.dataset.opt, 10) === oi);
-	    });
-	    updateProgress();
-        syncNormalSubmitVisibility();
-    // Auto-advance after the selected OMR row; if the selected row is last,
-    // open it so the Submit button is visible immediately.
-    setTimeout(() => {
-        if (qi < activeData.length - 1) {
-            navigate(qi + 1);
-        } else {
-            navigate(qi);
-        }
-    }, 220);
+function syncPEOSubmitVisibility() {
+    const submitBlock = document.getElementById("peo-submit-block");
+    if (!submitBlock || !activeData.length) return;
+    submitBlock.style.display = responses[activeData.length - 1] !== null ? "block" : "none";
 }
 
-function navigate(idx) {
-    if (idx < 0 || idx >= activeData.length) return;
-    document.getElementById(`q-${currentIdx}`).classList.remove("active");
-    document.getElementById(`omr-${currentIdx}`).classList.remove("active");
-    currentIdx = idx;
-    const activeCard = document.getElementById(`q-${currentIdx}`);
-    activeCard.classList.add("active");
-    document.getElementById(`omr-${currentIdx}`).classList.add("active");
+// Called ONLY from OMR bubbles — selects answer + auto-advances
+async function omrSelect(qi, oi) {
+    responses[qi] = oi;
+    if (qi === currentIdx) renderActiveNormalQuestion();
+    refreshNormalOmrState();
+    updateProgress();
     syncNormalSubmitVisibility();
+    if (qi < activeData.length - 1) {
+        setTimeout(() => { void navigate(qi + 1); }, 90);
+    }
+}
 
-    // Re-trigger the card's fade-in animation on every navigation — toggling
-    // .active alone won't replay a CSS animation that already finished once;
-    // removing and re-adding it via a forced reflow restarts it cleanly.
-    activeCard.style.animation = "none";
-    void activeCard.offsetWidth; // force reflow
-    activeCard.style.animation = "";
-
-    const optionsGrid = activeCard.querySelector(".options-grid");
+async function navigate(idx) {
+    if (idx < 0 || idx >= activeData.length) return;
+    if (idx === currentIdx) {
+        syncNormalSubmitVisibility();
+        return;
+    }
+    await ensureNormalExamQuestionLoaded(idx);
+    currentIdx = idx;
+    renderActiveNormalQuestion();
+    refreshNormalOmrState();
+    const activeCard = document.getElementById(`q-${currentIdx}`);
+    const optionsGrid = activeCard?.querySelector(".options-grid");
     if (optionsGrid) optionsGrid.scrollTop = 0;
 
     if (window.innerWidth < 768 && activeCard) {
         activeCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
     handleQuestionAudio(currentIdx);
+    void prefetchNormalExamQuestion(currentIdx + 1);
 }
 
 // Music/audio questions autoplay for exactly 30 seconds as soon as the
@@ -1550,6 +1639,9 @@ async function submitExam() {
         return;
     }
 
+    if (Array.isArray(gradedResult.public_questions) && gradedResult.public_questions.length === responses.length) {
+        activeData = mapSecureExamRows(gradedResult.public_questions);
+    }
     gradedResult.grading.forEach((grade, index) => {
         activeData[index].answer = grade.correctIndex;
     });
@@ -2845,6 +2937,8 @@ async function startPEOnlineTest() {
     try {
         showLoading(true, "Connecting...");
         const response = await apiRequest("pe-online-start", { method: "POST", body: {} });
+        normalExamMode = false;
+        activeExamTotal = 0;
         activeExamSessionId = response.session_id;
         activeData = mapSecureExamRows(response.questions);
         responses = new Array(activeData.length).fill(null);
@@ -3000,8 +3094,7 @@ function peoSyncWorkspaceView() {
 
     document.getElementById("peo-btn-prev").disabled = currentIdx === 0;
 
-    document.getElementById("peo-submit-block").style.display =
-        responses[activeData.length - 1] !== null ? "block" : "none";
+    syncPEOSubmitVisibility();
 
     stopQuestionAudio();
 }
@@ -3021,12 +3114,13 @@ function peoSelectOption(qIdx, choiceIdx) {
         optRows.forEach((row, i) => row.classList.toggle("selected", i === choiceIdx));
     }
 
-    // Auto-advance to the next question, same OMR pattern used elsewhere in the app
+    // Auto-advance to the next question. On the last question, keep the view
+    // stable and only reveal Submit instead of re-rendering the same question.
     if (qIdx === currentIdx && currentIdx < activeData.length - 1) {
         currentIdx++;
-        setTimeout(() => peoSyncWorkspaceView(), 180);
+        setTimeout(() => peoSyncWorkspaceView(), 90);
     } else {
-        peoSyncWorkspaceView();
+        syncPEOSubmitVisibility();
     }
 }
 
