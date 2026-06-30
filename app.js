@@ -3350,7 +3350,6 @@ function showPEFolderScreen() {
 // Chart pane stays fixed on the left (position: sticky) while the
 // question pane on the right shows one question at a time with // Next/Previous — same model GMAT/GRE/CAT use for chart-based sets.
 let peDIActiveSet = null; // the set/topic name currently open in the viewer
-let peDIQuestionIdx = 0;  // which question within that set is showing
 
 function renderPEDIGrid() {
     const grid = document.getElementById("pe-di-grid");
@@ -3392,7 +3391,6 @@ function renderPEDIGrid() {
 
 async function openPEDIViewer(setName) {
     peDIActiveSet = setName;
-    peDIQuestionIdx = 0;
 
     const setQuestions = getPEDISetQuestions(setName);
     try {
@@ -3414,7 +3412,6 @@ async function openPEDIViewer(setName) {
 
 function closePEDIViewer() {
     peDIActiveSet = null;
-    peDIQuestionIdx = 0;
     document.querySelectorAll("#pe-list .pe-list-item").forEach(li => {
         li.classList.toggle("active", li.dataset.target === "pe-di-panel");
     });
@@ -3440,73 +3437,45 @@ function renderPEDIQuestion() {
         return;
     }
 
-    if (peDIQuestionIdx >= setQuestions.length) peDIQuestionIdx = setQuestions.length - 1;
-    if (peDIQuestionIdx < 0) peDIQuestionIdx = 0;
-
-    const q = setQuestions[peDIQuestionIdx];
-    const options = Array.isArray(q.options) ? q.options : [];
-    const qId = `pe-di-q-${peDIQuestionIdx}`;
     pePracticeQuestionsByDomId.clear();
-    pePracticeQuestionsByDomId.set(qId, q);
-
-    const optionsHtml = options.slice(0, 4).map((opt, i) => `
-        <button type="button" class="pe-option" id="${qId}-opt-${i}"
-            data-pe-answer-qid="${qId}" data-pe-answer-opt="${i}">
-            ${ALPHA[i]}. ${escapePEHtml(opt || "")}
-        </button>
-    `).join("");
-
-    const explanationHtml = `
-        <div class="pe-solution-box" id="${qId}-solution" style="--clr:#9c27b0;">
-            <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
-            <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
-        </div>
-    `;
-
-    const navHtml = `
-        <div class="pe-question-actions" style="margin-top:18px;justify-content:space-between;">
-            <button type="button" class="pe-show-answer-btn" data-pedi-nav="-1" ${peDIQuestionIdx === 0 ? "disabled" : ""}>← Previous</button>
-            <span style="color:#8a92a6;font-size:12.5px;">Question ${peDIQuestionIdx + 1} of ${setQuestions.length}</span>
-            <button type="button" class="pe-show-answer-btn" data-pedi-nav="1" ${peDIQuestionIdx === setQuestions.length - 1 ? "disabled" : ""}>Next →</button>
-        </div>
-    `;
-
-    container.innerHTML = `
-        <div class="pe-question-card" style="--clr:#9c27b0;">
-            <div class="pe-question-meta">
-                <div class="pe-question-num">${peDIQuestionIdx + 1}</div>
-                <span class="pe-question-tag">Data Interpretation</span>
-                <span class="pe-question-tag">${escapePEHtml(peDIActiveSet)}</span>
+    container.innerHTML = setQuestions.map((q, questionIndex) => {
+        const options = Array.isArray(q.options) ? q.options : [];
+        const qId = `pe-di-q-${questionIndex}`;
+        pePracticeQuestionsByDomId.set(qId, q);
+        const optionsHtml = options.slice(0, 4).map((opt, optionIndex) => `
+            <button type="button" class="pe-option" id="${qId}-opt-${optionIndex}"
+                data-pe-answer-qid="${qId}" data-pe-answer-opt="${optionIndex}">
+                ${ALPHA[optionIndex]}. ${escapePEHtml(opt || "")}
+            </button>
+        `).join("");
+        return `
+            <div class="pe-question-card" style="--clr:#9c27b0;">
+                <div class="pe-question-meta">
+                    <div class="pe-question-num">${questionIndex + 1}</div>
+                    <span class="pe-question-tag">Data Interpretation</span>
+                    <span class="pe-question-tag">${escapePEHtml(peDIActiveSet)}</span>
+                </div>
+                <div class="pe-question-text">${escapePEHtml(q.question || "")}</div>
+                ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
+                <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
+                <div class="pe-question-actions">
+                    <div class="pe-feedback-msg" id="${qId}-feedback"></div>
+                    <button type="button" class="pe-show-answer-btn" id="${qId}-show-btn" data-pe-reveal-qid="${qId}">Show Answer</button>
+                </div>
+                <div class="pe-solution-box" id="${qId}-solution" style="--clr:#9c27b0;">
+                    <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
+                    <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
+                </div>
             </div>
-            <div class="pe-question-text">${escapePEHtml(q.question || "")}</div>
-            ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
-            <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
-            <div class="pe-question-actions">
-                <div class="pe-feedback-msg" id="${qId}-feedback"></div>
-                <button type="button" class="pe-show-answer-btn" id="${qId}-show-btn" data-pe-reveal-qid="${qId}">Show Answer</button>
-            </div>
-            ${explanationHtml}
-        </div>
-        ${navHtml}
-    `;
+        `;
+    }).join("");
 
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
     });
-    container.querySelectorAll("[data-pedi-nav]").forEach((button) => {
-        button.addEventListener("click", () => navigatePEDIQuestion(Number(button.dataset.pediNav)));
-    });
     container.querySelectorAll("[data-pe-reveal-qid]").forEach((button) => {
         button.addEventListener("click", () => revealPEAnswer(button.dataset.peRevealQid || ""));
     });
-}
-
-function navigatePEDIQuestion(delta) {
-    const setQuestions = getPEDISetQuestions(peDIActiveSet);
-    const next = peDIQuestionIdx + delta;
-    if (next < 0 || next >= setQuestions.length) return;
-    peDIQuestionIdx = next;
-    renderPEDIQuestion();
 }
 
 // ─── Question attempt flow (attempt first, then reveal) ────
@@ -3641,6 +3610,19 @@ async function answerPEQuestion(qId, chosenIndex) {
 }
 
 async function revealPEAnswer(qId) {
+    const solutionBox = document.getElementById(`${qId}-solution`);
+    const showBtn = document.getElementById(`${qId}-show-btn`);
+    if (solutionBox?.classList.contains("open")) {
+        solutionBox.classList.remove("open");
+        document.querySelectorAll(`#${qId}-options .pe-option`).forEach(button => {
+            button.classList.remove("pe-correct", "pe-incorrect", "pe-locked");
+            button.disabled = false;
+        });
+        const feedback = document.getElementById(`${qId}-feedback`);
+        if (feedback) { feedback.textContent = ""; feedback.className = "pe-feedback-msg"; }
+        if (showBtn) showBtn.textContent = "Show Answer";
+        return;
+    }
     setPEQuestionLoading(qId, true);
     let answerIndex;
     try {
@@ -3655,9 +3637,11 @@ async function revealPEAnswer(qId) {
     if (correctBtn) correctBtn.classList.add("pe-correct");
     const feedback = document.getElementById(`${qId}-feedback`);
     if (feedback) { feedback.textContent = "Answer revealed."; feedback.className = "pe-feedback-msg"; }
-    const showBtn = document.getElementById(`${qId}-show-btn`);
-    if (showBtn) showBtn.style.display = "none";
-    const solutionBox = document.getElementById(`${qId}-solution`);
+    if (showBtn) {
+        showBtn.disabled = false;
+        showBtn.style.display = "";
+        showBtn.textContent = "Hide Answer";
+    }
     if (solutionBox) solutionBox.classList.add("open");
 }
 
