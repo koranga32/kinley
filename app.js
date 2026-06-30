@@ -1480,6 +1480,40 @@ function updateActiveNormalQuestionSelection(selectedOptionIndex) {
     });
 }
 
+function animateContentIn(element, {
+    fromOpacity = 0.32,
+    fromY = 3,
+    duration = 220,
+    easing = "cubic-bezier(0.22, 1, 0.36, 1)"
+} = {}) {
+    if (!element || typeof element.animate !== "function") return;
+    element.animate(
+        [
+            { opacity: fromOpacity, transform: `translateY(${fromY}px)` },
+            { opacity: 1, transform: "translateY(0)" }
+        ],
+        { duration, easing }
+    );
+}
+
+async function animateContentOut(element, {
+    toOpacity = 0.45,
+    toY = 2,
+    duration = 140,
+    easing = "cubic-bezier(0.4, 0, 0.2, 1)"
+} = {}) {
+    if (!element || typeof element.animate !== "function") return;
+    try {
+        await element.animate(
+            [
+                { opacity: 1, transform: "translateY(0)" },
+                { opacity: toOpacity, transform: `translateY(${toY}px)` }
+            ],
+            { duration, easing, fill: "forwards" }
+        ).finished;
+    } catch {}
+}
+
 function syncNormalSubmitVisibility() {
     if (!activeData.length) return;
     const canSubmit = responses[activeData.length - 1] !== null;
@@ -1519,31 +1553,23 @@ async function navigate(idx) {
         return;
     }
     const outgoingCard = document.getElementById(`q-${currentIdx}`);
-    if (outgoingCard && typeof outgoingCard.animate === "function") {
-        try {
-            await outgoingCard.animate(
-                [
-                    { opacity: 1, transform: "translateY(0)" },
-                    { opacity: 0.28, transform: "translateY(3px)" }
-                ],
-                { duration: 120, easing: "ease-out", fill: "forwards" }
-            ).finished;
-        } catch {}
-    }
+    await animateContentOut(outgoingCard, {
+        toOpacity: 0.5,
+        toY: 2,
+        duration: 135,
+        easing: "cubic-bezier(0.4, 0, 0.2, 1)"
+    });
     await ensureNormalExamQuestionLoaded(idx);
     currentIdx = idx;
     renderActiveNormalQuestion();
     refreshNormalOmrState();
     const activeCard = document.getElementById(`q-${currentIdx}`);
-    if (activeCard && typeof activeCard.animate === "function") {
-        activeCard.animate(
-            [
-                { opacity: 0.18, transform: "translateY(4px)" },
-                { opacity: 1, transform: "translateY(0)" }
-            ],
-            { duration: 180, easing: "ease-out" }
-        );
-    }
+    animateContentIn(activeCard, {
+        fromOpacity: 0.34,
+        fromY: 3,
+        duration: 210,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)"
+    });
     const optionsGrid = activeCard?.querySelector(".options-grid");
     if (optionsGrid) optionsGrid.scrollTop = 0;
 
@@ -3113,6 +3139,12 @@ function peoSyncWorkspaceView() {
         contentBlock.style.animation = "none";
         void contentBlock.offsetWidth; // force reflow
         contentBlock.style.animation = "";
+        animateContentIn(contentBlock, {
+            fromOpacity: 0.38,
+            fromY: 2,
+            duration: 190,
+            easing: "cubic-bezier(0.22, 1, 0.36, 1)"
+        });
     }
 
     // Make sure every OMR bubble reflects the ACTUAL saved answer for its
