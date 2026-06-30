@@ -1827,10 +1827,16 @@
         .admin-side-stack {
             display: grid;
             grid-column: 1 / -1;
-            grid-template-columns: minmax(360px, 1fr) minmax(0, 1fr);
+            grid-template-columns: 1fr;
             gap: 14px;
             margin: 0;
             animation: fadeUp 0.3s ease 0.05s both;
+        }
+
+        .admin-question-registry-inline {
+            margin: 18px 38px 0;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
         }
 
         .admin-registry-panel { order: 2; }
@@ -1959,6 +1965,15 @@
                 margin-left: 16px;
                 margin-right: 16px;
             }
+
+            .admin-question-registry-inline {
+                margin-left: 16px;
+                margin-right: 16px;
+            }
+
+            .admin-col-num { width: 38px; }
+            .admin-col-category { width: 100px; }
+            .admin-col-action { width: 68px; }
         }
 
         .panel-title {
@@ -4582,6 +4597,43 @@
 	                        <button type="submit" class="btn btn-green btn-full" id="admin-submit-btn"> Save to Database</button>
 	                        <button type="button" class="btn btn-outline btn-full" id="cancel-edit-btn" style="display:none;margin-top:10px;">Cancel Edit</button>
 	                    </form>
+
+                        <div class="admin-registry-panel admin-question-registry-inline">
+                            <div class="panel-title">
+                                Question Registry
+                                <span class="badge-count" id="q-count">0</span>
+                            </div>
+
+                            <div class="admin-table-wrap">
+                                <table class="admin-table">
+                                    <colgroup>
+                                        <col class="admin-col-num">
+                                        <col class="admin-col-category">
+                                        <col>
+                                        <col class="admin-col-action">
+                                    </colgroup>
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Category</th>
+                                            <th>Question</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                                <div class="admin-table-scroll">
+                                    <table class="admin-table">
+                                        <colgroup>
+                                            <col class="admin-col-num">
+                                            <col class="admin-col-category">
+                                            <col>
+                                            <col class="admin-col-action">
+                                        </colgroup>
+                                        <tbody id="admin-tbody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
 	                </div>
 
                 <div class="panel caf-admin-panel admin-editor-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
@@ -4665,45 +4717,8 @@
                     <div class="quote-admin-registry" id="quote-admin-registry"></div>
                 </div>
 
-                <!-- Question Registry Table -->
+                <!-- Bulk Question Import -->
                 <div class="admin-side-stack">
-                    <div class="panel admin-registry-panel" style="margin:0;">
-                        <div class="panel-title">
-                            Question Registry
-                            <span class="badge-count" id="q-count">0</span>
-                        </div>
-
-                        <div class="admin-table-wrap">
-                            <table class="admin-table">
-                                <colgroup>
-                                    <col class="admin-col-num">
-                                    <col class="admin-col-category">
-                                    <col>
-                                    <col class="admin-col-action">
-                                </colgroup>
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Category</th>
-                                        <th>Question</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                            </table>
-                            <div class="admin-table-scroll">
-                                <table class="admin-table">
-                                    <colgroup>
-                                        <col class="admin-col-num">
-                                        <col class="admin-col-category">
-                                        <col>
-                                        <col class="admin-col-action">
-                                    </colgroup>
-                                    <tbody id="admin-tbody"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="panel bulk-import-box" style="margin:0;">
                         <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Bulk Append </div>
                         <p class="form-help">
