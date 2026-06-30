@@ -1518,11 +1518,32 @@ async function navigate(idx) {
         syncNormalSubmitVisibility();
         return;
     }
+    const outgoingCard = document.getElementById(`q-${currentIdx}`);
+    if (outgoingCard && typeof outgoingCard.animate === "function") {
+        try {
+            await outgoingCard.animate(
+                [
+                    { opacity: 1, transform: "translateY(0)" },
+                    { opacity: 0.28, transform: "translateY(3px)" }
+                ],
+                { duration: 120, easing: "ease-out", fill: "forwards" }
+            ).finished;
+        } catch {}
+    }
     await ensureNormalExamQuestionLoaded(idx);
     currentIdx = idx;
     renderActiveNormalQuestion();
     refreshNormalOmrState();
     const activeCard = document.getElementById(`q-${currentIdx}`);
+    if (activeCard && typeof activeCard.animate === "function") {
+        activeCard.animate(
+            [
+                { opacity: 0.18, transform: "translateY(4px)" },
+                { opacity: 1, transform: "translateY(0)" }
+            ],
+            { duration: 180, easing: "ease-out" }
+        );
+    }
     const optionsGrid = activeCard?.querySelector(".options-grid");
     if (optionsGrid) optionsGrid.scrollTop = 0;
 
@@ -3007,10 +3028,7 @@ function peoInitOMRSheet() {
             bubble.className = "peo-bubble";
             bubble.textContent = letter;
             bubble.id = `peo-bubble-${index}-${letterIdx}`;
-            // A bubble only records an answer when it belongs to the // selected row. If the row is not currently open, jump there and
-            // save the clicked option in the same click.
             bubble.onclick = () => {
-                currentIdx = index;
                 peoSelectOption(index, letterIdx);
             };
             bubblesContainer.appendChild(bubble);
