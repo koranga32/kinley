@@ -8,12 +8,12 @@
     <meta name="description" content="ExamPortal is a cloud-linked practice and testing platform with exam question banks, PE practice, current-affair flashcards, timed online tests, and admin tools.">
     <meta name="robots" content="index, follow">
     <meta name="theme-color" content="#0f1b35">
-    <meta property="og:title" content="ExamPortal - Cloud-Linked Practice and Testing System">
+    <meta property="og:title" content="ExamPortal - Exam Practice and Online Tests">
     <meta property="og:description" content="Practice exam questions, PE papers, current-affair flashcards, and timed online tests in one cloud-linked portal.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://examportal-dil.pages.dev/">
     <meta name="twitter:card" content="summary">
-    <title>ExamPortal | Exam Practice, PE Papers and Online Tests</title>
+    <title>ExamPortal | Exam Practice and Online Tests</title>
     <link rel="canonical" href="https://examportal-dil.pages.dev/">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -749,7 +749,7 @@
 
         .site-copyright {
             position: fixed;
-            left: 14px;
+            left: 12px;
             bottom: 10px;
             z-index: 900;
             color: rgba(15,27,53,0.48);
@@ -798,6 +798,19 @@
         .daily-quote-track.is-dzongkha {
             font-family: "Noto Sans Tibetan", "Microsoft Himalaya", sans-serif;
             font-size: 17px;
+        }
+		@media (min-width: 561px) {
+    	   .daily-quote-strip {
+			height: 34px;
+        	}
+
+           .daily-quote-track {
+           font-size: 18px;
+           }
+
+           .daily-quote-track.is-dzongkha {
+           font-size: 20px;
+           }
         }
 
         @keyframes dailyQuoteMarquee {
@@ -4436,7 +4449,7 @@
                         <option value="Contact">Contact</option>
                         <option value="Feedback">Feedback</option>
                         <option value="Technical Issue">Technical Issue</option>
-                        <option value="Question Correction">Question Correction</option>
+                        <option value="Question Correction">Answer Correction</option>
                     </select>
                 </div>
                 <div class="contact-field contact-span-2">
@@ -4484,7 +4497,7 @@
             <span class="timer-icon">⏱</span>
             <span id="timer-display">--:--</span>
         </div>
-        <button type="button" class="btn btn-ghost" id="theme-toggle-btn">🌙 Dark</button>
+        <button type="button" class="btn btn-ghost" id="theme-toggle-btn"> Dark</button>
         <button type="button" class="btn btn-ghost" id="contact-btn">Contact Us</button>
         <button type="button" class="btn btn-ghost" id="pe-btn" style="display:none;">📚 PE</button>
         <button type="button" class="btn btn-ghost" id="admin-btn">⚙ Admin</button>
@@ -4511,7 +4524,7 @@
             <div class="setup-badge">✦ New Test</div>
             <div class="panel-header">
                 <h2>Start Your Test</h2>
-                <p>Fill in your details and choose Test category to begin.</p>
+                <p>Fill in your details to begin.</p>
             </div>
 
             <div class="form-group">
@@ -4699,7 +4712,7 @@
                                 </label>
                                 <label class="radio-pill" id="pill-pe-past">
                                     <input type="radio" name="pe-type" value="Past Paper">
-                                    Past PE Examination
+                                    Past PE Paper
                                 </label>
                                 <label class="radio-pill" id="pill-pe-di">
                                     <input type="radio" name="pe-type" value="Data Interpretation">
@@ -4836,7 +4849,7 @@
 
                 <div class="panel caf-admin-panel admin-editor-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
                     <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Current Affair Admin</div>
-                    <p class="form-help">Add sticky-note current affair flashcards. Data is saved to Supabase .</p>
+                    <p class="form-help">Add sticky-note current affair flashcards .</p>
 
                     <form id="caf-admin-form">
                         <div class="caf-admin-form-grid">
@@ -5071,7 +5084,7 @@ Answer: C" ></textarea>
                 <!-- ONLINE TEST: timed full-length simulation, 2h 30m -->
                 <div id="pe-online-panel" class="pe-section">
                     <h2>Online Test</h2>
-                    <p class="pe-section-desc"> 100 questions: 30 Mock, 30 Past Paper, 20 Current Affairs questions and, 20 Data Interpretation questions with 1min 5sec as per BCSE PE Time allocation</p>
+                    <p class="pe-section-desc"> 100 questions as per BCSE Time 1min 5sec/Question: Mock,GK & Current Affairs, Dzongkha, Eglish Grammer and Data Interpretation questions </p>
                     <div class="pe-online-card">
                         <div class="pe-online-stat">
                             <i class="bi bi-clock-history"></i>
