@@ -1,14 +1,6 @@
 // ─── CONFIG ──────────────────────────────────────────
-/*
- * SECURITY: This is a low-privilege Supabase PUBLISHABLE key, not a secret.
- * Browser clients must send it, so it is intentionally visible and protected
- * by Row Level Security and least-privilege database grants. Never place an
- * sb_secret key, service_role key, database password, or private API token in
- * this file. When the Cloudflare server proxy is added, all backend secrets
- * must be stored only as encrypted environment variables on Cloudflare.
- */
-const SUPABASE_URL = "https://nwkfuluvgbsmyzomlpvw.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_I9WL1ChnlPJp2V_MSM4R5Q_RXQ48iBR";
+// All database access is routed through same-origin Cloudflare API functions.
+// Supabase secrets and privileged credentials never belong in this file.
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
@@ -487,38 +479,6 @@ function clearDatabaseCache() {
     clearPublicApiCache();
 }
 
-function supabaseHeaders(useAdmin = false, extra = {}) {
-    return {
-        apikey: SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${useAdmin && adminAccessToken ? adminAccessToken : SUPABASE_PUBLISHABLE_KEY}`,
-        ...extra
-    };
-}
-
-async function supabaseRequest(path, { method = "GET", body, useAdmin = false, prefer = "" } = {}) {
-    const headers = supabaseHeaders(useAdmin, body ? { "Content-Type": "application/json" } : {});
-    if (prefer) headers.Prefer = prefer;
-
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-        method,
-        headers,
-        body: body ? JSON.stringify(body) : undefined
-    });
-
-    if (!response.ok) {
-        let detail = `Supabase request failed (${response.status})`;
-        try {
-            const error = await response.json();
-            detail = error.message || error.details || detail;
-        } catch (e) {}
-        throw new Error(detail);
-    }
-
-    if (response.status === 204) return null;
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
-}
-
 async function apiRequest(path, { method = "GET", body, headers = {} } = {}) {
     const normalizedMethod = String(method || "GET").toUpperCase();
     if (normalizedMethod === "GET") {
@@ -657,11 +617,8 @@ async function fetchQuestions() {
     // multi-megabyte base64 data. This keeps initial load fast; media is
     // fetched separately afterward without blocking first render.
     if (adminAccessToken) {
-        const rows = await supabaseRequest(
-            "Exam?select=id,category,question,optionA,optionB,optionC,optionD,answer&order=id.asc",
-            { useAdmin: true }
-        );
-        return mapExamRows(rows).map(row => ({ ...row, _adminMediaLoaded: false }));
+        const adminRows = await fetchAdminQuestions();
+        return adminRows.filter(row => row.sourceTable === "Exam");
     }
     const rows = await apiRequest("questions?view=pe-practice");
     return mapExamRows(rows);
@@ -2862,7 +2819,8 @@ function wirePESidebar() {
     const contentSections = document.querySelectorAll(".pe-content .pe-section");
 
     listItems.forEach((item) => {
-        item.querySelector("a").onclick = () => {
+        item.querySelector("a").onclick = (event) => {
+            event.preventDefault();
             listItems.forEach((li) => li.classList.remove("active"));
             item.classList.add("active");
 
