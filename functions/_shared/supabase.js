@@ -31,3 +31,23 @@ export async function supabaseServerRequest(env, path, { method = "GET", body, p
     return text ? JSON.parse(text) : null;
 }
 
+export async function supabaseStorageUpload(env, bucket, objectPath, bytes, contentType) {
+    requireConfig(env);
+    const encodedPath = objectPath.split("/").map(encodeURIComponent).join("/");
+    const response = await fetch(`${env.SUPABASE_URL}/storage/v1/object/${encodeURIComponent(bucket)}/${encodedPath}`, {
+        method: "POST",
+        headers: {
+            apikey: env.SUPABASE_SECRET_KEY,
+            Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`,
+            "Content-Type": contentType,
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "x-upsert": "false"
+        },
+        body: bytes
+    });
+    if (!response.ok) {
+        console.error("Supabase Storage upload failure", response.status, await response.text());
+        throw validationError("media_upload_failed", "Media upload failed. Please try again.", 502);
+    }
+    return `${env.SUPABASE_URL}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodedPath}`;
+}

@@ -254,11 +254,12 @@ function validateQuestionOptions(value, label = "Options") {
     return value.map((option, index) => cleanText(option, `${label} ${index + 1}`, { min: 1, max: 2000 }));
 }
 
-function validateMediaDataUrl(value, label) {
+function validateMediaReference(value, label, mediaType) {
     if (value === undefined || value === null || value === "") return "";
     const text = cleanText(String(value), label, { min: 5, max: 8 * 1024 * 1024 });
-    if (!/^data:(?:image|audio)\//.test(text)) {
-        throw validationError("invalid_media", `${label} must be a valid data URL.`);
+    const expectedDataPrefix = new RegExp(`^data:${mediaType}/`, "i");
+    if (!expectedDataPrefix.test(text) && !/^https:\/\/[^\s]+$/i.test(text)) {
+        throw validationError("invalid_media", `${label} must be a valid ${mediaType} upload or trusted Storage URL.`);
     }
     return text;
 }
@@ -281,8 +282,8 @@ export function validateAdminQuestionPayload(input) {
         explanation: value.explanation === undefined || value.explanation === null ? "" : cleanText(String(value.explanation), "Explanation", { min: 0, max: 12000 }),
         options: validateQuestionOptions(value.options),
         answer,
-        imageCode: validateMediaDataUrl(value.imageCode, "Image"),
-        audioCode: validateMediaDataUrl(value.audioCode, "Audio")
+        imageCode: validateMediaReference(value.imageCode, "Image", "image"),
+        audioCode: validateMediaReference(value.audioCode, "Audio", "audio")
     };
 }
 
