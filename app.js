@@ -48,6 +48,7 @@ let cafStateLoaded = false;
 let cafStatePromise = null;
 let adminAccessToken = "";
 let adminOtpState = null;
+let adminAuthenticationPending = false;
 let editingCafCardId = "";
 let editingQuoteId = "";
 let editingQuestionIndex = null;
@@ -2055,6 +2056,7 @@ function handleAdminOtpDigitInput(event, index) {
     if (input.value && index < 5) focusAdminOtpDigit(index + 1);
     if (document.getElementById("admin-mfa-input")?.value.length === 6) {
         focusAdminOtpDigit(5);
+        authenticateAdmin();
     }
 }
 
@@ -2109,6 +2111,7 @@ async function verifyAdminEmailOtp(code) {
 }
 
 async function authenticateAdmin() {
+    if (adminAuthenticationPending) return;
     const passwordInput  = document.getElementById("admin-pw-input");
     const otpInput = document.getElementById("admin-mfa-input");
     const otpDigitInputs = getAdminOtpDigitInputs();
@@ -2127,6 +2130,7 @@ async function authenticateAdmin() {
         activeInput.focus();
         return;
     }
+    adminAuthenticationPending = true;
     errMsg.classList.remove("visible");
     passwordInput.disabled = true;
     otpInput.disabled = true;
@@ -2160,6 +2164,7 @@ async function authenticateAdmin() {
             }
             showAdminAuthError(message);
         } finally {
+            adminAuthenticationPending = false;
             showLoading(false);
             passwordInput.disabled = false;
             otpInput.disabled = false;
@@ -2196,6 +2201,7 @@ async function authenticateAdmin() {
             : "⚠ Admin password is incorrect. Please try again.";
         showAdminAuthError(message);
     } finally {
+        adminAuthenticationPending = false;
         showLoading(false);
         passwordInput.disabled = false;
         otpInput.disabled = false;
@@ -3675,11 +3681,40 @@ function escapePEHtml(text) {
     return escapeHTML(text);
 }
 
+const ADMIN_MEDIA_MAX_BYTES = 6 * 1024 * 1024;
+const ADMIN_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ADMIN_AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp4", "audio/wav"]);
+
+function validateAdminMediaFile(file, mediaType) {
+    const allowedTypes = mediaType === "image" ? ADMIN_IMAGE_TYPES : ADMIN_AUDIO_TYPES;
+    if (!allowedTypes.has(String(file?.type || "").toLowerCase())) {
+        showToast(
+            mediaType === "image"
+                ? "Please use a JPG, PNG, or WebP image."
+                : "Please use an MP3, M4A/MP4, or WAV audio file.",
+            "error"
+        );
+        return false;
+    }
+    if (!Number.isFinite(file.size) || file.size <= 0 || file.size > ADMIN_MEDIA_MAX_BYTES) {
+        showToast("Media files must be no larger than 6 MB.", "error");
+        return false;
+    }
+    return true;
+}
+
 function handleImageUpload(input) {
     const file = input.files[0];
     const preview = document.getElementById("adm-img-preview");
     const b64     = document.getElementById("adm-img-b64");
     if (!file) { b64.value = ""; preview.style.display = "none"; return; }
+    if (!validateAdminMediaFile(file, "image")) {
+        input.value = "";
+        b64.value = "";
+        preview.removeAttribute("src");
+        preview.style.display = "none";
+        return;
+    }
     const reader = new FileReader();
     reader.onload = e => {
         b64.value = e.target.result;
@@ -3694,6 +3729,13 @@ function handleAudioUpload(input) {
     const preview = document.getElementById("adm-audio-preview");
     const b64 = document.getElementById("adm-audio-b64");
     if (!file) { b64.value = ""; preview.style.display = "none"; return; }
+    if (!validateAdminMediaFile(file, "audio")) {
+        input.value = "";
+        b64.value = "";
+        preview.removeAttribute("src");
+        preview.style.display = "none";
+        return;
+    }
     const reader = new FileReader();
     reader.onload = e => {
         b64.value = e.target.result;
