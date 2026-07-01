@@ -256,7 +256,10 @@ function validateQuestionOptions(value, label = "Options") {
 
 function validateMediaReference(value, label, mediaType) {
     if (value === undefined || value === null || value === "") return "";
-    const text = cleanText(String(value), label, { min: 5, max: 8 * 1024 * 1024 });
+    // Base64 adds roughly one third to the original file size. Allow enough
+    // transport space for a real 6 MB file; decoded bytes are checked again
+    // by the Storage upload handler before anything is stored.
+    const text = cleanText(String(value), label, { min: 5, max: 9 * 1024 * 1024 });
     const expectedDataPrefix = new RegExp(`^data:${mediaType}/`, "i");
     if (!expectedDataPrefix.test(text) && !/^https:\/\/[^\s]+$/i.test(text)) {
         throw validationError("invalid_media", `${label} must be a valid ${mediaType} upload or trusted Storage URL.`);
