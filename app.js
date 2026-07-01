@@ -148,10 +148,24 @@ function bindStaticUiEvents() {
 }
 
 	// ─── INIT ────────────────────────────────────────────
-	window.onload = initializeApp;
+	if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initializeApp, { once: true });
+    } else {
+        initializeApp();
+    }
+
+    function loadDeferredVisualStyles() {
+        requestAnimationFrame(() => {
+            ["google-fonts-stylesheet", "bootstrap-icons-stylesheet"].forEach(id => {
+                const stylesheet = document.getElementById(id);
+                if (stylesheet) stylesheet.media = "all";
+            });
+        });
+    }
 
 	async function initializeApp() {
 	    showLoading(false);
+        loadDeferredVisualStyles();
         localStorage.removeItem("exam_theme_mode");
         applyThemeMode("light");
         bindStaticUiEvents();
@@ -3612,7 +3626,11 @@ async function answerPEQuestion(qId, chosenIndex) {
     }
 
     const showBtn = document.getElementById(`${qId}-show-btn`);
-    if (showBtn) showBtn.style.display = "none";
+    if (showBtn) {
+        showBtn.disabled = false;
+        showBtn.style.display = "";
+        showBtn.textContent = "Hide Answer";
+    }
     const solutionBox = document.getElementById(`${qId}-solution`);
     if (solutionBox) solutionBox.classList.add("open");
 }
