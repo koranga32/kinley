@@ -1,6 +1,6 @@
-import { apiError, handleError, json, methodNotAllowed, readJson, withSessionCookie } from "../_shared/http.js";
+import { apiError, handleError, json, methodNotAllowed, readJson, validationError, withSessionCookie } from "../_shared/http.js";
 import { enforceRateLimits, getSession, rejectCrossSiteRequest } from "../_shared/security.js";
-import { supabaseServerRequest } from "../_shared/supabase.js";
+import { supabaseServerRequest, supabaseStorageUpload } from "../_shared/supabase.js";
 import {
     validateAdminBulkQuestionsPayload,
     validateAdminFlashcardPayload,
@@ -23,6 +23,11 @@ const PUBLIC_CACHE_SHORT = {
 const PUBLIC_CACHE_MEDIA = {
     "Cache-Control": "public, max-age=300, s-maxage=1800, stale-while-revalidate=600"
 };
+const MEDIA_BUCKET = "exam-media";
+const MEDIA_MIME_TYPES = new Set([
+    "image/jpeg", "image/png", "image/webp",
+    "audio/mpeg", "audio/mp4", "audio/wav"
+]);
 
 const POLICIES = {
     health: { windowMs: MINUTE, ipLimit: 30, sessionLimit: 30 },
@@ -396,6 +401,65 @@ function toSupabaseQuestionPayload(question) {
         image: question.imageCode || "",
         audio: question.audioCode || ""
     };
+}
+
+function trustedStoragePrefix(env) {
+    return `${String(env.SUPABASE_URL || "").replace(/\/$/, "")}/storage/v1/object/public/${MEDIA_BUCKET}/`;
+}
+
+function decodeMediaDataUrl(dataUrl, expectedType) {
+    const match = /^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl);
+    if (!match || !match[1].toLowerCase().startsWith(`${expectedType}/`)) {
+        throw validationError("invalid_media", `A valid base64 ${expectedType} file is required.`);
+    }
+    const contentType = match[1].toLowerCase();
+    if (!MEDIA_MIME_TYPES.has(contentType)) {
+        throw validationError("unsupported_media_type", `The ${expectedType} file type is not supported.`);
+    }
+    let binary;
+    try {
+        binary = atob(match[2]);
+    } catch {
+        throw validationError("invalid_media", `The ${expectedType} file is invalid.`);
+    }
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+    if (!bytes.length || bytes.length > 6 * 1024 * 1024) {
+        throw validationError("invalid_media_size", `The ${expectedType} file must be no larger than 6 MB.`);
+    }
+    return { bytes, contentType };
+}
+
+function mediaExtension(contentType) {
+    return ({
+        "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+        "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/wav": "wav"
+    })[contentType];
+}
+
+async function storeQuestionMedia(env, value, expectedType, table, category) {
+    if (!value) return "";
+    if (/^https:\/\//i.test(value)) {
+        if (!value.startsWith(trustedStoragePrefix(env))) {
+            throw validationError("untrusted_media_url", "Only media from this project's exam-media bucket is allowed.");
+        }
+        return value;
+    }
+    const { bytes, contentType } = decodeMediaDataUrl(value, expectedType);
+    const section = table === "PEOnlineExam"
+        ? "pe-online"
+        : String(category || "").startsWith("__PE__::")
+            ? "pe-practice"
+            : "normal-exam";
+    const objectPath = `${section}/${expectedType}/${crypto.randomUUID()}.${mediaExtension(contentType)}`;
+    return supabaseStorageUpload(env, MEDIA_BUCKET, objectPath, bytes, contentType);
+}
+
+async function prepareQuestionMedia(env, question) {
+    const [imageCode, audioCode] = await Promise.all([
+        storeQuestionMedia(env, question.imageCode, "image", question.table, question.category),
+        storeQuestionMedia(env, question.audioCode, "audio", question.table, question.category)
+    ]);
+    return { ...question, imageCode, audioCode };
 }
 
 function buildSecureQuestions(rows, idPrefix = "") {
@@ -832,7 +896,8 @@ async function handleAdminQuestion(context) {
     if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
     const authFailure = await requireAdminAccess(context);
     if (authFailure) return authFailure;
-    const payload = validateAdminQuestionPayload(await readJson(context.request, 10 * 1024 * 1024));
+    const validatedPayload = validateAdminQuestionPayload(await readJson(context.request, 10 * 1024 * 1024));
+    const payload = await prepareQuestionMedia(context.env, validatedPayload);
     const path = payload.id
         ? `${payload.table}?id=eq.${encodeURIComponent(payload.id)}`
         : payload.table;
@@ -849,9 +914,13 @@ async function handleAdminBulkQuestions(context) {
     const authFailure = await requireAdminAccess(context);
     if (authFailure) return authFailure;
     const payload = validateAdminBulkQuestionsPayload(await readJson(context.request, 10 * 1024 * 1024));
+    const preparedQuestions = [];
+    for (const question of payload.questions) {
+        preparedQuestions.push(await prepareQuestionMedia(context.env, question));
+    }
     await supabaseServerRequest(context.env, payload.table, {
         method: "POST",
-        body: payload.questions.map(toSupabaseQuestionPayload),
+        body: preparedQuestions.map(toSupabaseQuestionPayload),
         prefer: "return=minimal"
     });
     return json({ ok: true, count: payload.questions.length }, 201);
