@@ -1982,6 +1982,11 @@ async function loadDailyQuotes({ fresh = false } = {}) {
     }
 }
 
+// PE practice navigation state. These declarations are public-page logic
+// and must remain independent from the separate admin application.
+let peActiveTopic = null;
+let peSidebarWired = false;
+const pePracticeQuestionsByDomId = new Map();
 
 function renderPEPanel(panelId) {
     if (panelId === "pe-home-panel") renderPEHomeGrid();
