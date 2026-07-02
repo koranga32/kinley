@@ -8,17 +8,17 @@
     <meta name="description" content="ExamPortal is a cloud-linked practice and testing platform with exam question banks, PE practice, current-affair flashcards, timed online tests, and admin tools.">
     <meta name="robots" content="index, follow">
     <meta name="theme-color" content="#0f1b35">
-    <meta property="og:title" content="ExamPortal - Exam Practice and Online Tests">
+    <meta property="og:title" content="ExamPortal - Cloud-Linked Practice and Testing System">
     <meta property="og:description" content="Practice exam questions, PE papers, current-affair flashcards, and timed online tests in one cloud-linked portal.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://examportal-dil.pages.dev/">
     <meta name="twitter:card" content="summary">
-    <title>ExamPortal | Exam Practice and Online Tests</title>
+    <title>ExamPortal | Exam Practice, PE Papers and Online Tests</title>
     <link rel="canonical" href="https://examportal-dil.pages.dev/">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link id="google-fonts-stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&amp;display=swap" rel="stylesheet" media="print">
+    <link id="bootstrap-icons-stylesheet" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" media="print">
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -749,7 +749,7 @@
 
         .site-copyright {
             position: fixed;
-            left: 12px;
+            left: 14px;
             bottom: 10px;
             z-index: 900;
             color: rgba(15,27,53,0.48);
@@ -799,18 +799,20 @@
             font-family: "Noto Sans Tibetan", "Microsoft Himalaya", sans-serif;
             font-size: 17px;
         }
-		@media (min-width: 561px) {
-    	   .daily-quote-strip {
-			height: 34px;
-        	}
 
-           .daily-quote-track {
-           font-size: 18px;
-           }
+        /* Larger quote text on desktop only. */
+        @media (min-width: 561px) {
+            .daily-quote-strip {
+                height: 34px;
+            }
 
-           .daily-quote-track.is-dzongkha {
-           font-size: 20px;
-           }
+            .daily-quote-track {
+                font-size: 18px;
+            }
+
+            .daily-quote-track.is-dzongkha {
+                font-size: 20px;
+            }
         }
 
         @keyframes dailyQuoteMarquee {
@@ -4449,7 +4451,7 @@
                         <option value="Contact">Contact</option>
                         <option value="Feedback">Feedback</option>
                         <option value="Technical Issue">Technical Issue</option>
-                        <option value="Question Correction">Answer Correction</option>
+                        <option value="Question Correction">Question Correction</option>
                     </select>
                 </div>
                 <div class="contact-field contact-span-2">
@@ -4497,11 +4499,9 @@
             <span class="timer-icon">⏱</span>
             <span id="timer-display">--:--</span>
         </div>
-        <button type="button" class="btn btn-ghost" id="theme-toggle-btn"> Dark</button>
+        <button type="button" class="btn btn-ghost" id="theme-toggle-btn">🌙 Dark</button>
         <button type="button" class="btn btn-ghost" id="contact-btn">Contact Us</button>
         <button type="button" class="btn btn-ghost" id="pe-btn" style="display:none;">📚 PE</button>
-        <button type="button" class="btn btn-ghost" id="admin-btn">⚙ Admin</button>
-        <button type="button" class="btn btn-ghost" id="admin-back-btn" style="display:none;"> Logout</button>
         <button type="button" class="btn btn-ghost" id="pe-back-btn" style="display:none;"> Back</button>
     </div>
 </header>
@@ -4524,7 +4524,7 @@
             <div class="setup-badge">✦ New Test</div>
             <div class="panel-header">
                 <h2>Start Your Test</h2>
-                <p>Fill in your details to begin.</p>
+                <p>Fill in your details and choose Test category to begin.</p>
             </div>
 
             <div class="form-group">
@@ -4712,7 +4712,7 @@
                                 </label>
                                 <label class="radio-pill" id="pill-pe-past">
                                     <input type="radio" name="pe-type" value="Past Paper">
-                                    Past PE Paper
+                                    Past PE Examination
                                 </label>
                                 <label class="radio-pill" id="pill-pe-di">
                                     <input type="radio" name="pe-type" value="Data Interpretation">
@@ -4849,7 +4849,7 @@
 
                 <div class="panel caf-admin-panel admin-editor-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
                     <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Current Affair Admin</div>
-                    <p class="form-help">Add sticky-note current affair flashcards .</p>
+                    <p class="form-help">Add sticky-note current affair flashcards. Data is saved to Supabase .</p>
 
                     <form id="caf-admin-form">
                         <div class="caf-admin-form-grid">
@@ -5084,7 +5084,7 @@ Answer: C" ></textarea>
                 <!-- ONLINE TEST: timed full-length simulation, 2h 30m -->
                 <div id="pe-online-panel" class="pe-section">
                     <h2>Online Test</h2>
-                    <p class="pe-section-desc"> 100 questions as per BCSE Time 1min 5sec/Question: Mock,GK & Current Affairs, Dzongkha, Eglish Grammer and Data Interpretation questions </p>
+                    <p class="pe-section-desc"> 100 questions: 30 Mock, 30 Past Paper, 20 Current Affairs questions and, 20 Data Interpretation questions with 1min 5sec as per BCSE PE Time allocation</p>
                     <div class="pe-online-card">
                         <div class="pe-online-stat">
                             <i class="bi bi-clock-history"></i>

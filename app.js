@@ -54,18 +54,6 @@ let editingQuoteId = "";
 let editingQuestionIndex = null;
 
 function bindStaticUiEvents() {
-    document.getElementById("admin-modal")?.addEventListener("click", handleModalBackdropClick);
-    document.getElementById("admin-pw-input")?.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") authenticateAdmin();
-    });
-    document.getElementById("pw-eye")?.addEventListener("click", togglePwVisibility);
-    getAdminOtpDigitInputs().forEach((input, index) => {
-        input.addEventListener("input", (event) => handleAdminOtpDigitInput(event, index));
-        input.addEventListener("keydown", (event) => handleAdminOtpDigitKeydown(event, index));
-    });
-    document.getElementById("admin-modal-cancel-btn")?.addEventListener("click", closeAdminModal);
-    document.getElementById("admin-modal-auth-btn")?.addEventListener("click", authenticateAdmin);
-
     document.getElementById("question-view-modal")?.addEventListener("click", handleQuestionViewBackdropClick);
     document.getElementById("question-view-close-btn")?.addEventListener("click", closeQuestionView);
 
@@ -79,8 +67,6 @@ function bindStaticUiEvents() {
     document.getElementById("theme-toggle-btn")?.addEventListener("click", toggleThemeMode);
     document.getElementById("contact-btn")?.addEventListener("click", openContactModal);
     document.getElementById("pe-btn")?.addEventListener("click", openPEPortal);
-    document.getElementById("admin-btn")?.addEventListener("click", openAdminPortal);
-    document.getElementById("admin-back-btn")?.addEventListener("click", closeAdminPortal);
     document.getElementById("pe-back-btn")?.addEventListener("click", closePEPortal);
 
     document.getElementById("student-name")?.addEventListener("keydown", (event) => {
@@ -173,40 +159,16 @@ function bindStaticUiEvents() {
         const copyrightEl = document.getElementById("site-copyright");
         if (copyrightEl) copyrightEl.textContent = `© ${new Date().getFullYear()}`;
         renderDailyQuoteTicker();
-        caHydrateAdminControls();
         warmPublicStartupData();
         setEntryActionButtons();
-        if (restoreAdminSession()) {
-            showLoading(true, "Connecting...");
-            try {
-                await restoreAdminPortal();
-                showLoading(false);
-                return;
-            } catch (error) {
-                clearAdminSession();
-                adminAccessToken = "";
-                document.body.classList.remove("admin-mode");
-                showLoading(false);
-                showToast("Admin session expired. Please sign in again.", "info");
-            }
-        }
 	    document.getElementById("student-name").focus();
 	}
-
-    document.addEventListener("pointerdown", () => {
-        touchAdminSession();
-    });
-
-    document.addEventListener("keydown", () => {
-        touchAdminSession();
-    });
 
     function warmPublicStartupData() {
         const kickOff = () => {
             loadDailyQuotes({ fresh: true })
                 .then(() => {
                     renderDailyQuoteTicker();
-                    renderDailyQuoteAdminRegistry();
                 })
                 .catch(() => {});
             caLoadState({ render: false }).catch(() => {});
@@ -447,33 +409,27 @@ function showToast(msg, type = "info") {
 function setEntryActionButtons() {
     const contactBtn = document.getElementById("contact-btn");
     const peBtn = document.getElementById("pe-btn");
-    const adminBtn = document.getElementById("admin-btn");
     const themeBtn = document.getElementById("theme-toggle-btn");
     if (themeBtn) themeBtn.style.display = "inline-flex";
     if (contactBtn) contactBtn.style.display = "block";
-    if (adminBtn) adminBtn.style.display = "block";
     if (peBtn) peBtn.style.display = "none";
 }
 
 function setPostContinueActionButtons() {
     const contactBtn = document.getElementById("contact-btn");
     const peBtn = document.getElementById("pe-btn");
-    const adminBtn = document.getElementById("admin-btn");
     const themeBtn = document.getElementById("theme-toggle-btn");
     if (themeBtn) themeBtn.style.display = "inline-flex";
     if (contactBtn) contactBtn.style.display = "none";
-    if (adminBtn) adminBtn.style.display = "none";
     if (peBtn) peBtn.style.display = "block";
 }
 
 function hideTopActionButtons() {
     const contactBtn = document.getElementById("contact-btn");
     const peBtn = document.getElementById("pe-btn");
-    const adminBtn = document.getElementById("admin-btn");
     const themeBtn = document.getElementById("theme-toggle-btn");
     if (themeBtn) themeBtn.style.display = "none";
     if (contactBtn) contactBtn.style.display = "none";
-    if (adminBtn) adminBtn.style.display = "none";
     if (peBtn) peBtn.style.display = "none";
 }
 
