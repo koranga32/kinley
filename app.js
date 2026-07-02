@@ -4,8 +4,6 @@
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
-const ADMIN_SESSION_KEY = "examportal_admin_session_v1";
-const ADMIN_SESSION_IDLE_MS = 20 * 60 * 1000;
 const SECONDS_PER_QUESTION = 30;
 const CA_SUPABASE_TABLE = "CurrentAffairFlashcards";
 const DAILY_QUOTES_TABLE = "daily_quotes";
@@ -46,17 +44,8 @@ let peQuestionsCache = [];
 let peTopicBuckets = new Map();
 let cafStateLoaded = false;
 let cafStatePromise = null;
-let adminAccessToken = "";
-let adminOtpState = null;
-let adminAuthenticationPending = false;
-let editingCafCardId = "";
-let editingQuoteId = "";
-let editingQuestionIndex = null;
 
 function bindStaticUiEvents() {
-    document.getElementById("question-view-modal")?.addEventListener("click", handleQuestionViewBackdropClick);
-    document.getElementById("question-view-close-btn")?.addEventListener("click", closeQuestionView);
-
     document.getElementById("contact-modal")?.addEventListener("click", handleContactBackdropClick);
     document.getElementById("contact-form")?.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -80,45 +69,6 @@ function bindStaticUiEvents() {
     document.getElementById("peo-submit-btn")?.addEventListener("click", peoSubmitOnlineTest);
     document.getElementById("pe-return-online-btn")?.addEventListener("click", returnToPEOnlineTestPage);
     document.getElementById("results-return-home-btn")?.addEventListener("click", retakeExam);
-
-    document.getElementById("admin-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        saveQuestion();
-    });
-    document.querySelectorAll('input[name="dest-mode"]').forEach((input) => {
-        input.addEventListener("change", onDestModeChange);
-    });
-    document.querySelectorAll('input[name="pe-type"]').forEach((input) => {
-        input.addEventListener("change", onPeTypeChange);
-    });
-    document.querySelectorAll('input[name="cat-mode"]').forEach((input) => {
-        input.addEventListener("change", onCatModeChange);
-    });
-    document.getElementById("adm-img-file")?.addEventListener("change", (event) => handleImageUpload(event.target));
-    document.getElementById("adm-audio-file")?.addEventListener("change", (event) => handleAudioUpload(event.target));
-    document.getElementById("cancel-edit-btn")?.addEventListener("click", cancelQuestionEdit);
-
-    document.getElementById("caf-admin-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        cafSaveAdminCard();
-    });
-    document.getElementById("caf-admin-scope")?.addEventListener("change", cafPopulateAdminCategories);
-    document.querySelectorAll('input[name="caf-cat-mode"]').forEach((input) => {
-        input.addEventListener("change", cafApplyAdminCategoryMode);
-    });
-    document.getElementById("caf-admin-clear-btn")?.addEventListener("click", cafResetAdminForm);
-    document.getElementById("caf-admin-cancel-btn")?.addEventListener("click", cafCancelEdit);
-
-    document.getElementById("quote-admin-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        saveDailyQuote();
-    });
-    document.getElementById("quote-admin-cancel-btn")?.addEventListener("click", cancelDailyQuoteEdit);
-
-    document.getElementById("bulk-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        saveBulkQuestions();
-    });
 
     document.getElementById("pe-home-search")?.addEventListener("input", renderPEHomeGrid);
     document.getElementById("caf-bhutan-box")?.addEventListener("click", () => cafSelectRegion("Bhutan"));
@@ -194,42 +144,6 @@ function bindStaticUiEvents() {
         applyThemeMode(nextMode);
     }
 
-    function persistAdminSession() {
-        if (!adminAccessToken) return;
-        try {
-            sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({
-                accessToken: adminAccessToken,
-                lastActivityAt: Date.now()
-            }));
-        } catch (e) {}
-    }
-
-    function restoreAdminSession() {
-        try {
-            const raw = sessionStorage.getItem(ADMIN_SESSION_KEY);
-            if (!raw) return false;
-            const parsed = JSON.parse(raw);
-            const token = String(parsed?.accessToken || "");
-            const lastActivityAt = Number(parsed?.lastActivityAt || 0);
-            if (!token || !Number.isFinite(lastActivityAt) || Date.now() - lastActivityAt > ADMIN_SESSION_IDLE_MS) {
-                clearAdminSession();
-                return false;
-            }
-            adminAccessToken = token;
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    function clearAdminSession() {
-        try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
-    }
-
-    function touchAdminSession() {
-        if (!adminAccessToken || !document.body.classList.contains("admin-mode")) return;
-        persistAdminSession();
-    }
 
 	function shuffleArray(items) {
 	    const copy = [...items];
@@ -271,17 +185,6 @@ function bindStaticUiEvents() {
             '"': "&quot;",
             "'": "&#39;"
         })[char]);
-    }
-
-    function escapeInlineJsString(value) {
-        return String(value ?? "")
-            .replace(/\\/g, "\\\\")
-            .replace(/'/g, "\\'")
-            .replace(/\r/g, "\\r")
-            .replace(/\n/g, "\\n")
-            .replace(/</g, "\\x3C")
-            .replace(/>/g, "\\x3E")
-            .replace(/&/g, "\\x26");
     }
 
     function safeMediaURL(value, mediaType) {
@@ -334,24 +237,7 @@ function bindStaticUiEvents() {
 	    };
 	}
 
-function getAdminCategory() {
-	    const destMode = document.querySelector("[name='dest-mode']:checked")?.value || "exam";
-	    if (destMode === "pe" || destMode === "pe-online") {
-	        const peType = document.querySelector("[name='pe-type']:checked")?.value || "Mock";
-	        const topic = document.getElementById("adm-pe-topic").value.trim() || "General";
-	        return `__PE__::${peType}::${topic}`;
-	    }
-	    const mode = document.querySelector("[name='cat-mode']:checked").value;
-	    return mode === "exist"
-	        ? document.getElementById("adm-cat-select").value
-	        : document.getElementById("adm-cat-input").value.trim();
-	}
 
-    function getAdminTargetTable(question = null) {
-        if (question?.sourceTable === "PEOnlineExam") return "PEOnlineExam";
-        const destMode = document.querySelector("[name='dest-mode']:checked")?.value || "exam";
-        return destMode === "pe-online" ? "PEOnlineExam" : "Exam";
-    }
 
 	// ─── PE CATEGORY ENCODING HELPERS ──────────────────
 	// PE questions are stored using the existing `category` column with a
@@ -504,18 +390,6 @@ async function fetchApiJson(path, { method = "GET", body, headers = {} } = {}) {
     return data;
 }
 
-async function adminApiRequest(path, { method = "POST", body } = {}) {
-    if (!adminAccessToken) {
-        throw new Error("Admin session is missing. Please sign in again.");
-    }
-    return apiRequest(path, {
-        method,
-        body,
-        headers: {
-            Authorization: `Bearer ${adminAccessToken}`
-        }
-    });
-}
 
 function getPublicApiCacheTTL(path) {
     if (path === "questions?view=catalog") return 5 * 60 * 1000;
@@ -540,12 +414,6 @@ function clearPublicApiCache() {
 // This guarantees question saving keeps working even if the database
 // schema was never updated with an `explanation` field.
 const EXPLANATION_DELIM = "\n§§EXPLAIN§§\n";
-
-function encodeQuestionWithExplanation(questionText, explanation) {
-    const cleanExplanation = (explanation || "").trim();
-    if (!cleanExplanation) return questionText;
-    return `${questionText}${EXPLANATION_DELIM}${cleanExplanation}`;
-}
 
 function decodeQuestionWithExplanation(rawQuestion) {
     const text = rawQuestion || "";
@@ -591,23 +459,10 @@ async function fetchQuestions() {
     // Lightweight fetch — excludes image/audio columns, which can each hold
     // multi-megabyte base64 data. This keeps initial load fast; media is
     // fetched separately afterward without blocking first render.
-    if (adminAccessToken) {
-        const adminRows = await fetchAdminQuestions();
-        return adminRows.filter(row => row.sourceTable === "Exam");
-    }
     const rows = await apiRequest("questions?view=pe-practice");
     return mapExamRows(rows);
 }
 
-async function fetchAdminQuestions() {
-    const result = await adminApiRequest("admin-questions", { method: "GET" });
-    const examRows = result?.exam || [];
-    const peOnlineRows = result?.peOnline || [];
-    return [
-        ...mapExamRows(examRows, "Exam"),
-        ...mapExamRows(peOnlineRows, "PEOnlineExam")
-    ].map(row => ({ ...row, _adminMediaLoaded: false }));
-}
 
 async function loadExamCatalog() {
     const rows = await apiRequest("questions?view=catalog");
@@ -616,7 +471,6 @@ async function loadExamCatalog() {
     examCatalogReady = categories.length > 0;
     updateCategorySelects();
     const total = [...examCategoryCounts.values()].reduce((sum, count) => sum + count, 0);
-    document.getElementById("q-count").textContent = total;
     const btn = document.getElementById("start-btn");
     btn.disabled = !examCatalogReady;
     btn.innerHTML = examCatalogReady
@@ -973,20 +827,6 @@ async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam m
     }
 }
 
-function toSupabaseQuestion(question) {
-    return {
-        category: question.category,
-        question: encodeQuestionWithExplanation(question.question, question.explanation),
-        optionA: question.options[0],
-        optionB: question.options[1],
-        optionC: question.options[2],
-        optionD: question.options[3],
-        answer: ALPHA[question.answer] || "A",
-        image: question.imageCode || "",
-        audio: question.audioCode || ""
-    };
-}
-
 async function loadDatabase() {
     if (databaseReady) return true;
     if (databaseLoading) return false;
@@ -1103,7 +943,6 @@ function processData(data) {
         examCatalogReady = categories.length > 0;
     }
     updateCategorySelects();
-    renderAdminTable();
     const noData = categories.length === 0;
     const btn = document.getElementById("start-btn");
     btn.disabled = noData;
@@ -1115,7 +954,6 @@ function processData(data) {
         btn.innerHTML = "<span>Continue</span> →";
     }
     const catalogTotal = [...examCategoryCounts.values()].reduce((sum, count) => sum + count, 0);
-    document.getElementById("q-count").textContent = examQuestions.length || catalogTotal;
     if (document.getElementById("pe-view") && document.getElementById("pe-view").style.display !== "none") {
         renderPEHomeGrid();
         renderPEMockGrid();
@@ -1128,8 +966,9 @@ function processData(data) {
 }
 
 function updateCategorySelects() {
-    ["category-select", "adm-cat-select"].forEach(id => {
+    ["category-select"].forEach(id => {
         const sel = document.getElementById(id);
+        if (!sel) return;
         sel.innerHTML = categories.length === 0
             ? `<option>No categories available</option>`
             : categories.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join("");
@@ -1766,113 +1605,6 @@ async function submitExam() {
     setTimeout(() => { ring.style.strokeDashoffset = offset; }, 300);
 }
 
-// ─── ADMIN ────────────────────────────────────────────
-function openAdminPortal() {
-    if (adminAccessToken) {
-        restoreAdminPortal();
-        return;
-    }
-    resetAdminGateway();
-    setAdminAuthMode("password");
-    // Show the styled modal instead of browser prompt
-    const modal = document.getElementById("admin-modal");
-    const input = document.getElementById("admin-pw-input");
-    const errMsg = document.getElementById("pw-error");
-    modal.classList.add("open");
-    input.type = "password";
-    document.getElementById("pw-eye").textContent = "👁";
-    errMsg.classList.remove("visible");
-    input.classList.remove("error-shake");
-    setTimeout(() => input.focus(), 280);
-}
-
-function closeAdminModal() {
-    document.getElementById("admin-modal").classList.remove("open");
-}
-
-function resetAdminGateway() {
-    adminOtpState = null;
-    const passwordInput = document.getElementById("admin-pw-input");
-    const otpInput = document.getElementById("admin-mfa-input");
-    const errMsg = document.getElementById("pw-error");
-    const authBtn = document.querySelector(".btn-modal-auth");
-    if (passwordInput) {
-        passwordInput.value = "";
-        passwordInput.disabled = false;
-        passwordInput.classList.remove("error-shake");
-    }
-    if (otpInput) {
-        otpInput.value = "";
-        otpInput.disabled = false;
-        otpInput.classList.remove("error-shake");
-    }
-    clearAdminOtpDigits();
-    if (authBtn) authBtn.disabled = false;
-    if (errMsg) {
-        errMsg.textContent = "⚠ Incorrect password. Please try again.";
-        errMsg.classList.remove("visible");
-    }
-}
-
-function setAdminAuthMode(mode) {
-    const subtitle = document.getElementById("admin-modal-subtitle");
-    const passwordWrap = document.getElementById("admin-pw-wrap");
-    const passwordInput = document.getElementById("admin-pw-input");
-    const passwordEye = document.getElementById("pw-eye");
-    const otpWrap = document.getElementById("admin-mfa-wrap");
-    const otpInput = document.getElementById("admin-mfa-input");
-    const isOtp = mode === "otp";
-    if (subtitle) {
-        subtitle.textContent = isOtp
-            ? `Enter the 6-digit code${adminOtpState?.destination ? ` sent to ${adminOtpState.destination}` : ""}`
-            : "Enter password";
-    }
-    if (passwordWrap) passwordWrap.style.display = isOtp ? "none" : "";
-    if (passwordInput) passwordInput.disabled = isOtp;
-    if (passwordEye) passwordEye.style.display = isOtp ? "none" : "";
-    if (otpWrap) otpWrap.style.display = isOtp ? "" : "none";
-    if (otpInput) otpInput.disabled = !isOtp;
-    getAdminOtpDigitInputs().forEach(input => {
-        input.disabled = !isOtp;
-    });
-}
-
-function showAdminAuthError(message) {
-    const modal = document.getElementById("admin-modal");
-    const input = adminOtpState
-        ? document.querySelector('.otp-digit-input')
-        : document.getElementById("admin-pw-input");
-    const errMsg = document.getElementById("pw-error");
-    const authBtn = document.querySelector(".btn-modal-auth");
-    if (input) {
-        input.disabled = false;
-        if (adminOtpState) {
-            clearAdminOtpDigits();
-            getAdminOtpDigitInputs().forEach(digitInput => {
-                digitInput.classList.remove("error-shake");
-                void digitInput.offsetWidth;
-                digitInput.classList.add("error-shake");
-                digitInput.disabled = false;
-            });
-        } else {
-            input.value = "";
-            input.classList.remove("error-shake");
-            void input.offsetWidth;
-            input.classList.add("error-shake");
-        }
-    }
-    if (authBtn) authBtn.disabled = false;
-    if (errMsg) {
-        errMsg.textContent = message;
-        errMsg.classList.add("visible");
-    }
-    modal.classList.add("open");
-    setTimeout(() => input?.focus(), 120);
-}
-
-function handleModalBackdropClick(e) {
-    if (e.target === document.getElementById("admin-modal")) closeAdminModal();
-}
 
 let contactCaptchaAnswer = 0;
 
@@ -1959,343 +1691,8 @@ async function submitContactForm() {
     }
 }
 
-function togglePwVisibility() {
-    const input = document.getElementById("admin-pw-input");
-    const eye   = document.getElementById("pw-eye");
-    if (input.type === "password") {
-        input.type = "text";
-        eye.textContent = "🙈";
-    } else {
-        input.type = "password";
-        eye.textContent = "👁";
-    }
-    input.focus();
-}
-
-function getAdminOtpDigitInputs() {
-    return Array.from(document.querySelectorAll(".otp-digit-input"));
-}
-
-function syncAdminOtpHiddenValue() {
-    const hiddenInput = document.getElementById("admin-mfa-input");
-    if (!hiddenInput) return;
-    hiddenInput.value = getAdminOtpDigitInputs().map(input => String(input.value || "").replace(/\D/g, "").slice(0, 1)).join("");
-}
-
-function focusAdminOtpDigit(index) {
-    const inputs = getAdminOtpDigitInputs();
-    const target = inputs[index];
-    if (target) target.focus();
-}
-
-function clearAdminOtpDigits() {
-    getAdminOtpDigitInputs().forEach(input => {
-        input.value = "";
-        input.classList.remove("error-shake");
-    });
-    syncAdminOtpHiddenValue();
-}
-
-function handleAdminOtpDigitInput(event, index) {
-    const input = event.target;
-    let value = String(input.value || "").replace(/\D/g, "");
-    if (value.length > 1) {
-        const digits = value.slice(0, 6).split("");
-        const inputs = getAdminOtpDigitInputs();
-        digits.forEach((digit, offset) => {
-            if (inputs[index + offset]) inputs[index + offset].value = digit;
-        });
-        value = digits[0] || "";
-    }
-    input.value = value.slice(0, 1);
-    syncAdminOtpHiddenValue();
-    if (input.value && index < 5) focusAdminOtpDigit(index + 1);
-    if (document.getElementById("admin-mfa-input")?.value.length === 6) {
-        focusAdminOtpDigit(5);
-        authenticateAdmin();
-    }
-}
-
-function handleAdminOtpDigitKeydown(event, index) {
-    const input = event.target;
-    if (event.key === "Backspace" && !input.value && index > 0) {
-        focusAdminOtpDigit(index - 1);
-        return;
-    }
-    if (event.key === "ArrowLeft" && index > 0) {
-        event.preventDefault();
-        focusAdminOtpDigit(index - 1);
-        return;
-    }
-    if (event.key === "ArrowRight" && index < 5) {
-        event.preventDefault();
-        focusAdminOtpDigit(index + 1);
-        return;
-    }
-    if (event.key === "Enter") {
-        event.preventDefault();
-        authenticateAdmin();
-    }
-}
-
-async function requestAdminEmailOtp(password) {
-    const result = await apiRequest("admin-otp-request", {
-        method: "POST",
-        body: { password }
-    });
-    adminOtpState = {
-        requestId: String(result.request_id || ""),
-        destination: String(result.destination || "")
-    };
-    return adminOtpState;
-}
-
-async function verifyAdminEmailOtp(code) {
-    if (!adminOtpState?.requestId) {
-        throw new Error("Verification session expired");
-    }
-    const result = await apiRequest("admin-otp-verify", {
-        method: "POST",
-        body: {
-            request_id: adminOtpState.requestId,
-            code
-        }
-    });
-    adminAccessToken = String(result.access_token || "");
-    adminOtpState = null;
-    persistAdminSession();
-}
-
-async function authenticateAdmin() {
-    if (adminAuthenticationPending) return;
-    const passwordInput  = document.getElementById("admin-pw-input");
-    const otpInput = document.getElementById("admin-mfa-input");
-    const otpDigitInputs = getAdminOtpDigitInputs();
-    const errMsg = document.getElementById("pw-error");
-    const authBtn = document.querySelector(".btn-modal-auth");
-    const activeInput = adminOtpState ? otpInput : passwordInput;
-    const credentialValue = adminOtpState ? otpInput.value.trim() : passwordInput.value;
-    if (!credentialValue) {
-        activeInput.classList.remove("error-shake");
-        void activeInput.offsetWidth;
-        activeInput.classList.add("error-shake");
-        errMsg.textContent = adminOtpState
-            ? "⚠ Please enter the 6-digit verification code."
-            : "⚠ Please enter your password.";
-        errMsg.classList.add("visible");
-        activeInput.focus();
-        return;
-    }
-    adminAuthenticationPending = true;
-    errMsg.classList.remove("visible");
-    passwordInput.disabled = true;
-    otpInput.disabled = true;
-    otpDigitInputs.forEach(input => { input.disabled = true; });
-    if (authBtn) authBtn.disabled = true;
-    closeAdminModal();
-    showLoading(true, "Connecting...");
-    if (adminOtpState) {
-        try {
-            await verifyAdminEmailOtp(credentialValue);
-            try {
-                await showAdminPortal();
-            } catch (portalError) {
-                throw new Error("Admin portal open failed");
-            }
-            showToast("Admin access granted.", "success");
-        } catch (error) {
-            adminAccessToken = "";
-            document.body.classList.remove("admin-mode");
-            const errorText = String(error?.message || "");
-            const message = /portal/i.test(errorText)
-                ? "⚠ Admin portal could not be opened. Please try again."
-                : /expired/i.test(errorText) || /session/i.test(errorText)
-                ? "⚠ Verification expired. Please enter password again."
-                : error?.status === 429 || /attempt/i.test(errorText)
-                ? "⚠ Too many incorrect codes. Please enter password again."
-                : "⚠ Incorrect verification code. Please try again.";
-            if (/expired|session|attempt/i.test(errorText) || error?.status === 429) {
-                resetAdminGateway();
-                setAdminAuthMode("password");
-            }
-            showAdminAuthError(message);
-        } finally {
-            adminAuthenticationPending = false;
-            showLoading(false);
-            passwordInput.disabled = false;
-            otpInput.disabled = false;
-            otpDigitInputs.forEach(input => { input.disabled = false; });
-            if (authBtn) authBtn.disabled = false;
-        }
-        return;
-    }
-    try {
-        const pendingOtp = await requestAdminEmailOtp(credentialValue);
-        if (pendingOtp?.requestId) {
-            setAdminAuthMode("otp");
-            const modal = document.getElementById("admin-modal");
-            modal.classList.add("open");
-            showLoading(false);
-            passwordInput.disabled = false;
-            otpInput.disabled = false;
-            otpDigitInputs.forEach(input => { input.disabled = false; });
-            if (authBtn) authBtn.disabled = false;
-            showToast("Verification code sent to email.", "success");
-            setTimeout(() => focusAdminOtpDigit(0), 120);
-            return;
-        }
-    } catch (error) {
-        adminAccessToken = "";
-        adminOtpState = null;
-        document.body.classList.remove("admin-mode");
-        const errorText = String(error?.message || "");
-        const errorCode = String(error?.code || "");
-        const message = errorCode === "security_not_configured"
-            ? "⚠ Admin email verification is not configured yet."
-            : errorCode === "otp_delivery_failed" || /delivery/i.test(errorText)
-            ? "⚠ Verification code could not be sent. Please try again."
-            : "⚠ Admin password is incorrect. Please try again.";
-        showAdminAuthError(message);
-    } finally {
-        adminAuthenticationPending = false;
-        showLoading(false);
-        passwordInput.disabled = false;
-        otpInput.disabled = false;
-        otpDigitInputs.forEach(input => { input.disabled = false; });
-        if (authBtn) authBtn.disabled = false;
-    }
-}
-
-async function showAdminPortal() {
-    document.body.classList.add("admin-mode");
-    persistAdminSession();
-    clearPublicApiCache();
-    const [adminQuestions] = await Promise.all([
-        fetchAdminQuestions(),
-        caLoadState({ render: false, force: true }),
-        loadDailyQuotes()
-    ]);
-    processData(adminQuestions);
-    databaseReady = true;
-    document.getElementById("q-count").textContent = questionPool.length;
-    caHydrateAdminControls();
-    caRenderAll();
-    document.getElementById("setup-view").style.display = "none";
-    document.getElementById("admin-view").style.display = "block";
-    hideTopActionButtons();
-    document.getElementById("admin-back-btn").style.display = "block";
-    document.querySelectorAll("[name='cat-mode']")[0].checked = true;
-    document.querySelectorAll("[name='dest-mode']")[0].checked = true;
-    onDestModeChange();
-    onCatModeChange();
-}
-
-async function loadAdminQuestionMedia(idx) {
-    const question = questionPool[idx];
-    if (!question || question._adminMediaLoaded || question.id === undefined || question.id === null) return question;
-    const table = question.sourceTable === "PEOnlineExam" ? "PEOnlineExam" : "Exam";
-    const rows = await adminApiRequest(
-        `admin-question-media?table=${encodeURIComponent(table)}&id=${encodeURIComponent(question.id)}`,
-        { method: "GET" }
-    );
-    const media = rows?.[0] || {};
-    question.imageCode = typeof media.image === "string" ? media.image : "";
-    question.audioCode = typeof media.audio === "string" ? media.audio : "";
-    question._adminMediaLoaded = true;
-    return question;
-}
-
-async function restoreAdminPortal() {
-    await showAdminPortal();
-}
-
-async function closeAdminPortal() {
-    document.body.classList.remove("admin-mode");
-    adminAccessToken = "";
-    adminOtpState = null;
-    clearAdminSession();
-    clearDatabaseCache();
-    questionPool = [];
-    databaseReady = false;
-    cancelQuestionEdit();
-    document.getElementById("admin-view").style.display  = "none";
-    document.getElementById("setup-view").style.display  = "block";
-    document.getElementById("setup-options").style.display = setupContinued ? "grid" : "none";
-    if (setupContinued) {
-        setPostContinueActionButtons();
-    } else {
-        document.getElementById("start-btn").innerHTML = "<span>Continue</span> →";
-        setEntryActionButtons();
-    }
-    document.getElementById("admin-back-btn").style.display = "none";
-    await loadExamCatalog();
-}
-
-function onCatModeChange() {
-    const isNew = document.querySelector("[name='cat-mode']:checked").value === "new";
-    document.getElementById("exist-wrap").style.display = isNew ? "none" : "block";
-    document.getElementById("new-wrap").style.display   = isNew ? "block" : "none";
-    document.getElementById("pill-exist").classList.toggle("active", !isNew);
-    document.getElementById("pill-new").classList.toggle("active", isNew);
-}
-
-function onDestModeChange() {
-    const destMode = document.querySelector("[name='dest-mode']:checked").value;
-    const isPE = destMode === "pe" || destMode === "pe-online";
-    const isPEOnline = destMode === "pe-online";
-    document.getElementById("pe-type-wrap").style.display = isPE ? "block" : "none";
-    document.getElementById("exam-cat-wrap").style.display = isPE ? "none" : "block";
-    document.getElementById("pill-exam").classList.toggle("active", !isPE);
-    document.getElementById("pill-pe").classList.toggle("active", destMode === "pe");
-    document.getElementById("pill-pe-online").classList.toggle("active", isPEOnline);
-    // Exam category fields are required only when targeting the exam bank
-    document.getElementById("adm-cat-input").required = false;
-    updateBulkDestinationBanner();
-}
-
-function onPeTypeChange() {
-    const peType = document.querySelector("[name='pe-type']:checked").value;
-    const isPast = peType === "Past Paper";
-    const isDI = peType === "Data Interpretation";
-    document.getElementById("pill-pe-mock").classList.toggle("active", peType === "Mock");
-    document.getElementById("pill-pe-past").classList.toggle("active", isPast);
-    document.getElementById("pill-pe-di").classList.toggle("active", isDI);
-    document.getElementById("pe-di-note").style.display = isDI ? "block" : "none";
-    document.getElementById("adm-pe-topic-label").textContent = isDI ? "Set Name (same name groups questions under one chart)" : "Topic / Paper Name";
-    document.getElementById("adm-pe-topic").placeholder = isDI ? "e.g., Sales Chart 2023, Bar Graph Set 1" : "e.g., Problems on Trains, RCSC 2024 Paper 1";
-    updateBulkDestinationBanner();
-}
-
-// Keeps the banner above the bulk-paste textarea in sync with whatever
-// the Destination/PE-type/topic controls are currently set to, so it's
-// never ambiguous which category bulk-pasted questions will land in.
-function updateBulkDestinationBanner() {
-    const label = document.getElementById("bulk-destination-label");
-    const banner = document.getElementById("bulk-destination-banner");
-    if (!label || !banner) return;
-    const destMode = document.querySelector("[name='dest-mode']:checked")?.value || "exam";
-    if (destMode === "pe" || destMode === "pe-online") {
-        const peType = document.querySelector("[name='pe-type']:checked")?.value || "Mock";
-        label.textContent = destMode === "pe-online" ? `🧪 PE Online → ${peType}` : `📚 PE → ${peType}`;
-        banner.style.background = "#e8f5e9";
-        banner.style.borderColor = "#2f9e44";
-        banner.style.color = "#1b5e20";
-    } else {
-        label.textContent = "Exam Question Bank";
-        banner.style.background = "#fff8e1";
-        banner.style.borderColor = "#f5d76e";
-        banner.style.color = "#7a5c00";
-    }
-}
-
-// Also refresh the banner live as the topic name is typed
-document.addEventListener("DOMContentLoaded", () => {
-    const topicInput = document.getElementById("adm-pe-topic");
-    if (topicInput) topicInput.addEventListener("input", updateBulkDestinationBanner);
-});
-
-// ════════════════════════════════════════════════════════
 // ─── CURRENT AFFAIR FLASHCARD WALL MODULE ──────────────
+
 const cafSubcategories = {
     Bhutan: ["Sports", "Authors & Book", "Art & Culture", "Environment", "Politics", "Technology", "Awards & Honor", "Person"],
     International: ["Person", "Authors & Books", "Awards & Honor", "Sports"]
@@ -2362,21 +1759,10 @@ async function caLoadState({ render = true, force = false } = {}) {
     }
 }
 
-function caHydrateAdminControls() {
-    cafPopulateAdminCategories();
-    cafResetAdminForm();
-    resetDailyQuoteForm();
-    cafUpdateDropdownOptions(cafSelectedScope);
-    cafRenderAdminRegistry();
-    renderDailyQuoteAdminRegistry();
-}
-
 function caRenderAll() {
     cafUpdateDropdownOptions(cafSelectedScope);
     cafFilterData(false);
-    cafRenderAdminRegistry();
     renderDailyQuoteTicker();
-    renderDailyQuoteAdminRegistry();
 }
 
 function cafUpdateDropdownOptions(scope) {
@@ -2540,130 +1926,6 @@ function cafRenderPageGrid() {
     requestAnimationFrame(cafSyncScrollControls);
 }
 
-function cafPopulateAdminCategories() {
-    const scope = document.getElementById("caf-admin-scope")?.value || "Bhutan";
-    const select = document.getElementById("caf-admin-category");
-    if (!select) return;
-    const previous = select.value;
-    const categoriesForScope = cafCategoriesForScope(scope);
-    select.innerHTML = categoriesForScope.map(cat => `<option value="${escapePEHtml(cat)}">${escapePEHtml(cat)}</option>`).join("");
-    if (previous && categoriesForScope.includes(previous)) select.value = previous;
-    cafApplyAdminCategoryMode();
-}
-
-function cafApplyAdminCategoryMode() {
-    const isNew = document.querySelector('[name="caf-cat-mode"]:checked')?.value === "new";
-    const existingWrap = document.getElementById("caf-exist-wrap");
-    const newWrap = document.getElementById("caf-new-wrap");
-    const existingPill = document.getElementById("caf-pill-exist");
-    const newPill = document.getElementById("caf-pill-new");
-    if (existingWrap) existingWrap.style.display = isNew ? "none" : "block";
-    if (newWrap) newWrap.style.display = isNew ? "block" : "none";
-    existingPill?.classList.toggle("active", !isNew);
-    newPill?.classList.toggle("active", isNew);
-}
-
-function cafSetAdminCategoryMode(mode) {
-    const input = document.querySelector(`[name="caf-cat-mode"][value="${mode}"]`);
-    if (input) input.checked = true;
-    cafApplyAdminCategoryMode();
-}
-
-function cafGetAdminCategory() {
-    const scope = document.getElementById("caf-admin-scope")?.value || "Bhutan";
-    const isNew = document.querySelector('[name="caf-cat-mode"]:checked')?.value === "new";
-    const entered = document.getElementById("caf-admin-category-new")?.value.trim() || "";
-    if (!isNew) return document.getElementById("caf-admin-category")?.value || "";
-    const existing = cafCategoriesForScope(scope).find(category => category.toLocaleLowerCase() === entered.toLocaleLowerCase());
-    return existing || entered;
-}
-
-function cafResetAdminForm() {
-    const form = document.getElementById("caf-admin-form");
-    if (form) form.reset();
-    editingCafCardId = "";
-    cafSetAdminCategoryMode("exist");
-    const date = document.getElementById("caf-admin-date");
-    if (date && !date.value) date.value = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Thimphu" }).format(new Date());
-    cafPopulateAdminCategories();
-    const saveBtn = document.getElementById("caf-admin-save-btn");
-    const cancelBtn = document.getElementById("caf-admin-cancel-btn");
-    if (saveBtn) saveBtn.textContent = "Save Flashcard";
-    if (cancelBtn) cancelBtn.style.display = "none";
-}
-
-function cafStartEditCard(id) {
-    const card = cafNotes.find(item => String(item.id || "") === String(id || ""));
-    if (!card) {
-        showToast("Flashcard could not be loaded for editing.", "error");
-        return;
-    }
-    editingCafCardId = String(card.id || "");
-    document.getElementById("caf-admin-scope").value = card.scope || "Bhutan";
-    cafPopulateAdminCategories();
-    cafSetAdminCategoryMode("exist");
-    document.getElementById("caf-admin-category").value = card.category || "Sports";
-    document.getElementById("caf-admin-date").value = card.date || "";
-    document.getElementById("caf-admin-question").value = card.examFocus || "";
-    document.getElementById("caf-admin-answer").value = card.answer || "";
-    const saveBtn = document.getElementById("caf-admin-save-btn");
-    const cancelBtn = document.getElementById("caf-admin-cancel-btn");
-    if (saveBtn) saveBtn.textContent = "Update Flashcard";
-    if (cancelBtn) cancelBtn.style.display = "";
-    document.getElementById("caf-admin-form")?.scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-function cafCancelEdit() {
-    cafResetAdminForm();
-}
-
-async function cafSaveAdminCard() {
-    const wasEditing = Boolean(editingCafCardId);
-    const payload = {
-        id: editingCafCardId || "",
-        scope: document.getElementById("caf-admin-scope")?.value || "Bhutan",
-        category: cafGetAdminCategory(),
-        date_stamp: document.getElementById("caf-admin-date")?.value.trim(),
-        exam_focus: document.getElementById("caf-admin-question")?.value.trim(),
-        answer: document.getElementById("caf-admin-answer")?.value.trim()
-    };
-    if (!payload.category || !payload.date_stamp || !payload.exam_focus || !payload.answer) {
-        showToast("Choose or enter a category, then fill date, question, and answer.", "error");
-        return;
-    }
-    try {
-        await adminApiRequest("admin-flashcard", { body: payload });
-        clearPublicApiCache();
-        showToast(wasEditing ? "Current Affair flashcard updated." : "Current Affair flashcard saved.", "success");
-        cafResetAdminForm();
-        await caLoadState();
-    } catch (e) {
-        showToast("Could not save Current Affair flashcard. Check Supabase table/policies.", "error");
-    }
-}
-
-function cafRenderAdminRegistry() {
-    const registry = document.getElementById("caf-admin-registry");
-    if (!registry) return;
-    if (!cafNotes.length) {
-        registry.innerHTML = `<div class="empty-state"><p>No Current Affair flashcards saved yet.</p></div>`;
-        return;
-    }
-    registry.innerHTML = cafNotes.slice(0, 30).map(item => `
-        <div class="caf-admin-row">
-            <strong>${escapePEHtml(item.scope)}</strong>
-            <span>${escapePEHtml(item.category)}</span>
-            <span>${escapePEHtml(item.examFocus)}</span>
-            <button type="button" class="btn-view-sm" data-caf-edit-id="${escapeHTML(String(item.id || ""))}">Edit</button>
-        </div>
-    `).join("");
-
-    registry.querySelectorAll("[data-caf-edit-id]").forEach(button => {
-        button.addEventListener("click", () => {
-            cafStartEditCard(button.dataset.cafEditId || "");
-        });
-    });
-}
 
 function renderDailyQuoteTicker() {
     const track = document.getElementById("daily-quote-track");
@@ -2690,7 +1952,6 @@ function renderDailyQuoteTicker() {
         loadDailyQuotes({ fresh: true }).then(() => {
             dailyQuoteTickerIndex = 0;
             renderDailyQuoteTicker();
-            renderDailyQuoteAdminRegistry();
         });
     }, Math.max(0, nextExpiry - Date.now()) + 50);
     dailyQuoteTickerIndex %= queue.length;
@@ -2721,99 +1982,6 @@ async function loadDailyQuotes({ fresh = false } = {}) {
     }
 }
 
-function resetDailyQuoteForm() {
-    const form = document.getElementById("quote-admin-form");
-    if (form) form.reset();
-    editingQuoteId = "";
-    const saveBtn = document.getElementById("quote-admin-save-btn");
-    const cancelBtn = document.getElementById("quote-admin-cancel-btn");
-    if (saveBtn) saveBtn.textContent = "Publish Quote";
-    if (cancelBtn) cancelBtn.style.display = "none";
-}
-
-function startDailyQuoteEdit(id) {
-    const quote = dailyQuotes.find(item => String(item.id || "") === String(id || ""));
-    if (!quote) {
-        showToast("Daily quote could not be loaded for editing.", "error");
-        return;
-    }
-    editingQuoteId = String(quote.id || "");
-    document.getElementById("quote-admin-english").value = quote.english || "";
-    document.getElementById("quote-admin-dzongkha").value = quote.dzongkha || "";
-    const saveBtn = document.getElementById("quote-admin-save-btn");
-    const cancelBtn = document.getElementById("quote-admin-cancel-btn");
-    if (saveBtn) saveBtn.textContent = "Update Quote";
-    if (cancelBtn) cancelBtn.style.display = "";
-    document.getElementById("quote-admin-form")?.scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-function cancelDailyQuoteEdit() {
-    resetDailyQuoteForm();
-}
-
-async function saveDailyQuote() {
-    const wasEditing = Boolean(editingQuoteId);
-    const english = document.getElementById("quote-admin-english")?.value.trim();
-    const dzongkha = document.getElementById("quote-admin-dzongkha")?.value.trim();
-    if (!english || !dzongkha) {
-        showToast("Enter both English and Dzongkha quotes.", "error");
-        return;
-    }
-
-    try {
-        await adminApiRequest("admin-quote", {
-            body: {
-                id: editingQuoteId || "",
-                english_quote: english,
-                dzongkha_quote: dzongkha
-            }
-        });
-        clearPublicApiCache();
-        await loadDailyQuotes({ fresh: true });
-        dailyQuoteTickerIndex = 0;
-        resetDailyQuoteForm();
-        renderDailyQuoteTicker();
-        renderDailyQuoteAdminRegistry();
-        showToast(wasEditing ? "Quote updated successfully." : "Quote published for 24 hours.", "success");
-    } catch (e) {
-        const message = e?.message ? `Could not save quote: ${e.message}` : "Could not save quote.";
-        showToast(message, "error");
-    }
-}
-
-function renderDailyQuoteAdminRegistry() {
-    const registry = document.getElementById("quote-admin-registry");
-    if (!registry) return;
-    if (!dailyQuotes.length) {
-        registry.innerHTML = `<div class="empty-state"><p>No daily quotes published yet.</p></div>`;
-        return;
-    }
-    registry.innerHTML = dailyQuotes.slice(0, 20).map(item => `
-        <div class="quote-admin-row">
-            <span>${escapePEHtml(item.english)}</span>
-            <span class="quote-admin-dzongkha">${escapePEHtml(item.dzongkha)}</span>
-            <button type="button" class="btn-view-sm" data-quote-edit-id="${escapeHTML(String(item.id || ""))}">Edit</button>
-        </div>
-    `).join("");
-
-    registry.querySelectorAll("[data-quote-edit-id]").forEach(button => {
-        button.addEventListener("click", () => {
-            startDailyQuoteEdit(button.dataset.quoteEditId || "");
-        });
-    });
-}
-
-// PE (PRACTICE ENGINE) PAGE
-// Sidebar click-handling below mirrors the reference template's
-// own logic exactly:
-//   listItems.forEach(li => li.classList.remove('active'));
-//   item.classList.add('active');
-//   contentSections.forEach(s => s.classList.remove('active'));
-//   document.getElementById(targetPanelId).classList.add('active');
-// ════════════════════════════════════════════════════════
-let peActiveTopic = null;   // { peType, topic } while viewing questions; null while browsing
-let peSidebarWired = false;
-const pePracticeQuestionsByDomId = new Map();
 
 function renderPEPanel(panelId) {
     if (panelId === "pe-home-panel") renderPEHomeGrid();
@@ -2870,7 +2038,6 @@ async function openPEPortal() {
     document.getElementById("setup-view").style.display = "none";
     document.getElementById("exam-view") && document.getElementById("exam-view").classList.remove("show");
     document.getElementById("results-view") && document.getElementById("results-view").classList.remove("show");
-    document.getElementById("admin-view").style.display = "none";
     document.getElementById("pe-view").style.display = "block";
     hideTopActionButtons();
     document.getElementById("pe-back-btn").style.display = "block";
@@ -2941,7 +2108,7 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
     const topics = buildPETopicList(peTypeFilter, searchTerm);
 
     if (topics.length === 0) {
-        grid.innerHTML = '<div class="pe-empty-msg">No PE questions here yet. Add some from the Admin panel.</div>';
+        grid.innerHTML = '<div class="pe-empty-msg">No PE questions are available here yet.</div>';
         return;
     }
 
@@ -3330,7 +2497,7 @@ function renderPEDIGrid() {
     const sets = buildPETopicList("Data Interpretation", searchTerm);
 
     if (sets.length === 0) {
-        grid.innerHTML = '<div class="pe-empty-msg">No Data Interpretation sets yet. Add one from the Admin panel.</div>';
+        grid.innerHTML = '<div class="pe-empty-msg">No Data Interpretation sets are available yet.</div>';
         return;
     }
 
@@ -3636,440 +2803,3 @@ async function revealPEAnswer(qId) {
 function escapePEHtml(text) {
     return escapeHTML(text);
 }
-
-const ADMIN_MEDIA_MAX_BYTES = 6 * 1024 * 1024;
-const ADMIN_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const ADMIN_AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp4", "audio/wav"]);
-
-function validateAdminMediaFile(file, mediaType) {
-    const allowedTypes = mediaType === "image" ? ADMIN_IMAGE_TYPES : ADMIN_AUDIO_TYPES;
-    if (!allowedTypes.has(String(file?.type || "").toLowerCase())) {
-        showToast(
-            mediaType === "image"
-                ? "Please use a JPG, PNG, or WebP image."
-                : "Please use an MP3, M4A/MP4, or WAV audio file.",
-            "error"
-        );
-        return false;
-    }
-    if (!Number.isFinite(file.size) || file.size <= 0 || file.size > ADMIN_MEDIA_MAX_BYTES) {
-        showToast("Media files must be no larger than 6 MB.", "error");
-        return false;
-    }
-    return true;
-}
-
-function handleImageUpload(input) {
-    const file = input.files[0];
-    const preview = document.getElementById("adm-img-preview");
-    const b64     = document.getElementById("adm-img-b64");
-    if (!file) { b64.value = ""; preview.style.display = "none"; return; }
-    if (!validateAdminMediaFile(file, "image")) {
-        input.value = "";
-        b64.value = "";
-        preview.removeAttribute("src");
-        preview.style.display = "none";
-        return;
-    }
-    const reader = new FileReader();
-    reader.onload = e => {
-        b64.value = e.target.result;
-        preview.src = e.target.result;
-        preview.style.display = "block";
-    };
-    reader.readAsDataURL(file);
-}
-
-function handleAudioUpload(input) {
-    const file = input.files[0];
-    const preview = document.getElementById("adm-audio-preview");
-    const b64 = document.getElementById("adm-audio-b64");
-    if (!file) { b64.value = ""; preview.style.display = "none"; return; }
-    if (!validateAdminMediaFile(file, "audio")) {
-        input.value = "";
-        b64.value = "";
-        preview.removeAttribute("src");
-        preview.style.display = "none";
-        return;
-    }
-    const reader = new FileReader();
-    reader.onload = e => {
-        b64.value = e.target.result;
-        preview.src = e.target.result;
-        preview.style.display = "block";
-    };
-    reader.readAsDataURL(file);
-}
-
-function setAdminFormMode(mode) {
-    const isEdit = mode === "edit";
-    document.getElementById("admin-form-title").textContent = isEdit ? "Edit Question" : "Add Question";
-    document.getElementById("admin-submit-btn").textContent = isEdit ? "Save Changes" : "+ Save to Database";
-    document.getElementById("cancel-edit-btn").style.display = isEdit ? "inline-flex" : "none";
-}
-
-function resetAdminForm() {
-    document.getElementById("admin-form").reset();
-    document.getElementById("adm-img-preview").style.display = "none";
-    document.getElementById("adm-img-b64").value = "";
-    document.getElementById("adm-audio-preview").style.display = "none";
-    document.getElementById("adm-audio-preview").removeAttribute("src");
-    document.getElementById("adm-audio-b64").value = "";
-    document.getElementById("adm-explanation").value = "";
-    document.getElementById("adm-pe-topic").value = "";
-    document.querySelectorAll("[name='cat-mode']")[0].checked = true;
-    document.querySelectorAll("[name='dest-mode']")[0].checked = true;
-    document.querySelectorAll("[name='pe-type']")[0].checked = true;
-    editingQuestionIndex = null;
-    onDestModeChange();
-    onPeTypeChange();
-    onCatModeChange();
-    setAdminFormMode("add");
-}
-
-function cancelQuestionEdit() {
-    resetAdminForm();
-}
-
-async function editQuestion(idx) {
-    const q = questionPool[idx];
-    if (!q) return;
-
-    if (!q._adminMediaLoaded) {
-        showLoading(true, "Loading question media...");
-        try {
-            await loadAdminQuestionMedia(idx);
-        } catch (error) {
-            showToast("Question opened without media preview. Media can be re-uploaded if needed.", "info");
-        } finally {
-            showLoading(false);
-        }
-    }
-
-    editingQuestionIndex = idx;
-    const peInfo = parsePECategory(q.category);
-
-    if (peInfo) {
-        const peDestination = q.sourceTable === "PEOnlineExam" ? "pe-online" : "pe";
-        document.querySelector(`[name='dest-mode'][value='${peDestination}']`).checked = true;
-        onDestModeChange();
-        document.querySelector(`[name='pe-type'][value='${peInfo.peType}']`).checked = true;
-        onPeTypeChange();
-        document.getElementById("adm-pe-topic").value = peInfo.topic || "";
-    } else {
-        // Editing a normal exam question
-        document.querySelector("[name='dest-mode'][value='exam']").checked = true;
-        onDestModeChange();
-        const existingCategory = categories.includes(q.category);
-        document.querySelector("[name='cat-mode'][value='exist']").checked = existingCategory;
-        document.querySelector("[name='cat-mode'][value='new']").checked = !existingCategory;
-        onCatModeChange();
-        if (existingCategory) document.getElementById("adm-cat-select").value = q.category;
-        else document.getElementById("adm-cat-input").value = q.category || "";
-    }
-
-    document.getElementById("adm-question").value = q.question || "";
-    document.getElementById("adm-explanation").value = q.explanation || "";
-    ["A","B","C","D"].forEach((label, index) => {
-        document.getElementById(`adm-${label}`).value = (q.options || [])[index] || "";
-    });
-    document.getElementById("adm-correct").value = Number.isInteger(q.answer) && q.answer >= 0 ? q.answer : 0;
-    document.getElementById("adm-img-b64").value = q.imageCode || "";
-    const preview = document.getElementById("adm-img-preview");
-    preview.src = q.imageCode || "";
-    preview.style.display = q.imageCode ? "block" : "none";
-    document.getElementById("adm-audio-b64").value = q.audioCode || "";
-    const audioPreview = document.getElementById("adm-audio-preview");
-    audioPreview.src = q.audioCode || "";
-    audioPreview.style.display = q.audioCode ? "block" : "none";
-    setAdminFormMode("edit");
-    document.getElementById("admin-form").scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-	async function saveQuestion() {
-	    let cat = getAdminCategory();
-
-	    if (!cat || cat === "No categories available") {
-	        showToast("Please specify a valid category.", "error"); return;
-	    }
-
-	    const question = document.getElementById("adm-question").value.trim();
-	    const options = ["A","B","C","D"].map(l => document.getElementById(`adm-${l}`).value.trim());
-	    if (!question || options.some(o => !o)) {
-	        showToast("Please complete the question and all four options.", "error"); return;
-	    }
-
-	    showLoading(true, "Saving question to database…");
-	    const payload = {
-            id: "",
-            table: "",
-	        category: cat,
-	        question,
-	        explanation: document.getElementById("adm-explanation").value.trim(),
-	        options,
-	        answer: parseInt(document.getElementById("adm-correct").value),
-	        imageCode: document.getElementById("adm-img-b64").value,
-	        audioCode: document.getElementById("adm-audio-b64").value
-	    };
-
-    const wasEditing = editingQuestionIndex !== null;
-    try {
-        if (wasEditing) {
-            const existing = questionPool[editingQuestionIndex];
-            if (!existing || existing.id === undefined || existing.id === null) {
-                showToast("Question ID is missing. Refresh and try again.", "error");
-                return;
-            }
-            payload.id = String(existing.id);
-            payload.table = getAdminTargetTable(existing);
-        } else {
-            payload.table = getAdminTargetTable();
-        }
-        await adminApiRequest("admin-question", { body: payload });
-        resetAdminForm();
-        clearDatabaseCache();
-        databaseReady = false;
-        await showAdminPortal();
-        showToast(wasEditing ? "Question updated successfully!" : "Question saved successfully!", "success");
-    } catch (e) {
-        console.error("Save question error:", e);
-        showToast(`Failed to save question: ${e.message || "Unknown error"}`, "error");
-    } finally {
-        showLoading(false);
-    }
-	}
-
-	function stripQuestionPrefix(text) {
-	    return String(text || "").trim().replace(/^\d+[\).:-]\s*/, "").replace(/^Question\s*[:.-]\s*/i, "").trim();
-	}
-
-	function stripOptionPrefix(text) {
-	    return String(text || "").trim()
-	        .replace(/^Option\s*[A-D]\s*[:).-]\s*/i, "")
-	        .replace(/^[A-D]\s*[:).-]\s*/i, "")
-	        .replace(/^[1-4]\s*[:).-]\s*/i, "")
-	        .trim();
-	}
-
-	function stripAnswerPrefix(text) {
-	    return String(text || "").trim()
-	        .replace(/^(Correct\s*)?Answer\s*[:.-]\s*/i, "")
-	        .replace(/^Correct\s*[:.-]\s*/i, "")
-	        .trim();
-	}
-
-	function buildBulkQuestion(category, question, options, correctRaw, label) {
-	    const answer = parseCorrectAnswer(stripAnswerPrefix(correctRaw));
-	    const cleanedQuestion = stripQuestionPrefix(question);
-	    const cleanedOptions = options.map(stripOptionPrefix);
-
-	    if (!cleanedQuestion || cleanedOptions.some(option => !option)) {
-	        return { error: `${label}: question and all four options are required` };
-	    }
-
-	    if (answer === -1) {
-	        return { error: `${label}: answer must be A, B, C, D, or 1-4` };
-	    }
-
-	    return {
-	        question: {
-	            category,
-	            question: cleanedQuestion,
-	            options: cleanedOptions,
-	            answer,
-	            imageCode: "",
-	            audioCode: ""
-	        }
-	    };
-	}
-
-	function parsePipeBulkQuestions(rawText, category) {
-	    const questions = [];
-	    const errors = [];
-	    const lines = rawText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-
-	    lines.forEach((line, index) => {
-	        const parts = line.split("|").map(part => part.trim()).filter(Boolean);
-	        if (parts.length < 6) {
-	            errors.push(`Line ${index + 1}: use Question | A | B | C | D | Answer`);
-	            return;
-	        }
-
-	        const result = buildBulkQuestion(
-	            category,
-	            parts[0],
-	            parts.slice(1, 5),
-	            parts.slice(5).join(" "),
-	            `Line ${index + 1}`
-	        );
-
-	        if (result.error) errors.push(result.error);
-	        else questions.push(result.question);
-	    });
-
-	    return { questions, errors };
-	}
-
-	function parseBlockBulkQuestions(rawText, category) {
-	    const questions = [];
-	    const errors = [];
-	    let blocks = rawText
-	        .split(/\n\s*\n/)
-	        .map(block => block.split(/\r?\n/).map(line => line.trim()).filter(Boolean))
-	        .filter(block => block.length);
-
-	    if (blocks.length === 1 && blocks[0].length > 15 && blocks[0].length % 6 === 0) {
-	        const allLines = blocks[0];
-	        blocks = [];
-	        for (let i = 0; i < allLines.length; i += 6) {
-	            blocks.push(allLines.slice(i, i + 6));
-	        }
-	    }
-
-	    blocks.forEach((lines, index) => {
-	        if (lines.length < 6 || lines.length > 15) {
-	            errors.push(`Question ${index + 1}: use 6 to 15 lines - question text, A, B, C, D, answer`);
-	            return;
-	        }
-	        const questionLines = lines.slice(0, -5);
-	        const optionLines = lines.slice(-5, -1);
-	        const answerLine = lines[lines.length - 1];
-
-	        const result = buildBulkQuestion(
-	            category,
-	            questionLines.join("\n"),
-	            optionLines,
-	            answerLine,
-	            `Question ${index + 1}`
-	        );
-
-	        if (result.error) errors.push(result.error);
-	        else questions.push(result.question);
-	    });
-
-	    return { questions, errors };
-	}
-
-	function parseBulkQuestions(rawText, category) {
-	    const hasPipeFormat = rawText.split(/\r?\n/).some(line => line.includes("|"));
-	    return hasPipeFormat
-	        ? parsePipeBulkQuestions(rawText, category)
-	        : parseBlockBulkQuestions(rawText, category);
-	}
-
-	async function saveBulkQuestions() {
-	    const cat = getAdminCategory();
-	    if (!cat || cat === "No categories available") {
-	        showToast("Please specify a valid category.", "error"); return;
-	    }
-
-	    const rawText = document.getElementById("bulk-questions").value.trim();
-	    if (!rawText) {
-	        showToast("Please paste at least one bulk question line.", "error"); return;
-	    }
-
-	    const { questions, errors } = parseBulkQuestions(rawText, cat);
-	    if (errors.length) {
-	        showToast(errors[0], "error"); return;
-	    }
-	    if (!questions.length) {
-	        showToast("No valid questions found.", "error"); return;
-	    }
-
-	    showLoading(true, `Saving ${questions.length} questions…`);
-	    try {
-	        const table = getAdminTargetTable();
-	        await adminApiRequest("admin-bulk-questions", {
-                body: {
-                    table,
-                    questions: questions.map(question => ({
-                        category: question.category,
-                        question: question.question,
-                        explanation: question.explanation || "",
-                        options: question.options,
-                        answer: question.answer,
-                        imageCode: question.imageCode || "",
-                        audioCode: question.audioCode || ""
-                    }))
-                }
-            });
-
-	        document.getElementById("bulk-form").reset();
-	        clearDatabaseCache();
-            databaseReady = false;
-            await showAdminPortal();
-	        const peInfo = parsePECategory(cat);
-	        const destinationLabel = table === "PEOnlineExam"
-                ? `🧪 PE Online → ${peInfo?.peType || "General"} → ${peInfo?.topic || "General"}`
-                : peInfo
-                ? `📚 PE → ${peInfo.peType} → ${peInfo.topic}`
-                : `Exam category "${cat}"`;
-	        showToast(`${questions.length} questions appended to: ${destinationLabel}`, "success");
-	        if (document.getElementById("pe-view") && document.getElementById("pe-view").style.display !== "none") {
-	            renderPEHomeGrid();
-	            renderPEMockGrid();
-	            renderPEPastGrid();
-	            updatePEOnlineCount();
-	        }
-	    } catch (e) {
-	        console.error("Bulk save error:", e);
-	        showToast("Bulk append failed. Please try again.", "error");
-	        showLoading(false);
-	    }
-	}
-
-	function viewQuestion(idx) {
-	    const q = questionPool[idx];
-	    if (!q) return;
-
-	    const options = Array.isArray(q.options) ? q.options : [];
-	    const answerIndex = Number.isInteger(q.answer) ? q.answer : parseInt(q.answer, 10);
-	    const optionsHtml = options.slice(0, 4).map((option, oi) => `
-	        <div class="question-view-option ${oi === answerIndex ? 'correct' : ''}">
-	            <span class="question-view-alpha">${ALPHA[oi] || oi + 1}</span>
-	            <span>${escapeHTML(formatOptionText(option))}${oi === answerIndex ? ' ✓' : ''}</span>
-	        </div>
-	    `).join("");
-
-	    document.getElementById("question-view-body").innerHTML = `
-	        <div class="question-view-category">${escapeHTML(q.category || "Uncategorized")}</div>
-	        <div class="question-view-text">${escapeHTML(q.question || "")}</div>
-	        <div class="question-view-options">${optionsHtml || '<div class="empty-state"><p>No options found.</p></div>'}</div>
-	    `;
-	    document.getElementById("question-view-modal").classList.add("open");
-	}
-
-	function closeQuestionView() {
-	    document.getElementById("question-view-modal").classList.remove("open");
-	}
-
-	function handleQuestionViewBackdropClick(e) {
-	    if (e.target === document.getElementById("question-view-modal")) closeQuestionView();
-	}
-
-	function renderAdminTable() {
-	    const tbody = document.getElementById("admin-tbody");
-	    if (!tbody) return;
-    if (questionPool.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><p>No questions in the database yet.</p></div></td></tr>`;
-        return;
-    }
-    tbody.innerHTML = questionPool.map((q, i) => {
-        const peInfo = parsePECategory(q.category);
-        const isPEOnline = q.sourceTable === "PEOnlineExam";
-        const badge = peInfo
-            ? `<span style="font-size:11px;font-weight:600;color:var(--navy);background:${isPEOnline ? "#ede7f6" : "#e8edf7"};padding:3px 8px;border-radius:4px;">${isPEOnline ? "🧪 PE Online" : "📚 PE"} · ${escapeHTML(peInfo.peType)} · ${escapeHTML(peInfo.topic)}</span>`
-            : `<span style="font-size:11px;font-weight:600;color:var(--gold);background:var(--gold-pale);padding:3px 8px;border-radius:4px;">${escapeHTML(q.category)}</span>`;
-        return `
-	        <tr>
-	            <td style="color:var(--ink-muted);font-weight:700;">${i+1}</td>
-	            <td>${badge}</td>
-	            <td class="admin-question-cell" title="${escapeHTML(q.question)}">${escapeHTML(q.question)}</td>
-	            <td><button type="button" class="btn-view-sm" data-edit-question-index="${i}">Edit</button></td>
-	        </tr>`;
-    }).join("");
-
-    tbody.querySelectorAll("[data-edit-question-index]").forEach((button) => {
-        button.addEventListener("click", () => editQuestion(Number(button.dataset.editQuestionIndex)));
-    });
-	}

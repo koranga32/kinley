@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-b6hb0+GUS7tN58G45qQZ+FXrsCOjqRfPvh0+xafZhm8='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; manifest-src 'self'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests">
     <meta name="referrer" content="strict-origin-when-cross-origin">
-    <meta name="description" content="ExamPortal is a cloud-linked practice and testing platform with exam question banks, PE practice, current-affair flashcards, timed online tests, and admin tools.">
+    <meta name="description" content="ExamPortal is a cloud-linked practice and testing platform with exam question banks, PE practice, current-affair flashcards, and timed online tests.">
     <meta name="robots" content="index, follow">
     <meta name="theme-color" content="#0f1b35">
     <meta property="og:title" content="ExamPortal - Cloud-Linked Practice and Testing System">
@@ -26,7 +26,7 @@
         "name": "ExamPortal",
         "url": "https://examportal-dil.pages.dev/",
         "applicationCategory": "EducationalApplication",
-        "description": "A cloud-linked practice and testing platform with exam question banks, PE practice, current-affair flashcards, timed online tests, and admin tools.",
+        "description": "A cloud-linked practice and testing platform with exam question banks, PE practice, current-affair flashcards, and timed online tests.",
         "operatingSystem": "Web"
     }
     </script>
@@ -474,144 +474,144 @@
             opacity: 1;
         }
 
-        body.dark-theme:not(.admin-mode) #setup-view .panel,
-        body.dark-theme:not(.admin-mode) .question-card,
-        body.dark-theme:not(.admin-mode) .sidebar-card,
-        body.dark-theme:not(.admin-mode) .results-header-card,
-        body.dark-theme:not(.admin-mode) .result-stat-card,
-        body.dark-theme:not(.admin-mode) #review-container .question-card {
+        body.dark-theme #setup-view .panel,
+        body.dark-theme .question-card,
+        body.dark-theme .sidebar-card,
+        body.dark-theme .results-header-card,
+        body.dark-theme .result-stat-card,
+        body.dark-theme #review-container .question-card {
             background: rgba(17,24,39,0.92);
             border-color: rgba(148,163,184,0.22);
             box-shadow: 0 18px 48px rgba(0,0,0,0.32);
             color: #e5e7eb;
         }
 
-        body.dark-theme:not(.admin-mode) #setup-view .panel-header,
-        body.dark-theme:not(.admin-mode) .nav-actions,
-        body.dark-theme:not(.admin-mode) .sidebar-card-header {
+        body.dark-theme #setup-view .panel-header,
+        body.dark-theme .nav-actions,
+        body.dark-theme .sidebar-card-header {
             border-color: rgba(148,163,184,0.18);
         }
 
-        body.dark-theme:not(.admin-mode) #setup-view .panel-header h2,
-        body.dark-theme:not(.admin-mode) .q-text,
-        body.dark-theme:not(.admin-mode) .option-item,
-        body.dark-theme:not(.admin-mode) .stat-num,
-        body.dark-theme:not(.admin-mode) .score-fraction,
-        body.dark-theme:not(.admin-mode) .score-pct,
-        body.dark-theme:not(.admin-mode) .results-title,
-        body.dark-theme:not(.admin-mode) .review-section-title {
+        body.dark-theme #setup-view .panel-header h2,
+        body.dark-theme .q-text,
+        body.dark-theme .option-item,
+        body.dark-theme .stat-num,
+        body.dark-theme .score-fraction,
+        body.dark-theme .score-pct,
+        body.dark-theme .results-title,
+        body.dark-theme .review-section-title {
             color: #f8fafc;
         }
 
-        body.dark-theme:not(.admin-mode) #setup-view .panel-header p,
-        body.dark-theme:not(.admin-mode) .form-group label,
-        body.dark-theme:not(.admin-mode) .stat-lbl,
-        body.dark-theme:not(.admin-mode) .sidebar-card-header,
-        body.dark-theme:not(.admin-mode) .results-subtitle,
-        body.dark-theme:not(.admin-mode) .omr-q-label {
+        body.dark-theme #setup-view .panel-header p,
+        body.dark-theme .form-group label,
+        body.dark-theme .stat-lbl,
+        body.dark-theme .sidebar-card-header,
+        body.dark-theme .results-subtitle,
+        body.dark-theme .omr-q-label {
             color: #aab6c8;
         }
 
-        body.dark-theme:not(.admin-mode) .form-control,
-        body.dark-theme:not(.admin-mode) .option-item,
-        body.dark-theme:not(.admin-mode) .q-image,
-        body.dark-theme:not(.admin-mode) .q-image-wrap {
+        body.dark-theme .form-control,
+        body.dark-theme .option-item,
+        body.dark-theme .q-image,
+        body.dark-theme .q-image-wrap {
             background: rgba(30,41,59,0.78);
             border-color: rgba(148,163,184,0.22);
             color: #f8fafc;
         }
 
-        body.dark-theme:not(.admin-mode) .form-control:focus {
+        body.dark-theme .form-control:focus {
             background: rgba(15,23,42,0.95);
             border-color: var(--gold);
             box-shadow: 0 0 0 3px rgba(201,168,76,0.18);
         }
 
-        body.dark-theme:not(.admin-mode) .form-control[readonly] {
+        body.dark-theme .form-control[readonly] {
             color: var(--gold-light);
         }
 
-        body.dark-theme:not(.admin-mode) .setup-badge,
-        body.dark-theme:not(.admin-mode) .q-category-tag {
+        body.dark-theme .setup-badge,
+        body.dark-theme .q-category-tag {
             background: rgba(201,168,76,0.16);
             border-color: rgba(201,168,76,0.32);
             color: var(--gold-light);
         }
 
-        body.dark-theme:not(.admin-mode) .option-item.option-readonly:hover {
+        body.dark-theme .option-item.option-readonly:hover {
             background: rgba(30,41,59,0.78);
             border-color: rgba(148,163,184,0.22);
         }
 
-        body.dark-theme:not(.admin-mode) .btn-outline,
-        body.dark-theme:not(.admin-mode) .peo-btn-prev {
+        body.dark-theme .btn-outline,
+        body.dark-theme .peo-btn-prev {
             color: #f8fafc;
             border-color: rgba(226,232,240,0.72);
             background: transparent;
         }
 
-        body.dark-theme:not(.admin-mode) .btn:disabled {
+        body.dark-theme .btn:disabled {
             opacity: 0.86;
             color: #dbe5f4;
             border-color: rgba(226,232,240,0.44);
         }
 
-        body.dark-theme:not(.admin-mode) .btn-nav-hint,
-        body.dark-theme:not(.admin-mode) .btn-nav-hint span {
+        body.dark-theme .btn-nav-hint,
+        body.dark-theme .btn-nav-hint span {
             color: #cbd5e1 !important;
         }
 
-        body.dark-theme:not(.admin-mode) .btn-outline:not(:disabled):hover,
-        body.dark-theme:not(.admin-mode) .peo-btn-prev:not(:disabled):hover {
+        body.dark-theme .btn-outline:not(:disabled):hover,
+        body.dark-theme .peo-btn-prev:not(:disabled):hover {
             background: rgba(255,255,255,0.08);
             border-color: var(--gold-light);
         }
 
-        body.dark-theme:not(.admin-mode) .option-item.selected {
+        body.dark-theme .option-item.selected {
             background: rgba(201,168,76,0.16);
             border-color: var(--gold-light);
             color: #fff7d6;
         }
 
-        body.dark-theme:not(.admin-mode) .option-alpha,
-        body.dark-theme:not(.admin-mode) .omr-bubble {
+        body.dark-theme .option-alpha,
+        body.dark-theme .omr-bubble {
             color: #f8fafc;
             border-color: rgba(226,232,240,0.82);
         }
 
-        body.dark-theme:not(.admin-mode) .omr-bubble {
+        body.dark-theme .omr-bubble {
             background: rgba(30,41,59,0.78);
             font-weight: 800;
         }
 
-        body.dark-theme:not(.admin-mode) .omr-row {
+        body.dark-theme .omr-row {
             border-color: rgba(226,232,240,0.2);
         }
 
-        body.dark-theme:not(.admin-mode) .omr-row.active,
-        body.dark-theme:not(.admin-mode) .stat-cell {
+        body.dark-theme .omr-row.active,
+        body.dark-theme .stat-cell {
             background: rgba(255,255,255,0.08);
         }
 
-        body.dark-theme:not(.admin-mode) .stats-row {
+        body.dark-theme .stats-row {
             background: rgba(226,232,240,0.2);
             border-top-color: rgba(226,232,240,0.22);
         }
 
-        body.dark-theme:not(.admin-mode) .normal-sidebar-submit-wrap,
-        body.dark-theme:not(.admin-mode) #normal-question-card > .nav-actions {
+        body.dark-theme .normal-sidebar-submit-wrap,
+        body.dark-theme #normal-question-card > .nav-actions {
             background: rgba(17,24,39,0.96);
         }
 
-        body.dark-theme:not(.admin-mode) .stat-num {
+        body.dark-theme .stat-num {
             color: #ffffff;
         }
 
-        body.dark-theme:not(.admin-mode) .stat-lbl {
+        body.dark-theme .stat-lbl {
             color: #dbe5f4;
         }
 
-        body.dark-theme:not(.admin-mode) .sidebar-card-body::-webkit-scrollbar-track {
+        body.dark-theme .sidebar-card-body::-webkit-scrollbar-track {
             background: rgba(15,23,42,0.7);
         }
 
@@ -820,31 +820,9 @@
             to { transform: translateX(-100%); }
         }
 
-        body.dark-theme:not(.admin-mode) .daily-quote-track { color: #f3f4f6; }
+        body.dark-theme .daily-quote-track { color: #f3f4f6; }
 
         #setup-view > .panel { margin-top: 20px; }
-
-        .quote-admin-registry {
-            margin: 14px 38px 0;
-            border: 1px solid var(--border);
-            border-radius: 7px;
-            max-height: 190px;
-            overflow-y: auto;
-            background: var(--white);
-        }
-
-        .quote-admin-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-            gap: 10px;
-            align-items: center;
-            padding: 9px 10px;
-            border-bottom: 1px solid var(--border);
-            color: var(--ink);
-        }
-
-        .quote-admin-row:last-child { border-bottom: 0; }
-        .quote-admin-row span { overflow-wrap: anywhere; }
 
         @media (prefers-reduced-motion: reduce) {
             .daily-quote-track { animation-duration: 90s; }
@@ -854,9 +832,6 @@
             .daily-quote-strip { width: calc(100% - 20px); height: 26px; margin-top: 8px; }
             .daily-quote-track { font-size: 15px; animation-duration: 16s; }
             #setup-view > .panel { margin-top: 14px; }
-            .quote-admin-registry { margin-left: 16px; margin-right: 16px; }
-            .quote-admin-row { grid-template-columns: 1fr auto; }
-            .quote-admin-row .quote-admin-dzongkha { grid-column: 1 / -1; grid-row: 2; }
         }
 
         /* ─── EXAM LAYOUT ───────────────────────────── */
@@ -1880,421 +1855,7 @@
         .review-verdict.wrong   { background: var(--red-light);   color: var(--red); }
         .review-verdict.skipped { background: #f3f4f6; color: var(--ink-muted); }
 
-        /* ─── ADMIN PANEL ───────────────────────────── */
-        .admin-wrap { padding: 0 18px 50px; }
 
-        #admin-view,
-        #admin-view * {
-            font-family: "Times New Roman", Times, serif !important;
-            font-size: 12px !important;
-        }
-
-        #admin-view .panel-title,
-        #admin-view .admin-table thead th {
-            font-size: 13px !important;
-        }
-
-        body.admin-mode #admin-view .btn,
-        body.admin-mode #admin-view .btn-danger-sm,
-        body.admin-mode #admin-view .btn-view-sm {
-            box-shadow:
-                inset 0 1px 0 rgba(255,255,255,0.55),
-                inset 0 -2px 3px rgba(0,0,0,0.18),
-                0 2px 0 rgba(15,27,53,0.22),
-                0 7px 14px rgba(15,27,53,0.14) !important;
-        }
-
-        body.admin-mode #admin-view .btn:not(:disabled):active,
-        body.admin-mode #admin-view .btn-danger-sm:not(:disabled):active,
-        body.admin-mode #admin-view .btn-view-sm:not(:disabled):active {
-            box-shadow:
-                inset 0 2px 4px rgba(0,0,0,0.22),
-                inset 0 -1px 0 rgba(255,255,255,0.18),
-                0 1px 0 rgba(15,27,53,0.18) !important;
-        }
-
-        #admin-submit-btn {
-            width: auto;
-            min-width: 150px;
-            margin: 0 auto;
-            padding: 7px 14px;
-            display: flex;
-        }
-
-        .admin-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 16px;
-            max-width: 1120px;
-            margin: 0 auto;
-            align-items: start;
-        }
-
-        .admin-grid > .panel,
-        .admin-side-stack > .panel {
-            width: 100%;
-            max-width: none;
-        }
-
-        .admin-grid > .admin-editor-panel {
-            width: calc(100% - 28px);
-            margin-left: 14px !important;
-            margin-right: 14px !important;
-        }
-
-        .admin-editor-panel > form {
-            padding-left: 38px;
-            padding-right: 38px;
-        }
-
-        .admin-editor-panel > .panel-title,
-        .admin-editor-panel > .form-help {
-            margin-left: 38px;
-            margin-right: 38px;
-        }
-
-        .admin-side-stack {
-            display: grid;
-            grid-column: 1 / -1;
-            grid-template-columns: 1fr;
-            gap: 14px;
-            margin: 0;
-            animation: fadeUp 0.3s ease 0.05s both;
-        }
-
-        .admin-question-registry-inline {
-            margin: 18px 38px 0;
-            padding-top: 16px;
-            border-top: 1px solid var(--border);
-        }
-
-        .admin-registry-panel { order: 2; }
-        .admin-side-stack .bulk-import-box { order: 1; }
-
-        @media (min-width: 1101px) {
-            body.admin-mode header {
-                padding-left: max(18px, calc((100vw - 1120px) / 2 + 18px));
-                padding-right: max(18px, calc((100vw - 1120px) / 2 + 18px));
-            }
-
-            .admin-grid > .panel,
-            .admin-side-stack > .panel {
-                padding: 15px 17px;
-            }
-
-            .admin-grid > .panel {
-                margin-top: 14px !important;
-            }
-
-            .admin-grid .panel-title {
-                font-size: 13px !important;
-                margin-bottom: 9px;
-                padding-bottom: 7px;
-            }
-
-            .admin-grid .form-group {
-                margin-bottom: 8px;
-            }
-
-            .admin-grid .form-group label {
-                margin-bottom: 3px;
-                font-size: 12px;
-            }
-
-            .admin-grid .form-control {
-                padding: 6px 9px;
-                font-size: 12px;
-                border-radius: 6px;
-            }
-
-            .admin-grid textarea.form-control {
-                min-height: 56px;
-            }
-
-            .admin-grid #adm-question {
-                min-height: 62px;
-            }
-
-            .admin-grid .cat-mode-row {
-                gap: 7px;
-                margin-bottom: 6px;
-            }
-
-            .admin-grid .radio-pill {
-                padding: 5px 9px;
-                font-size: 12px;
-                border-radius: 6px;
-            }
-
-            .admin-grid .category-box {
-                padding: 7px 9px;
-                border-radius: 7px;
-            }
-
-            .admin-grid .form-help {
-                margin: -3px 0 7px;
-                font-size: 12px;
-                line-height: 1.35;
-            }
-
-            .admin-grid textarea.bulk-textarea {
-                min-height: 190px;
-            }
-
-            .admin-grid .btn {
-                padding: 7px 12px;
-                font-size: 12px;
-                border-radius: 6px;
-            }
-
-            .admin-grid .caf-admin-registry {
-                margin-top: 10px;
-                max-height: 190px;
-            }
-
-            .admin-grid .caf-admin-form-grid {
-                gap: 10px;
-            }
-
-            .admin-grid .admin-table td,
-            .admin-grid .admin-table thead th {
-                padding: 7px 9px;
-            }
-
-            .admin-grid .admin-table-scroll {
-                max-height: 300px;
-            }
-
-            .admin-grid .caf-admin-row {
-                padding: 8px 10px;
-                gap: 8px;
-            }
-        }
-
-        @media (max-width: 1100px) {
-            .admin-wrap { padding: 0 16px 60px; }
-            .admin-grid { grid-template-columns: 1fr; }
-            .admin-side-stack { grid-template-columns: 1fr !important; }
-        }
-
-        @media (max-width: 560px) {
-            .admin-grid > .admin-editor-panel {
-                width: calc(100% - 12px);
-                margin-left: 6px !important;
-                margin-right: 6px !important;
-            }
-
-            .admin-editor-panel > form {
-                padding-left: 16px;
-                padding-right: 16px;
-            }
-
-            .admin-editor-panel > .panel-title,
-            .admin-editor-panel > .form-help {
-                margin-left: 16px;
-                margin-right: 16px;
-            }
-
-            .admin-question-registry-inline {
-                margin-left: 16px;
-                margin-right: 16px;
-            }
-
-            .admin-col-num { width: 38px; }
-            .admin-col-category { width: 100px; }
-            .admin-col-action { width: 68px; }
-        }
-
-        .panel-title {
-            font-family: 'DM Serif Display', serif;
-            font-size: 20px;
-            font-weight: 400;
-            color: var(--navy);
-            margin-bottom: 20px;
-            padding-bottom: 14px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .badge-count {
-            background: var(--navy);
-            color: white;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 20px;
-            font-family: 'DM Sans', sans-serif;
-        }
-
-        .cat-mode-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-
-        .radio-pill {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 14px;
-            border: 1.5px solid var(--border);
-            border-radius: 7px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--ink-muted);
-            transition: all 0.15s;
-            user-select: none;
-        }
-
-        .radio-pill input[type="radio"] { display: none; }
-
-        .radio-pill.active {
-            border-color: var(--navy);
-            color: var(--navy);
-            background: rgba(15,27,53,0.04);
-            font-weight: 600;
-        }
-
-        .admin-table-wrap {
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            overflow: hidden;
-        }
-
-        .admin-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-            table-layout: fixed;
-        }
-
-        .admin-col-num { width: 56px; }
-        .admin-col-category { width: 180px; }
-        .admin-col-action { width: 96px; }
-
-        .admin-table thead th {
-            background: var(--navy);
-            color: white;
-            padding: 11px 14px;
-            text-align: left;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-        }
-
-        .admin-table tbody tr {
-            border-bottom: 1px solid var(--cream);
-            transition: background 0.1s;
-        }
-
-        .admin-table tbody tr:last-child { border-bottom: none; }
-        .admin-table tbody tr:hover { background: var(--cream); }
-
-        .admin-table td {
-            padding: 11px 14px;
-            color: var(--ink);
-            vertical-align: middle;
-        }
-
-        .admin-question-cell {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .admin-table-scroll {
-            max-height: 340px;
-            overflow-y: auto;
-        }
-
-	        .admin-table-scroll::-webkit-scrollbar { width: 4px; }
-	        .admin-table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-	        .question-view-body {
-	            text-align: left;
-	            margin-top: 18px;
-	        }
-
-	        .question-view-category {
-	            display: inline-flex;
-	            color: var(--gold);
-	            background: var(--gold-pale);
-	            border: 1px solid rgba(201,168,76,0.28);
-	            border-radius: 5px;
-	            padding: 4px 9px;
-	            font-size: 11px;
-	            font-weight: 800;
-	            text-transform: uppercase;
-	            letter-spacing: 0.4px;
-	            margin-bottom: 12px;
-	        }
-
-	        .question-view-text {
-	            font-size: 15px;
-	            font-weight: 700;
-	            color: var(--navy);
-	            line-height: 1.45;
-	            margin-bottom: 14px;
-	        }
-
-	        .question-view-options {
-	            display: grid;
-	            gap: 8px;
-	            margin-bottom: 18px;
-	        }
-
-	        .question-view-option {
-	            display: grid;
-	            grid-template-columns: 28px 1fr;
-	            gap: 10px;
-	            align-items: start;
-	            padding: 10px 12px;
-	            border: 1px solid var(--border);
-	            border-radius: 7px;
-	            background: var(--cream);
-	            font-size: 13px;
-	            color: var(--ink);
-	        }
-
-	        .question-view-option.correct {
-	            border-color: rgba(26,127,90,0.35);
-	            background: var(--green-light);
-	        }
-
-	        .question-view-alpha {
-	            font-weight: 800;
-	            color: var(--navy);
-	        }
-
-        .empty-state {
-            text-align: center;
-            padding: 36px;
-            color: var(--ink-muted);
-        }
-
-        .empty-state svg { margin-bottom: 12px; opacity: 0.3; }
-        .empty-state p { font-size: 13px; }
-
-        .category-box {
-            background: var(--cream);
-            border: 1px dashed var(--border);
-            border-radius: 8px;
-            padding: 14px;
-        }
-
-        .img-preview {
-            max-width: 140px;
-            max-height: 90px;
-            object-fit: contain;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            margin-top: 10px;
-            display: none;
-        }
 
         /* ─── TOAST NOTIFICATION ────────────────────── */
         .toast {
@@ -2352,7 +1913,7 @@
             transition: width 0.4s ease;
         }
 
-        /* ─── ADMIN GATEWAY MODAL ───────────────────── */
+        /* ─── SHARED MODAL ──────────────────────────── */
         .modal-backdrop {
             position: fixed;
             inset: 0;
@@ -3279,68 +2840,8 @@
             align-self: center;
         }
 
-        .caf-admin-panel .caf-admin-form-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 14px;
-        }
-
-        .caf-admin-panel .caf-admin-wide { grid-column: 1 / -1; }
-        .caf-admin-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 12px;
-        }
-
-        .caf-admin-registry {
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            margin-top: 18px;
-            max-height: 240px;
-            overflow-y: auto;
-        }
-
-        .caf-admin-registry::-webkit-scrollbar { width: 4px; }
-        .caf-admin-registry::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-        .caf-admin-row {
-            display: grid;
-            grid-template-columns: 0.8fr 1fr 1.6fr auto;
-            gap: 10px;
-            align-items: center;
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--border);
-            font-size: 12px;
-        }
-
-        .caf-admin-row:last-child { border-bottom: 0; }
-        .caf-admin-row strong { color: var(--navy); }
-
-        body.admin-mode #admin-view .caf-admin-registry {
-            background: var(--white);
-        }
-
-        body.admin-mode #admin-view .caf-admin-row {
-            color: var(--ink);
-            background: var(--white);
-        }
-
-        body.admin-mode #admin-view .caf-admin-row strong,
-        body.admin-mode #admin-view .caf-admin-row span,
-        body.admin-mode #admin-view .caf-admin-row div {
-            color: var(--ink) !important;
-            opacity: 1 !important;
-        }
-
-        body.admin-mode #admin-view .caf-admin-row strong {
-            color: var(--navy) !important;
-        }
-
         @media (max-width: 900px) {
             .caf-wall-grid { grid-auto-columns: calc((100% - 18px) / 2); }
-            .caf-admin-panel .caf-admin-form-grid { grid-template-columns: 1fr; }
-            .caf-admin-panel .caf-admin-wide { grid-column: auto; }
         }
 
         @media (max-width: 560px) {
@@ -3379,7 +2880,6 @@
             .caf-question-text,
             .caf-answer-text { font-size: 12px; line-height: 1.3; max-height: none; }
             .caf-card-footer { padding-top: 4px; gap: 4px; font-size: 8px; }
-            .caf-admin-row { grid-template-columns: 1fr; }
         }
 
         /* ── Online Test landing panel ── */
@@ -3673,66 +3173,66 @@
         .peo-submit-btn-container { padding: 0 12px 12px; }
         .peo-btn-submit { width: 100%; padding: 10px; background: #2f9e44; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
 
-        body.dark-theme:not(.admin-mode) .exam-layout.show,
-        body.dark-theme:not(.admin-mode) .peo-test-workspace {
+        body.dark-theme .exam-layout.show,
+        body.dark-theme .peo-test-workspace {
             background: #111827 !important;
         }
 
-        body.dark-theme:not(.admin-mode) .peo-question-panel,
-        body.dark-theme:not(.admin-mode) .peo-graph-panel,
-        body.dark-theme:not(.admin-mode) .peo-omr-panel {
+        body.dark-theme .peo-question-panel,
+        body.dark-theme .peo-graph-panel,
+        body.dark-theme .peo-omr-panel {
             background: rgba(17,24,39,0.94);
             border-color: rgba(148,163,184,0.24);
             color: #f8fafc;
         }
 
-        body.dark-theme:not(.admin-mode) .peo-graph-panel {
+        body.dark-theme .peo-graph-panel {
             background: transparent;
             border: 0;
         }
 
-        body.dark-theme:not(.admin-mode) .peo-question-text,
-        body.dark-theme:not(.admin-mode) .peo-option-row,
-        body.dark-theme:not(.admin-mode) .peo-graph-title,
-        body.dark-theme:not(.admin-mode) .peo-omr-q-num,
-        body.dark-theme:not(.admin-mode) .peo-omr-summary-bar {
+        body.dark-theme .peo-question-text,
+        body.dark-theme .peo-option-row,
+        body.dark-theme .peo-graph-title,
+        body.dark-theme .peo-omr-q-num,
+        body.dark-theme .peo-omr-summary-bar {
             color: #f8fafc;
         }
 
-        body.dark-theme:not(.admin-mode) .peo-option-row,
-        body.dark-theme:not(.admin-mode) .peo-omr-row,
-        body.dark-theme:not(.admin-mode) .peo-omr-footer-area {
+        body.dark-theme .peo-option-row,
+        body.dark-theme .peo-omr-row,
+        body.dark-theme .peo-omr-footer-area {
             background: rgba(30,41,59,0.82);
             border-color: rgba(148,163,184,0.22);
         }
 
-        body.dark-theme:not(.admin-mode) .peo-option-letter,
-        body.dark-theme:not(.admin-mode) .peo-bubble {
+        body.dark-theme .peo-option-letter,
+        body.dark-theme .peo-bubble {
             background: rgba(15,23,42,0.9);
             border-color: rgba(203,213,225,0.62);
             color: #dbe5f4;
         }
 
-        body.dark-theme:not(.admin-mode) .peo-option-row.selected {
+        body.dark-theme .peo-option-row.selected {
             background: rgba(201,168,76,0.18);
             border-color: var(--gold-light);
         }
 
-        body.dark-theme:not(.admin-mode) .peo-cat-badge,
-        body.dark-theme:not(.admin-mode) .q-audio-timer {
+        body.dark-theme .peo-cat-badge,
+        body.dark-theme .q-audio-timer {
             background: rgba(201,168,76,0.18);
             color: var(--gold-light);
             border: 1px solid rgba(201,168,76,0.28);
         }
 
-        body.dark-theme:not(.admin-mode) .peo-bubble.active,
-        body.dark-theme:not(.admin-mode) .omr-bubble.filled {
+        body.dark-theme .peo-bubble.active,
+        body.dark-theme .omr-bubble.filled {
             background: var(--gold-light);
             border-color: var(--gold-light);
             color: #111827;
         }
 
-        body.dark-theme:not(.admin-mode) .peo-summary-val {
+        body.dark-theme .peo-summary-val {
             color: var(--gold-light);
         }
 
@@ -4381,59 +3881,7 @@
 <!-- ─── TOAST ─────────────────────────────────────── -->
 <div class="toast" id="toast"></div>
 
-<!-- ─── ADMIN GATEWAY MODAL ────────────────────────── -->
-<div class="modal-backdrop" id="admin-modal">
-    <div class="modal-box" id="modal-box">
-        <div class="modal-icon">🔐</div>
-        <div class="modal-title">Admin Gateway</div>
-        <div class="modal-subtitle" id="admin-modal-subtitle">Enter password</div>
 
-        <div class="pw-input-wrap" id="admin-pw-wrap">
-            <input
-                type="password"
-                id="admin-pw-input"
-                class="pw-input"
-                placeholder="Password Entry"
-                autocomplete="current-password"
-            >
-            <button class="pw-toggle" type="button" id="pw-eye" title="Show/hide password">👁</button>
-        </div>
-        <div class="pw-input-wrap" id="admin-mfa-wrap" style="display:none;">
-            <input type="hidden" id="admin-mfa-input" autocomplete="one-time-code">
-            <div class="otp-box-row">
-                <input type="text" class="otp-digit-input" data-otp-digit="0" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
-                <input type="text" class="otp-digit-input" data-otp-digit="1" inputmode="numeric" maxlength="1">
-                <input type="text" class="otp-digit-input" data-otp-digit="2" inputmode="numeric" maxlength="1">
-                <input type="text" class="otp-digit-input" data-otp-digit="3" inputmode="numeric" maxlength="1">
-                <input type="text" class="otp-digit-input" data-otp-digit="4" inputmode="numeric" maxlength="1">
-                <input type="text" class="otp-digit-input" data-otp-digit="5" inputmode="numeric" maxlength="1">
-            </div>
-        </div>
-        <div class="pw-error-msg" id="pw-error">⚠ Incorrect password. Please try again.</div>
-
-        <div class="modal-btn-row">
-            <button type="button" class="btn-modal-cancel" id="admin-modal-cancel-btn">Cancel</button>
-            <button type="button" class="btn-modal-auth" id="admin-modal-auth-btn">
-                <span>Authenticate</span>
-                <span>→</span>
-            </button>
-        </div>
-
-        <div class="modal-divider"></div>
-        <div class="modal-security-note">🔒 Protected </div>
-	    </div>
-	</div>
-
-	<div class="modal-backdrop" id="question-view-modal">
-	    <div class="modal-box">
-	        <div class="modal-title">Question Details</div>
-	        <div class="modal-subtitle">Review the selected question and answer options.</div>
-	        <div class="question-view-body" id="question-view-body"></div>
-	        <div class="modal-btn-row" style="grid-template-columns:1fr;margin-top:18px;">
-	            <button type="button" class="btn-modal-auth" id="question-view-close-btn">Close</button>
-	        </div>
-	    </div>
-	</div>
 
     <div class="modal-backdrop" id="contact-modal">
         <div class="modal-box contact-modal-box">
@@ -4674,292 +4122,7 @@
         </div>
     </div>
 
-    <!-- ─── ADMIN VIEW ─────────────────────────────── -->
-    <div id="admin-view" style="display:none;">
-        <div class="admin-wrap">
-            <div class="admin-grid">
 
-                <!-- Add Question Form -->
-                <div class="panel admin-editor-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
-                    <div class="panel-title" id="admin-form-title">Add Question</div>
-
-                    <form id="admin-form">
-                        <div class="form-group">
-                            <label>Destination</label>
-                            <div class="cat-mode-row" id="dest-mode-row">
-                                <label class="radio-pill active" id="pill-exam">
-                                    <input type="radio" name="dest-mode" value="exam" checked>
-                                    Exam Question Bank
-                                </label>
-                                <label class="radio-pill" id="pill-pe">
-                                    <input type="radio" name="dest-mode" value="pe">
-                                     PE Pages
-                                </label>
-                                <label class="radio-pill" id="pill-pe-online">
-                                    <input type="radio" name="dest-mode" value="pe-online">
-                                     PE Online
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- PE Sub-Type Selector (only visible when Destination = PE) -->
-                        <div class="form-group" id="pe-type-wrap" style="display:none;">
-                            <label>PE Sub-Category</label>
-                            <div class="cat-mode-row">
-                                <label class="radio-pill active" id="pill-pe-mock">
-                                    <input type="radio" name="pe-type" value="Mock" checked>
-                                    Mock Test
-                                </label>
-                                <label class="radio-pill" id="pill-pe-past">
-                                    <input type="radio" name="pe-type" value="Past Paper">
-                                    Past PE Examination
-                                </label>
-                                <label class="radio-pill" id="pill-pe-di">
-                                    <input type="radio" name="pe-type" value="Data Interpretation">
-                                     Data Interpretation
-                                </label>
-                            </div>
-                            <div style="margin-top:10px;">
-                                <label style="font-size:12px;color:var(--ink-muted);font-weight:600;display:block;margin-bottom:6px;" id="adm-pe-topic-label">Topic / Paper Name</label>
-                                <input type="text" id="adm-pe-topic" class="form-control" placeholder="e.g., Problems on Trains, RCSC 2024 Paper 1">
-                            </div>
-                            <div id="pe-di-note" style="display:none;margin-top:10px;font-size:12px;color:var(--ink-muted);background:var(--cream);border-left:3px solid var(--gold);padding:10px 12px;border-radius:6px;line-height:1.5;">
-                                  <strong>Data Interpretation set:</strong> upload the chart/graph <strong>Illustration / Image</strong> field below, every question you save under this same Set Name will share that chart in a split-screen view. Add each question for this chart one at a time, keeping the same Set Name.
-                            </div>
-                        </div>
-
-                        <div class="form-group" id="exam-cat-wrap">
-                            <label>Category Mode</label>
-                            <div class="cat-mode-row" id="cat-mode-row">
-	                                <label class="radio-pill active" id="pill-exist">
-	                                    <input type="radio" name="cat-mode" value="exist" checked>
-	                                    Existing 
-	                                </label>
-	                                <label class="radio-pill" id="pill-new">
-	                                    <input type="radio" name="cat-mode" value="new">
-	                                    New 
-	                                </label>
-                            </div>
-                            <div class="category-box">
-                                <div id="exist-wrap">
-                                    <label style="font-size:12px;color:var(--ink-muted);font-weight:600;display:block;margin-bottom:6px;">Select Category</label>
-                                    <select id="adm-cat-select" class="form-control"></select>
-                                </div>
-                                <div id="new-wrap" style="display:none;">
-                                    <label style="font-size:12px;color:var(--ink-muted);font-weight:600;display:block;margin-bottom:6px;">New Name</label>
-                                    <input type="text" id="adm-cat-input" class="form-control" placeholder="e.g., Biology, History">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Question Text</label>
-                            <textarea id="adm-question" class="form-control" placeholder="Enter question prompt…" required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Illustration / Image </label>
-                            <input type="file" id="adm-img-file" accept="image/*" class="form-control" style="padding:8px;">
-                            <input type="hidden" id="adm-img-b64">
-                            <img id="adm-img-preview" class="img-preview" alt="Preview" decoding="async">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Music / Audio Question </label>
-                            <input type="file" id="adm-audio-file" accept="audio/*" class="form-control" style="padding:8px;">
-                            <input type="hidden" id="adm-audio-b64">
-                            <audio id="adm-audio-preview" class="q-audio" controls style="display:none;"></audio>
-                        </div>
-
-                        <div class="row-2">
-                            <div class="form-group">
-                                <label>Option A</label>
-                                <input type="text" id="adm-A" class="form-control" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Option B</label>
-                                <input type="text" id="adm-B" class="form-control" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Option C</label>
-                                <input type="text" id="adm-C" class="form-control" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Option D</label>
-                                <input type="text" id="adm-D" class="form-control" required>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Correct Answer</label>
-                            <select id="adm-correct" class="form-control">
-                                <option value="0">Option A</option>
-                                <option value="1">Option B</option>
-                                <option value="2">Option C</option>
-                                <option value="3">Option D</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Explanation / Solution </label>
-                            <textarea id="adm-explanation" class="form-control" placeholder="Provide detailed explanation or solution… (shown only on PE page)" style="min-height:80px;"></textarea>
-                        </div>
-
-	                        <button type="submit" class="btn btn-green btn-full" id="admin-submit-btn"> Save to Database</button>
-	                        <button type="button" class="btn btn-outline btn-full" id="cancel-edit-btn" style="display:none;margin-top:10px;">Cancel Edit</button>
-	                    </form>
-
-                        <div class="admin-registry-panel admin-question-registry-inline">
-                            <div class="panel-title">
-                                Question Registry
-                                <span class="badge-count" id="q-count">0</span>
-                            </div>
-
-                            <div class="admin-table-wrap">
-                                <table class="admin-table">
-                                    <colgroup>
-                                        <col class="admin-col-num">
-                                        <col class="admin-col-category">
-                                        <col>
-                                        <col class="admin-col-action">
-                                    </colgroup>
-                                    <thead>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Category</th>
-                                            <th>Question</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
-                                </table>
-                                <div class="admin-table-scroll">
-                                    <table class="admin-table">
-                                        <colgroup>
-                                            <col class="admin-col-num">
-                                            <col class="admin-col-category">
-                                            <col>
-                                            <col class="admin-col-action">
-                                        </colgroup>
-                                        <tbody id="admin-tbody"></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-	                </div>
-
-                <div class="panel caf-admin-panel admin-editor-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
-                    <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Current Affair Admin</div>
-                    <p class="form-help">Add sticky-note current affair flashcards. Data is saved to Supabase .</p>
-
-                    <form id="caf-admin-form">
-                        <div class="caf-admin-form-grid">
-                            <div class="form-group">
-                                <label>Focus Header</label>
-                                <select id="caf-admin-scope" class="form-control">
-                                    <option value="Bhutan">Bhutan </option>
-                                    <option value="International">International </option>
-                                </select>
-                            </div>
-                            <div class="form-group caf-admin-wide">
-                                <label>Category Mode</label>
-                                <div class="cat-mode-row">
-                                    <label class="radio-pill active" id="caf-pill-exist">
-                                        <input type="radio" name="caf-cat-mode" value="exist" checked>
-                                        Existing
-                                    </label>
-                                    <label class="radio-pill" id="caf-pill-new">
-                                        <input type="radio" name="caf-cat-mode" value="new">
-                                        New
-                                    </label>
-                                </div>
-                                <div class="category-box">
-                                    <div id="caf-exist-wrap">
-                                        <label>View Existing Category</label>
-                                        <select id="caf-admin-category" class="form-control"></select>
-                                    </div>
-                                    <div id="caf-new-wrap" style="display:none;">
-                                        <label>New Category Name</label>
-                                        <input type="text" id="caf-admin-category-new" class="form-control" maxlength="120" placeholder="e.g., Economy, Science & Health">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group caf-admin-wide">
-                                <label> Date Stamp</label>
-                                <input type="text" id="caf-admin-date" class="form-control" placeholder="26 June 2026" required>
-                            </div>
-                            <div class="form-group caf-admin-wide">
-                                <label>Question </label>
-                                <textarea id="caf-admin-question" class="form-control" placeholder="Enter flashcard prompt text..." required></textarea>
-                            </div>
-                            <div class="form-group caf-admin-wide">
-                                <label>Verified Answer </label>
-                                <textarea id="caf-admin-answer" class="form-control" placeholder="Enter solution outcome details..." required></textarea>
-                            </div>
-                        </div>
-                        <div class="caf-admin-actions">
-                            <button type="submit" class="btn btn-green" id="caf-admin-save-btn">Save Flashcard </button>
-                            <button type="button" class="btn btn-outline" id="caf-admin-clear-btn">Clear</button>
-                            <button type="button" class="btn btn-outline" id="caf-admin-cancel-btn" style="display:none;">Cancel Edit</button>
-                        </div>
-                    </form>
-
-                    <div class="caf-admin-registry" id="caf-admin-registry"></div>
-                </div>
-
-                <div class="panel admin-editor-panel" style="margin:24px 0 0; animation:fadeUp 0.3s ease both;">
-                    <div class="panel-title" style="margin-bottom:14px;">Daily Quotes Admin</div>
-                    <p class="form-help">Publish English and Dzongkha text for 24 hours. Each language is shown separately.</p>
-
-                    <form id="quote-admin-form">
-                        <div class="form-group">
-                            <label>English Quote</label>
-                            <textarea id="quote-admin-english" class="form-control" placeholder="Enter the English quote..." required></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Dzongkha Quote</label>
-                            <textarea id="quote-admin-dzongkha" class="form-control" placeholder="Enter the Dzongkha quote..." required></textarea>
-                        </div>
-                        <div class="caf-admin-actions" style="justify-content:center;">
-                            <button type="submit" class="btn btn-green" id="quote-admin-save-btn" style="margin:0 auto;display:flex;">Publish Quote</button>
-                            <button type="button" class="btn btn-outline" id="quote-admin-cancel-btn" style="display:none;">Cancel Edit</button>
-                        </div>
-                    </form>
-
-                    <div class="quote-admin-registry" id="quote-admin-registry"></div>
-                </div>
-
-                <!-- Bulk Question Import -->
-                <div class="admin-side-stack">
-                    <div class="panel bulk-import-box" style="margin:0;">
-                        <div class="panel-title" style="font-size:17px;margin-bottom:14px;">Bulk Append </div>
-                        <p class="form-help">
-                            Paste each question as up to 15 lines: question text can use multiple lines, followed by A, B, C, D, and Answer. Leave one blank line between questions.
-                        </p>
-                        <div id="bulk-destination-banner" style="background:#fff8e1;border:1.5px solid #f5d76e;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#7a5c00;">
-                            Destination: <span id="bulk-destination-label">Exam Question Bank</span>
-                        </div>
-                        <form id="bulk-form">
-                            <div class="form-group">
-                                <label>Bulk Question List</label>
-                                <textarea id="bulk-questions" class="form-control bulk-textarea" placeholder="Example:
-
-You can continue the question on another line.
-A. First option
-B. Second option
-C. Third option
-D. Fourth option
-Answer: C" ></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-navy btn-full">Append Bulk </button>
-                        </form>
-                    </div>
-
-                </div>
-            </div>
-
-        </div>
-        </div>
-    </div>
 
     <!-- ─── PE (PRACTICE ENGINE) VIEW ────────────────── -->
     <div id="pe-view" style="display:none;">
