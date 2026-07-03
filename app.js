@@ -126,6 +126,7 @@ function bindStaticUiEvents() {
             caLoadState({ render: false }).catch(() => {});
             loadExamCatalog().catch(() => {});
             loadPEOnlineQuestionBank().then(updatePEOnlineCount).catch(() => {});
+            loadDatabase({ silent: true }).catch(() => {});
         };
         if (typeof requestAnimationFrame === "function") {
             requestAnimationFrame(() => setTimeout(kickOff, 0));
@@ -831,7 +832,8 @@ async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam m
     }
 }
 
-async function loadDatabase() {
+async function loadDatabase(options = {}) {
+    const silent = Boolean(options.silent);
     if (databaseReady) return true;
     if (databaseLoading) return false;
     databaseLoading = true;
@@ -843,7 +845,7 @@ async function loadDatabase() {
             processData(JSON.parse(cached));
             databaseReady = true;
             databaseLoading = false;
-            if (!examPreparing) showLoading(false);
+            if (!examPreparing && !silent) showLoading(false);
             // Refresh in background silently (no spinner)
             fetchQuestions()
                 .then(data => {
@@ -858,14 +860,16 @@ async function loadDatabase() {
     }
 
     // ── First-time load with timeout + animated progress ──
-    showLoading(true, "Loading question database…");
-    setLoaderProgress(10);
+    if (!silent) {
+        showLoading(true, "Loading question database…");
+        setLoaderProgress(10);
+    }
 
     // Animate progress bar while waiting
     let prog = 10;
     const progInterval = setInterval(() => {
         prog = Math.min(prog + (Math.random() * 8 + 3), 85);
-        setLoaderProgress(prog);
+        if (!silent) setLoaderProgress(prog);
     }, 400);
     // Use Promise.race for timeout — AbortController causes DataCloneError in sandboxed iframes
     const fetchPromise = fetchQuestions();
@@ -875,47 +879,55 @@ async function loadDatabase() {
     );
 
     try {
-        document.getElementById("loading-text").textContent = "Fetching questions…";
+        if (!silent) document.getElementById("loading-text").textContent = "Fetching questions…";
         const data = await Promise.race([fetchPromise, timeoutPromise]);
         clearTimeout(timeoutId);
         clearInterval(progInterval);
-        setLoaderProgress(95);
+        if (!silent) setLoaderProgress(95);
 
         saveDatabaseCache(data);
         processData(data);
         databaseReady = true;
 
-        document.getElementById("loading-text").textContent = "Ready!";
-        setLoaderProgress(100);
-        setTimeout(() => {
-            if (!examPreparing) showLoading(false);
-        }, 300);
+        if (!silent) {
+            document.getElementById("loading-text").textContent = "Ready!";
+            setLoaderProgress(100);
+            setTimeout(() => {
+                if (!examPreparing) showLoading(false);
+            }, 300);
+        }
         databaseLoading = false;
         return true;
 
     } catch (e) {
         clearTimeout(timeoutId);
         clearInterval(progInterval);
-        setLoaderProgress(0);
+        if (!silent) setLoaderProgress(0);
         if (e.message === "TIMEOUT") {
             const fallback = localStorage.getItem(DB_CACHE_KEY);
             if (fallback) {
                 processData(JSON.parse(fallback));
                 databaseReady = true;
                 databaseLoading = false;
-                showToast("Using saved questions. Internet is slow.", "info");
-                showLoading(false);
+                if (!silent) {
+                    showToast("Using saved questions. Internet is slow.", "info");
+                    showLoading(false);
+                }
                 return true;
             }
-            showToast("Database is taking too long. Please try again.", "error");
-            document.getElementById("loading-text").textContent = "Database is taking too long.";
+            if (!silent) {
+                showToast("Database is taking too long. Please try again.", "error");
+                document.getElementById("loading-text").textContent = "Database is taking too long.";
+            }
         } else {
-            showToast("Failed to load question database.", "error");
-            document.getElementById("loading-text").textContent = "Failed to connect.";
+            if (!silent) {
+                showToast("Failed to load question database.", "error");
+                document.getElementById("loading-text").textContent = "Failed to connect.";
+            }
         }
         console.error(e);
         databaseLoading = false;
-        setTimeout(() => showLoading(false), 1500);
+        if (!silent) setTimeout(() => showLoading(false), 1500);
         return false;
     }
 }
