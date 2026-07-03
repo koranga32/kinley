@@ -74,10 +74,11 @@ async function handleQuestions(context) {
     if (view === "media") {
         const ids = validateMediaIds(url.searchParams.get("ids"));
         if (!ids.length) return apiError(400, "missing_ids", "Question media IDs are required.");
-        return json(await supabaseServerRequest(
+        const rows = await supabaseServerRequest(
             context.env,
             `Exam?select=id,image,audio&id=in.(${ids.join(",")})`
-        ), 200, PUBLIC_CACHE_MEDIA);
+        );
+        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row)), 200, PUBLIC_CACHE_MEDIA);
     }
     if (view === "category-media") {
         const category = String(url.searchParams.get("category") || "").normalize("NFKC").trim();
@@ -89,7 +90,8 @@ async function handleQuestions(context) {
             order: "id.asc"
         });
         params.set("category", `eq.${category}`);
-        return json(await supabaseServerRequest(context.env, `Exam?${params.toString()}`), 200, PUBLIC_CACHE_MEDIA);
+        const rows = await supabaseServerRequest(context.env, `Exam?${params.toString()}`);
+        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row)), 200, PUBLIC_CACHE_MEDIA);
     }
     return apiError(400, "invalid_view", "Question view must be catalog, pe-practice, media, or category-media.");
 }
@@ -136,14 +138,14 @@ async function handlePEOnlineQuestions(context) {
             context.env,
             `PEOnlineExam?select=id,image,audio&id=in.(${ids.join(",")})`
         );
-        return json((rows || []).map(row => ({ ...row, id: `peo:${row.id}` })), 200, PUBLIC_CACHE_MEDIA);
+        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row, value => `peo:${value}`)), 200, PUBLIC_CACHE_MEDIA);
     }
     if (view === "all-media") {
         const rows = await supabaseServerRequest(
             context.env,
             "PEOnlineExam?select=id,image,audio&order=id.asc"
         );
-        return json((rows || []).map(row => ({ ...row, id: `peo:${row.id}` })), 200, PUBLIC_CACHE_MEDIA);
+        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row, value => `peo:${value}`)), 200, PUBLIC_CACHE_MEDIA);
     }
     return apiError(400, "invalid_view", "PE Online question view must be catalog, media, or all-media.");
 }
@@ -397,6 +399,38 @@ function toSupabaseQuestionPayload(question) {
 
 function trustedStoragePrefix(env) {
     return `${String(env.SUPABASE_URL || "").replace(/\/$/, "")}/storage/v1/object/public/${MEDIA_BUCKET}/`;
+}
+
+function normalizePublicMediaValue(env, value, expectedType) {
+    const source = String(value || "").trim();
+    if (!source) return "";
+    if (source.startsWith("https://") || source.startsWith("blob:")) return source;
+    if (source.startsWith(`data:${expectedType}/`)) return source;
+
+    const supabaseOrigin = String(env.SUPABASE_URL || "").replace(/\/$/, "");
+    const bucketPrefix = `${MEDIA_BUCKET}/`;
+
+    if (source.startsWith("/storage/v1/object/public/")) {
+        return `${supabaseOrigin}${source}`;
+    }
+    if (source.startsWith("storage/v1/object/public/")) {
+        return `${supabaseOrigin}/${source}`;
+    }
+
+    const normalizedPath = source.startsWith(bucketPrefix)
+        ? source.slice(bucketPrefix.length)
+        : source.replace(/^\/+/, "");
+
+    return `${trustedStoragePrefix(env)}${normalizedPath}`;
+}
+
+function normalizePublicMediaRow(env, row, idTransform = value => value) {
+    return {
+        ...row,
+        id: idTransform(row.id),
+        image: normalizePublicMediaValue(env, row.image, "image"),
+        audio: normalizePublicMediaValue(env, row.audio, "audio")
+    };
 }
 
 function decodeMediaDataUrl(dataUrl, expectedType) {
