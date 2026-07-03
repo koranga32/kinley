@@ -61,7 +61,7 @@ function bindStaticUiEvents() {
     document.getElementById("student-name")?.addEventListener("keydown", (event) => {
         if (event.key === "Enter") startExam();
     });
-    document.getElementById("category-select")?.addEventListener("change", updateTestSummary);
+    document.getElementById("category-select")?.addEventListener("change", handleCategorySelectionChange);
     document.getElementById("start-btn")?.addEventListener("click", startExam);
     document.getElementById("normal-sidebar-submit-btn")?.addEventListener("click", submitExam);
 
@@ -1006,6 +1006,24 @@ function updateTestSummary() {
 
 }
 
+function queueSelectedCategoryMediaPrefetch(options = {}) {
+    if (!examCatalogReady) return;
+    const select = document.getElementById("category-select");
+    const category = String(select?.value || "").trim();
+    if (!category) return;
+    void prefetchCategoryMedia(category, options).catch(() => {});
+}
+
+function queuePEOnlineMediaPrefetch() {
+    void Promise.resolve(prefetchPEOnlineMedia()).catch(() => {});
+}
+
+function handleCategorySelectionChange() {
+    updateTestSummary();
+    if (!setupContinued) return;
+    queueSelectedCategoryMediaPrefetch();
+}
+
 // ─── EXAM START ───────────────────────────────────────
 async function startExam() {
     if (examPreparing) return;
@@ -1034,6 +1052,7 @@ async function startExam() {
             btn.innerHTML = "<span>Begin Examination</span> →";
             btn.disabled = false;
             setPostContinueActionButtons();
+            queueSelectedCategoryMediaPrefetch();
             document.getElementById("category-select").focus();
             examPreparing = false;
             showLoading(false);
@@ -2074,6 +2093,7 @@ async function openPEPortal() {
     loadPEOnlineQuestionBank()
         .then(() => {
             updatePEOnlineCount();
+            queuePEOnlineMediaPrefetch();
         })
         .catch(error => {
             peOnlineCatalog.total = 0;
