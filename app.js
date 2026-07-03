@@ -39,6 +39,7 @@ let peOnlineCatalog = {
 let questionMediaCache = new Map();
 let categoryMediaPrefetch = { category: "", promise: null };
 let peOnlineMediaPrefetchPromise = null;
+let peTopicMediaPrefetch = new Map();
 let publicApiCache = new Map();
 let peQuestionsCache = [];
 let peTopicBuckets = new Map();
@@ -337,6 +338,7 @@ function clearDatabaseCache() {
     questionMediaCache = new Map();
     categoryMediaPrefetch = { category: "", promise: null };
     peOnlineMediaPrefetchPromise = null;
+    peTopicMediaPrefetch = new Map();
     clearPublicApiCache();
 }
 
@@ -1016,6 +1018,50 @@ function queueSelectedCategoryMediaPrefetch(options = {}) {
 
 function queuePEOnlineMediaPrefetch() {
     void Promise.resolve(prefetchPEOnlineMedia()).catch(() => {});
+}
+
+function getPETopicQuestions(peType, topic) {
+    return getPEQuestions().filter(q => {
+        const info = parsePECategory(q.category);
+        return info.peType === peType && info.topic === topic;
+    });
+}
+
+function getPETopicPrefetchKey(peType, topic) {
+    return `${String(peType || "").trim()}::${String(topic || "").trim()}`;
+}
+
+async function prefetchPETopicMedia(peType, topic, { blockForMs = 0 } = {}) {
+    if (peType === "Data Interpretation") return;
+
+    const key = getPETopicPrefetchKey(peType, topic);
+    if (!key) return;
+
+    if (!peTopicMediaPrefetch.has(key)) {
+        const topicQuestions = getPETopicQuestions(peType, topic);
+        if (!topicQuestions.length) return;
+
+        const warmable = topicQuestions.filter(q => q.imageCode || q.audioCode).slice(0, 3);
+        const promise = (async () => {
+            await fetchSelectedQuestionMedia(topicQuestions);
+            if (warmable.length) {
+                await warmQuestionAssets(warmable, { reportProgress: false });
+            }
+        })().catch(error => {
+            peTopicMediaPrefetch.delete(key);
+            console.error("PE topic media prefetch failed:", error);
+        });
+
+        peTopicMediaPrefetch.set(key, promise);
+    }
+
+    const existingPromise = peTopicMediaPrefetch.get(key);
+    if (blockForMs > 0 && existingPromise) {
+        await Promise.race([
+            existingPromise,
+            new Promise(resolve => setTimeout(resolve, blockForMs))
+        ]);
+    }
 }
 
 function handleCategorySelectionChange() {
@@ -2151,9 +2197,19 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
     `).join("");
 
     grid.querySelectorAll(".pe-card[data-pe-type][data-pe-topic]").forEach(card => {
+        const queueCardMedia = () => {
+            void prefetchPETopicMedia(card.dataset.peType || "", card.dataset.peTopic || "").catch(() => {});
+        };
+        card.addEventListener("mouseenter", queueCardMedia, { passive: true });
+        card.addEventListener("focusin", queueCardMedia);
+        card.addEventListener("touchstart", queueCardMedia, { passive: true });
         card.addEventListener("click", () => {
             openPETopic(card.dataset.peType || "", card.dataset.peTopic || "");
         });
+    });
+
+    topics.slice(0, 2).forEach(topic => {
+        void prefetchPETopicMedia(topic.peType, topic.topic).catch(() => {});
     });
 }
 
@@ -2477,16 +2533,13 @@ async function openPETopic(peType, topic) {
     }
     peActiveTopic = { peType, topic };
 
-    const topicQuestions = getPEQuestions().filter(q => {
-        const info = parsePECategory(q.category);
-        return info.peType === peType && info.topic === topic;
-    });
+    const topicQuestions = getPETopicQuestions(peType, topic);
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-question-screen").classList.add("active");
     renderPEQuestionList();
 
     try {
-        await fetchSelectedQuestionMedia(topicQuestions);
+        await prefetchPETopicMedia(peType, topic, { blockForMs: 900 });
         if (peActiveTopic && peActiveTopic.peType === peType && peActiveTopic.topic === topic) {
             renderPEQuestionList();
         }
