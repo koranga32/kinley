@@ -1355,10 +1355,10 @@ function syncNormalSubmitVisibility() {
     if (!activeData.length) return;
     const canSubmit = responses[activeData.length - 1] !== null;
     document.querySelectorAll(".normal-submit-btn").forEach(btn => {
-        btn.style.display = canSubmit ? "" : "none";
+        btn.classList.toggle("is-hidden", !canSubmit);
     });
     document.querySelectorAll(".normal-submit-hint").forEach(hint => {
-        hint.style.display = canSubmit ? "none" : "";
+        hint.classList.toggle("is-hidden", canSubmit);
     });
 }
 
@@ -2461,17 +2461,19 @@ async function openPETopic(peType, topic) {
         const info = parsePECategory(q.category);
         return info.peType === peType && info.topic === topic;
     });
+    document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
+    document.getElementById("pe-question-screen").classList.add("active");
+    renderPEQuestionList();
+
     try {
         await fetchSelectedQuestionMedia(topicQuestions);
+        if (peActiveTopic && peActiveTopic.peType === peType && peActiveTopic.topic === topic) {
+            renderPEQuestionList();
+        }
     } catch (error) {
         console.error("PE topic media load failed:", error);
         showToast("The questions loaded, but some media could not be downloaded.", "info");
     }
-
-    document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
-    document.getElementById("pe-question-screen").classList.add("active");
-
-    renderPEQuestionList();
 }
 
 function showPEFolderScreen() {
