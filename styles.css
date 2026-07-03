@@ -2959,7 +2959,7 @@
             position: fixed;
             inset: 64px 0 0 0;
             background: var(--cream);
-            display: flex;
+            display: none;
             padding: 20px;
             gap: 20px;
             z-index: 40;
