@@ -1231,7 +1231,7 @@ function renderActiveNormalQuestion() {
     const audioHtml = audioSource
         ? `<div class="q-audio-wrap">
                <audio id="audio-${currentIdx}" src="${audioSource}" class="q-audio" controls></audio>
-               <div class="q-audio-timer" id="audio-timer-${currentIdx}" style="display:none;">⏱ <span id="audio-timer-val-${currentIdx}">30</span>s remaining</div>
+               <div class="q-audio-timer is-hidden" id="audio-timer-${currentIdx}">⏱ <span id="audio-timer-val-${currentIdx}">30</span>s remaining</div>
            </div>`
         : "";
     const opts = q.options.map((o, oi) => `
@@ -1241,9 +1241,9 @@ function renderActiveNormalQuestion() {
         </div>`).join("");
     const navRight = `
         ${currentIdx === activeData.length - 1 ? "" : `<button type="button" class="btn btn-outline btn-nav-hint normal-submit-hint" disabled title="Tick answer on OMR sheet →">
-              <span style="opacity:0.5;font-size:12px;">← Mark answer on OMR sheet</span>
+              <span class="omr-hint-copy">← Mark answer on OMR sheet</span>
            </button>`}
-        <button type="button" class="btn btn-green normal-submit-btn normal-inline-submit-btn" data-submit-exam style="display:none;">Submit Exam ✓</button>
+        <button type="button" class="btn btn-green normal-submit-btn normal-inline-submit-btn is-hidden" data-submit-exam>Submit Exam ✓</button>
     `;
     const mobileOmrBubblesHtml = ALPHA.map((label, oi) => `
         <div class="omr-bubble ${responses[currentIdx] === oi ? "filled" : ""}"
@@ -2117,9 +2117,9 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
         return;
     }
 
+    const accentClass = accentClassFromColor(accentColor);
     grid.innerHTML = topics.map(t => `
-        <div class="pe-card"
-             style="--hover-clr:${escapeHTML(accentColor)};"
+        <div class="pe-card ${accentClass}"
              data-pe-type="${escapeHTML(t.peType)}"
              data-pe-topic="${escapeHTML(t.topic)}">
             <i class="bi bi-folder-fill pe-card-icon"></i>
@@ -2513,10 +2513,10 @@ function renderPEDIGrid() {
         });
         const thumbnailSource = firstQ ? safeMediaSource(firstQ.imageCode, "image") : "";
         const thumb = thumbnailSource
-            ? `<img src="${thumbnailSource}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;" alt="" loading="lazy" decoding="async">`
+            ? `<img src="${thumbnailSource}" class="pe-card-thumb" alt="" loading="lazy" decoding="async">`
             : `<i class="bi bi-bar-chart-line pe-card-icon"></i>`;
         return `
-            <div class="pe-card" style="--hover-clr:#9c27b0;" data-di-topic="${escapeHTML(s.topic)}">
+            <div class="pe-card accent-purple" data-di-topic="${escapeHTML(s.topic)}">
                 ${thumb}
                 <div class="pe-card-info">
                     <div class="pe-card-title">${escapePEHtml(s.topic)}</div>
@@ -2605,7 +2605,7 @@ function renderPEDIQuestion() {
             </button>
         `).join("");
         return `
-            <div class="pe-question-card" style="--clr:#9c27b0;">
+            <div class="pe-question-card accent-purple">
                 <div class="pe-question-meta">
                     <div class="pe-question-num">${questionIndex + 1}</div>
                     <span class="pe-question-tag">Data Interpretation</span>
@@ -2618,7 +2618,7 @@ function renderPEDIQuestion() {
                     <div class="pe-feedback-msg" id="${qId}-feedback"></div>
                     <button type="button" class="pe-show-answer-btn" id="${qId}-show-btn" data-pe-reveal-qid="${qId}">Show Answer</button>
                 </div>
-                <div class="pe-solution-box" id="${qId}-solution" style="--clr:#9c27b0;">
+                <div class="pe-solution-box accent-purple" id="${qId}-solution">
                     <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
                     <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
                 </div>
@@ -2666,15 +2666,16 @@ function renderPEQuestionList() {
             </button>
         `).join("");
 
+        const accentClass = accentClassFromColor(accent);
         const explanationHtml = `
-            <div class="pe-solution-box" id="${qId}-solution" style="--clr:${accent};">
+            <div class="pe-solution-box ${accentClass}" id="${qId}-solution">
                 <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
                 <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
             </div>
         `;
 
         return `
-            <div class="pe-question-card" style="--clr:${accent};">
+            <div class="pe-question-card ${accentClass}">
                 <div class="pe-question-meta">
                     <div class="pe-question-num">${idx + 1}</div>
                     <span class="pe-question-tag">${escapeHTML(peInfo.peType)}</span>
@@ -2807,4 +2808,16 @@ async function revealPEAnswer(qId) {
 
 function escapePEHtml(text) {
     return escapeHTML(text);
+}
+
+function accentClassFromColor(color) {
+    switch (String(color || "").toLowerCase()) {
+        case "#f44336": return "accent-red";
+        case "#38bdf8": return "accent-sky";
+        case "#00bcd4": return "accent-cyan";
+        case "#4caf50": return "accent-green";
+        case "#9c27b0": return "accent-purple";
+        case "#ff9800": return "accent-orange";
+        default: return "";
+    }
 }
