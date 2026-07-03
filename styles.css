@@ -2258,7 +2258,7 @@
         .pe-navigation-spacer {
             width: 100px;
             flex-shrink: 0;
-            transition: width 0.18s ease;
+            transition: width 0.24s ease;
         }
 
         .pe-navigation-spacer.open {
@@ -2278,6 +2278,12 @@
             display: flex;
             justify-content: center;
             align-items: center;
+        }
+
+        @media (min-width: 901px) {
+            .pe-menu-toggle {
+                display: none;
+            }
         }
 
         .pe-menu-toggle::before {
@@ -2341,7 +2347,7 @@
             line-height: 50px;
             opacity: 0;
             visibility: hidden;
-            transition: 0.3s ease;
+            transition: opacity 0.24s ease, visibility 0.24s ease;
             white-space: nowrap;
             font-weight: 600;
             font-size: 13px;

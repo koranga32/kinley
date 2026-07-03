@@ -40,6 +40,7 @@ let questionMediaCache = new Map();
 let categoryMediaPrefetch = { category: "", promise: null };
 let peOnlineMediaPrefetchPromise = null;
 let peTopicMediaPrefetch = new Map();
+let peDIGraphPrefetch = new Map();
 let publicApiCache = new Map();
 let peQuestionsCache = [];
 let peTopicBuckets = new Map();
@@ -339,6 +340,7 @@ function clearDatabaseCache() {
     categoryMediaPrefetch = { category: "", promise: null };
     peOnlineMediaPrefetchPromise = null;
     peTopicMediaPrefetch = new Map();
+    peDIGraphPrefetch = new Map();
     clearPublicApiCache();
 }
 
@@ -1056,6 +1058,43 @@ async function prefetchPETopicMedia(peType, topic, { blockForMs = 0 } = {}) {
     }
 
     const existingPromise = peTopicMediaPrefetch.get(key);
+    if (blockForMs > 0 && existingPromise) {
+        await Promise.race([
+            existingPromise,
+            new Promise(resolve => setTimeout(resolve, blockForMs))
+        ]);
+    }
+}
+
+async function prefetchPEDISetGraph(setName, { blockForMs = 0 } = {}) {
+    const normalizedSetName = String(setName || "").trim();
+    if (!normalizedSetName) return;
+
+    if (!peDIGraphPrefetch.has(normalizedSetName)) {
+        const setQuestions = getPEDISetQuestions(normalizedSetName);
+        const sharedGraphQuestion = setQuestions[0];
+        if (!sharedGraphQuestion) return;
+
+        const promise = (async () => {
+            await fetchSelectedQuestionMedia([sharedGraphQuestion], { persistCache: false });
+            const graphSource = safeMediaURL(sharedGraphQuestion.imageCode, "image");
+            if (graphSource) {
+                await preloadImageAsset(graphSource);
+            }
+            const audioQuestions = setQuestions.filter(q => q.audioCode).slice(0, 2);
+            if (audioQuestions.length) {
+                await fetchSelectedQuestionMedia(audioQuestions, { persistCache: false });
+                await warmQuestionAssets(audioQuestions, { reportProgress: false });
+            }
+        })().catch(error => {
+            peDIGraphPrefetch.delete(normalizedSetName);
+            console.error("PE DI graph prefetch failed:", error);
+        });
+
+        peDIGraphPrefetch.set(normalizedSetName, promise);
+    }
+
+    const existingPromise = peDIGraphPrefetch.get(normalizedSetName);
     if (blockForMs > 0 && existingPromise) {
         await Promise.race([
             existingPromise,
@@ -2072,11 +2111,41 @@ function wirePESidebar() {
     const menuToggle = document.getElementById("pe-menu-toggle");
     const navigation = document.getElementById("pe-navigation");
     const spacer = document.getElementById("pe-navigation-spacer");
+    const desktopSidebarMedia = typeof window !== "undefined" && window.matchMedia
+        ? window.matchMedia("(min-width: 901px)")
+        : null;
+    const syncPESidebarState = (open) => {
+        if (!navigation) return;
+        navigation.classList.toggle("open", open);
+        if (spacer) spacer.classList.toggle("open", open);
+    };
+
     if (menuToggle && navigation) {
         menuToggle.onclick = () => {
-            navigation.classList.toggle("open");
-            if (spacer) spacer.classList.toggle("open", navigation.classList.contains("open"));
+            if (desktopSidebarMedia?.matches) return;
+            const nextOpen = !navigation.classList.contains("open");
+            syncPESidebarState(nextOpen);
         };
+    }
+
+    if (navigation) {
+        navigation.addEventListener("mouseenter", () => {
+            if (!desktopSidebarMedia?.matches) return;
+            syncPESidebarState(true);
+        });
+        navigation.addEventListener("mouseleave", () => {
+            if (!desktopSidebarMedia?.matches) return;
+            syncPESidebarState(false);
+        });
+        navigation.addEventListener("focusin", () => {
+            if (!desktopSidebarMedia?.matches) return;
+            syncPESidebarState(true);
+        });
+        navigation.addEventListener("focusout", (event) => {
+            if (!desktopSidebarMedia?.matches) return;
+            if (navigation.contains(event.relatedTarget)) return;
+            syncPESidebarState(false);
+        });
     }
 
     const listItems = document.querySelectorAll("#pe-list .pe-list-item");
@@ -2114,7 +2183,8 @@ async function openPEPortal() {
 
     wirePESidebar();
 
-    // Reset to Home panel and a collapsed sidebar every time PE is opened
+    // Reset to Home panel and a collapsed sidebar every time PE is opened.
+    // On desktop the hover handlers will expand it when the cursor enters.
     peActiveTopic = null;
     document.getElementById("pe-navigation").classList.remove("open");
     document.getElementById("pe-navigation-spacer").classList.remove("open");
@@ -2602,9 +2672,19 @@ function renderPEDIGrid() {
     }).join("");
 
     grid.querySelectorAll(".pe-card[data-di-topic]").forEach(card => {
+        const queueDISetMedia = () => {
+            void prefetchPEDISetGraph(card.dataset.diTopic || "").catch(() => {});
+        };
+        card.addEventListener("mouseenter", queueDISetMedia, { passive: true });
+        card.addEventListener("focusin", queueDISetMedia);
+        card.addEventListener("touchstart", queueDISetMedia, { passive: true });
         card.addEventListener("click", () => {
             openPEDIViewer(card.dataset.diTopic || "");
         });
+    });
+
+    sets.slice(0, 2).forEach(set => {
+        void prefetchPEDISetGraph(set.topic).catch(() => {});
     });
 }
 
@@ -2623,12 +2703,9 @@ async function openPEDIViewer(setName) {
     const cachedGraph = sharedGraphQuestion ? safeMediaURL(sharedGraphQuestion.imageCode, "image") : "";
     if (cachedGraph) chartImg.src = cachedGraph;
     else chartImg.removeAttribute("src");
-
     if (!sharedGraphQuestion || cachedGraph) return;
     try {
-        // A DI set uses one shared graph. Fetching every row would download
-        // duplicate Base64 images and block the viewer unnecessarily.
-        await fetchSelectedQuestionMedia([sharedGraphQuestion], { persistCache: false });
+        await prefetchPEDISetGraph(setName, { blockForMs: 1200 });
         if (peDIActiveSet !== setName) return;
         const graphSource = safeMediaURL(sharedGraphQuestion.imageCode, "image");
         if (graphSource) chartImg.src = graphSource;
