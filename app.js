@@ -140,9 +140,12 @@ function bindStaticUiEvents() {
 
     function applyThemeMode(mode) {
         const useDark = mode === "dark";
+        document.documentElement.classList.add("theme-switch-instant");
         document.body.classList.toggle("dark-theme", useDark);
         const btn = document.getElementById("theme-toggle-btn");
         if (btn) btn.textContent = useDark ? "☀ Light" : "🌙 Dark";
+        void document.body.offsetWidth;
+        requestAnimationFrame(() => document.documentElement.classList.remove("theme-switch-instant"));
     }
 
     function toggleThemeMode() {
@@ -2094,7 +2097,7 @@ async function loadDailyQuotes({ fresh = false } = {}) {
             english: row.english_quote || "",
             dzongkha: row.dzongkha_quote || "",
             expiresAt: new Date(row.expires_at).getTime()
-        })).filter(item => item.english && item.dzongkha && item.expiresAt > Date.now());
+        })).filter(item => (item.english || item.dzongkha) && item.expiresAt > Date.now());
     } catch (e) {
         dailyQuotes = [];
     }

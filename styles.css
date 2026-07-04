@@ -29,6 +29,12 @@
             padding: 0;
         }
 
+        html.theme-switch-instant *,
+        html.theme-switch-instant *::before,
+        html.theme-switch-instant *::after {
+            transition: none !important;
+        }
+
         html { scroll-behavior: smooth; }
 
         body {
