@@ -2385,7 +2385,7 @@
 
         .pe-section.active {
             display: block;
-            animation: peFadeIn 0.4s ease-in-out;
+            animation: peFadeIn 0.22s ease-out;
         }
 
         .pe-content:has(#pe-current-affair-panel.active) {
@@ -2398,7 +2398,7 @@
         }
 
         @keyframes peFadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
         }
 

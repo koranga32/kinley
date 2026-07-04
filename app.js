@@ -19,6 +19,7 @@ let timeLeft     = 0;
 let timerInterval= null;
 let databaseReady = false;
 let databaseLoading = false;
+let databaseLoadPromise = null;
 let examCatalogReady = false;
 let examCategoryCounts = new Map();
 let setupContinued = false;
@@ -118,15 +119,17 @@ function bindStaticUiEvents() {
 
     function warmPublicStartupData() {
         const kickOff = () => {
-            loadDailyQuotes({ fresh: true })
-                .then(() => {
-                    renderDailyQuoteTicker();
-                })
-                .catch(() => {});
-            caLoadState({ render: false }).catch(() => {});
-            loadExamCatalog().catch(() => {});
-            loadPEOnlineQuestionBank().then(updatePEOnlineCount).catch(() => {});
-            loadDatabase({ silent: true }).catch(() => {});
+            const lightweightLoads = [
+                loadDailyQuotes({ fresh: true }).then(renderDailyQuoteTicker),
+                caLoadState({ render: false }),
+                loadExamCatalog(),
+                loadPEOnlineQuestionBank().then(updatePEOnlineCount)
+            ];
+            Promise.allSettled(lightweightLoads).then(() => {
+                // The full PE practice bank is larger. Start it after the small
+                // startup requests so they do not all compete for bandwidth.
+                setTimeout(() => loadDatabase({ silent: true }).catch(() => {}), 120);
+            });
         };
         if (typeof requestAnimationFrame === "function") {
             requestAnimationFrame(() => setTimeout(kickOff, 0));
@@ -835,8 +838,21 @@ async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam m
 async function loadDatabase(options = {}) {
     const silent = Boolean(options.silent);
     if (databaseReady) return true;
-    if (databaseLoading) return false;
+    if (databaseLoadPromise) {
+        if (!silent) showLoading(true, "Opening PE...");
+        const loaded = await databaseLoadPromise;
+        if (!silent) showLoading(false);
+        return loaded;
+    }
     databaseLoading = true;
+    databaseLoadPromise = loadDatabaseOnce(silent).finally(() => {
+        databaseLoading = false;
+        databaseLoadPromise = null;
+    });
+    return databaseLoadPromise;
+}
+
+async function loadDatabaseOnce(silent) {
 
     // ── Cache-first: render instantly if we have data ──
     const cached = sessionStorage.getItem(DB_CACHE_KEY) || localStorage.getItem(DB_CACHE_KEY);
@@ -844,7 +860,6 @@ async function loadDatabase(options = {}) {
         try {
             processData(JSON.parse(cached));
             databaseReady = true;
-            databaseLoading = false;
             if (!examPreparing && !silent) showLoading(false);
             // Refresh in background silently (no spinner)
             fetchQuestions()
@@ -896,7 +911,6 @@ async function loadDatabase(options = {}) {
                 if (!examPreparing) showLoading(false);
             }, 300);
         }
-        databaseLoading = false;
         return true;
 
     } catch (e) {
@@ -908,7 +922,6 @@ async function loadDatabase(options = {}) {
             if (fallback) {
                 processData(JSON.parse(fallback));
                 databaseReady = true;
-                databaseLoading = false;
                 if (!silent) {
                     showToast("Using saved questions. Internet is slow.", "info");
                     showLoading(false);
@@ -926,7 +939,6 @@ async function loadDatabase(options = {}) {
             }
         }
         console.error(e);
-        databaseLoading = false;
         if (!silent) setTimeout(() => showLoading(false), 1500);
         return false;
     }
@@ -971,13 +983,10 @@ function processData(data) {
     }
     const catalogTotal = [...examCategoryCounts.values()].reduce((sum, count) => sum + count, 0);
     if (document.getElementById("pe-view") && document.getElementById("pe-view").style.display !== "none") {
-        renderPEHomeGrid();
-        renderPEMockGrid();
-        renderPEPastGrid();
-        renderPEDIGrid();
-        updatePEOnlineCount();
+        const activePanel = document.querySelector(".pe-content .pe-section.active")?.id;
         if (peActiveTopic) renderPEQuestionList();
-        if (peDIActiveSet) renderPEDIQuestion();
+        else if (peDIActiveSet) renderPEDIQuestion();
+        else if (activePanel) renderPEPanel(activePanel);
     }
 }
 
@@ -2199,6 +2208,7 @@ async function openPEPortal() {
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-home-panel").classList.add("active");
 
+    const databaseWasReady = databaseReady;
     if (!databaseReady) {
         showLoading(true, "Opening PE...");
         const loaded = await loadDatabase();
@@ -2209,7 +2219,9 @@ async function openPEPortal() {
         }
     }
 
-    renderPEHomeGrid();
+    // A newly completed database load renders the active panel in processData.
+    // Only render here when the cached data was already ready before opening.
+    if (databaseWasReady) renderPEHomeGrid();
 
     loadPEOnlineQuestionBank()
         .then(() => {
@@ -2283,7 +2295,7 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
         });
     });
 
-    topics.slice(0, 2).forEach(topic => {
+    topics.slice(0, 1).forEach(topic => {
         void prefetchPETopicMedia(topic.peType, topic.topic).catch(() => {});
     });
 }
@@ -2688,7 +2700,7 @@ function renderPEDIGrid() {
         });
     });
 
-    sets.slice(0, 2).forEach(set => {
+    sets.slice(0, 1).forEach(set => {
         void prefetchPEDISetGraph(set.topic).catch(() => {});
     });
 }
