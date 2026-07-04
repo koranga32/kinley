@@ -724,9 +724,26 @@ async function handlePEOnlineQuestion(context) {
     }, 200);
 }
 
+async function purgeExpiredQuotes(env, nowIso) {
+    await supabaseServerRequest(
+        env,
+        `daily_quotes?expires_at=lte.${encodeURIComponent(nowIso)}`,
+        { method: "DELETE", prefer: "return=minimal" }
+    );
+}
+
+function queueExpiredQuoteCleanup(context, nowIso) {
+    const cleanup = purgeExpiredQuotes(context.env, nowIso).catch(error => {
+        console.error("Expired daily quote cleanup failed:", error);
+    });
+    if (typeof context.waitUntil === "function") context.waitUntil(cleanup);
+}
+
 async function handleQuotes(context) {
     if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const now = encodeURIComponent(new Date().toISOString());
+    const nowIso = new Date().toISOString();
+    queueExpiredQuoteCleanup(context, nowIso);
+    const now = encodeURIComponent(nowIso);
     return json(await supabaseServerRequest(
         context.env,
         `daily_quotes?select=id,english_quote,dzongkha_quote,expires_at,created_at&expires_at=gt.${now}&order=created_at.desc`
