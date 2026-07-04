@@ -320,8 +320,6 @@
             animation: fadeUp 0.35s ease both;
         }
 
-        .panel-wide { max-width: 860px; }
-
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(16px); }
             to   { opacity: 1; transform: translateY(0); }
@@ -3584,10 +3582,6 @@
                 font-size: 12px;
             }
 
-            .pe-di-split-right .pe-show-answer-btn {
-                padding: 5px 9px;
-            }
-
             .pe-di-split-right .pe-solution-box {
                 padding: 10px;
                 margin-top: 8px;
@@ -3710,23 +3704,6 @@
         .pe-feedback-msg { font-size: 13px; font-weight: 700; padding: 6px 0; }
         .pe-feedback-msg.correct { color: #6ee08c; }
         .pe-feedback-msg.incorrect { color: #ff8a8a; }
-
-        .pe-show-answer-btn {
-            background: transparent;
-            color: #c9ccd2;
-            border: 1.5px solid #383d46;
-            padding: 6px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 700;
-            transition: all 0.2s;
-        }
-
-        .pe-show-answer-btn:hover {
-            background: #383d46;
-            color: #fff;
-        }
 
         .pe-solution-box {
             background: #20232a;

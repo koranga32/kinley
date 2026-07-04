@@ -5,9 +5,6 @@ const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
 const SECONDS_PER_QUESTION = 30;
-const CA_SUPABASE_TABLE = "CurrentAffairFlashcards";
-const DAILY_QUOTES_TABLE = "daily_quotes";
-const DAILY_QUOTE_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
 // ─── STATE ───────────────────────────────────────────
 let questionPool = [];
