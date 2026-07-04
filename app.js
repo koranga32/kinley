@@ -1647,12 +1647,6 @@ async function submitExam() {
         return;
     }
 
-    if (Array.isArray(gradedResult.public_questions) && gradedResult.public_questions.length === responses.length) {
-        activeData = mapSecureExamRows(gradedResult.public_questions);
-    }
-    gradedResult.grading.forEach((grade, index) => {
-        activeData[index].answer = grade.correctIndex;
-    });
     const correct = gradedResult.correct;
     const wrong = gradedResult.wrong;
     const skipped = gradedResult.skipped;
@@ -1686,7 +1680,7 @@ async function submitExam() {
     // Review cards
     document.getElementById("review-container").innerHTML = activeData.map((q, i) => {
         const ans = responses[i];
-        const isCorrect = ans !== null && ans === q.answer;
+        const isCorrect = gradedResult.grading[i]?.status === "CORRECT";
         const isSkipped = ans === null;
         const cls = isSkipped ? "skipped" : isCorrect ? "correct" : "wrong";
         const verdict = isSkipped
@@ -1699,7 +1693,6 @@ async function submitExam() {
             <div class="review-q-text">Q${i+1}: ${escapeHTML(q.question)}</div>
             <div class="review-answers">
                 ${!isSkipped ? `<span class="answer-tag ${isCorrect?'correct-ans':'wrong-ans'}">Your answer: ${ALPHA[ans]}) ${escapeHTML(q.options[ans])}</span>` : ''}
-                ${!isCorrect ? `<span class="answer-tag correct-ans">Correct: ${ALPHA[q.answer]}) ${escapeHTML(q.options[q.answer])}</span>` : ''}
                 ${isSkipped ? `<span class="answer-tag your-ans">Not answered</span>` : ''}
                 ${verdict}
             </div>
@@ -2780,7 +2773,6 @@ function renderPEDIQuestion() {
                 <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
                 <div class="pe-question-actions">
                     <div class="pe-feedback-msg" id="${qId}-feedback"></div>
-                    <button type="button" class="pe-show-answer-btn" id="${qId}-show-btn" data-pe-reveal-qid="${qId}">Show Answer</button>
                 </div>
                 <div class="pe-solution-box accent-purple" id="${qId}-solution">
                     <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
@@ -2792,9 +2784,6 @@ function renderPEDIQuestion() {
 
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
-    });
-    container.querySelectorAll("[data-pe-reveal-qid]").forEach((button) => {
-        button.addEventListener("click", () => revealPEAnswer(button.dataset.peRevealQid || ""));
     });
 }
 
@@ -2851,7 +2840,6 @@ function renderPEQuestionList() {
                 <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
                 <div class="pe-question-actions">
                     <div class="pe-feedback-msg" id="${qId}-feedback"></div>
-                    <button type="button" class="pe-show-answer-btn" id="${qId}-show-btn" data-pe-reveal-qid="${qId}">Show Answer</button>
                 </div>
                 ${explanationHtml}
             </div>
@@ -2860,9 +2848,6 @@ function renderPEQuestionList() {
 
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
-    });
-    container.querySelectorAll("[data-pe-reveal-qid]").forEach((button) => {
-        button.addEventListener("click", () => revealPEAnswer(button.dataset.peRevealQid || ""));
     });
 }
 
@@ -2873,38 +2858,22 @@ function lockPEOptions(qId) {
     });
 }
 
-async function loadPEQuestionSolution(qId) {
-    const question = pePracticeQuestionsByDomId.get(qId);
-    if (!question) throw new Error("Question is no longer available.");
-    if (Number.isInteger(question.answer) && question.answer >= 0 && question.answer <= 3) return question;
-
-    const result = await apiRequest(`question-solution?id=${encodeURIComponent(question.id)}`);
-    if (!Number.isInteger(result.answerIndex) || result.answerIndex < 0 || result.answerIndex > 3) {
-        throw new Error("This question does not have a valid answer yet.");
-    }
-    question.answer = result.answerIndex;
-    question.explanation = result.explanation || "";
-    const solutionText = document.querySelector(`#${qId}-solution .pe-solution-text`);
-    if (solutionText) solutionText.textContent = question.explanation;
-    return question;
-}
-
 function setPEQuestionLoading(qId, loading) {
     document.querySelectorAll(`#${qId}-options .pe-option`).forEach(button => {
         button.disabled = loading;
     });
-    const showButton = document.getElementById(`${qId}-show-btn`);
-    if (showButton) {
-        showButton.disabled = loading;
-        showButton.textContent = loading ? "Checking..." : "Show Answer";
-    }
 }
 
 async function answerPEQuestion(qId, chosenIndex) {
     setPEQuestionLoading(qId, true);
-    let answerIndex;
+    let result;
     try {
-        answerIndex = (await loadPEQuestionSolution(qId)).answer;
+        const question = pePracticeQuestionsByDomId.get(qId);
+        if (!question) throw new Error("Question is no longer available.");
+        result = await apiRequest("question-solution", {
+            method: "POST",
+            body: { id: String(question.id), selected_index: chosenIndex }
+        });
     } catch (error) {
         setPEQuestionLoading(qId, false);
         showToast(`Could not check answer: ${error.message}`, "error");
@@ -2912,62 +2881,15 @@ async function answerPEQuestion(qId, chosenIndex) {
     }
     lockPEOptions(qId);
     const chosenBtn = document.getElementById(`${qId}-opt-${chosenIndex}`);
-    const correctBtn = document.getElementById(`${qId}-opt-${answerIndex}`);
     const feedback = document.getElementById(`${qId}-feedback`);
 
-    if (chosenIndex === answerIndex) {
+    if (result.correct === true) {
         chosenBtn.classList.add("pe-correct");
         if (feedback) { feedback.textContent = "✓ Correct!"; feedback.className = "pe-feedback-msg correct"; }
     } else {
         chosenBtn.classList.add("pe-incorrect");
-        if (correctBtn) correctBtn.classList.add("pe-correct");
-        if (feedback) { feedback.textContent = "✕ Not quite — correct answer highlighted."; feedback.className = "pe-feedback-msg incorrect"; }
+        if (feedback) { feedback.textContent = "✕ Not quite."; feedback.className = "pe-feedback-msg incorrect"; }
     }
-
-    const showBtn = document.getElementById(`${qId}-show-btn`);
-    if (showBtn) {
-        showBtn.disabled = false;
-        showBtn.style.display = "";
-        showBtn.textContent = "Hide Answer";
-    }
-    const solutionBox = document.getElementById(`${qId}-solution`);
-    if (solutionBox) solutionBox.classList.add("open");
-}
-
-async function revealPEAnswer(qId) {
-    const solutionBox = document.getElementById(`${qId}-solution`);
-    const showBtn = document.getElementById(`${qId}-show-btn`);
-    if (solutionBox?.classList.contains("open")) {
-        solutionBox.classList.remove("open");
-        document.querySelectorAll(`#${qId}-options .pe-option`).forEach(button => {
-            button.classList.remove("pe-correct", "pe-incorrect", "pe-locked");
-            button.disabled = false;
-        });
-        const feedback = document.getElementById(`${qId}-feedback`);
-        if (feedback) { feedback.textContent = ""; feedback.className = "pe-feedback-msg"; }
-        if (showBtn) showBtn.textContent = "Show Answer";
-        return;
-    }
-    setPEQuestionLoading(qId, true);
-    let answerIndex;
-    try {
-        answerIndex = (await loadPEQuestionSolution(qId)).answer;
-    } catch (error) {
-        setPEQuestionLoading(qId, false);
-        showToast(`Could not reveal answer: ${error.message}`, "error");
-        return;
-    }
-    lockPEOptions(qId);
-    const correctBtn = document.getElementById(`${qId}-opt-${answerIndex}`);
-    if (correctBtn) correctBtn.classList.add("pe-correct");
-    const feedback = document.getElementById(`${qId}-feedback`);
-    if (feedback) { feedback.textContent = "Answer revealed."; feedback.className = "pe-feedback-msg"; }
-    if (showBtn) {
-        showBtn.disabled = false;
-        showBtn.style.display = "";
-        showBtn.textContent = "Hide Answer";
-    }
-    if (solutionBox) solutionBox.classList.add("open");
 }
 
 function escapePEHtml(text) {

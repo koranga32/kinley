@@ -97,9 +97,18 @@ async function handleQuestions(context) {
 }
 
 async function handleQuestionSolution(context) {
-    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const id = new URL(context.request.url).searchParams.get("id") || "";
+    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
+    const payload = await readJson(context.request, 1024);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)
+        || Object.keys(payload).some(key => !["id", "selected_index"].includes(key))) {
+        return apiError(400, "invalid_check", "Question check contains unexpected fields.");
+    }
+    const id = String(payload.id || "").trim();
+    const selectedIndex = Number(payload.selected_index);
     if (!/^\d{1,12}$/.test(id)) return apiError(400, "invalid_id", "Question ID is invalid.");
+    if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex > 3) {
+        return apiError(400, "invalid_selection", "Selected answer must be 0, 1, 2, or 3.");
+    }
     const rows = await supabaseServerRequest(
         context.env,
         `Exam?select=id,category,question,answer&id=eq.${id}&limit=1`
@@ -108,13 +117,9 @@ async function handleQuestionSolution(context) {
     if (!String(rows[0].category || "").startsWith("__PE__::")) {
         return apiError(403, "solution_unavailable", "Solutions are available only in PE practice.");
     }
-    const rawQuestion = String(rows[0].question || "");
-    const delimiter = "\n§§EXPLAIN§§\n";
-    const delimiterIndex = rawQuestion.indexOf(delimiter);
     return json({
         id: String(rows[0].id),
-        answerIndex: parseAnswerIndex(rows[0].answer),
-        explanation: delimiterIndex < 0 ? "" : rawQuestion.slice(delimiterIndex + delimiter.length)
+        correct: selectedIndex === parseAnswerIndex(rows[0].answer)
     });
 }
 
@@ -750,7 +755,7 @@ async function handleResponses(context) {
         if (status === "CORRECT") correct++;
         else if (status === "WRONG") wrong++;
         else skipped++;
-        return { status, correctIndex: item.correctIndex };
+        return { status };
     });
     const payload = {
         time_stamp: submission.time_stamp,
@@ -775,8 +780,7 @@ async function handleResponses(context) {
             wrong,
             skipped,
             total: items.length,
-            grading,
-            public_questions: normalized.publicQuestions
+            grading
         }
     }, 201);
 }
