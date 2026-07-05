@@ -615,8 +615,10 @@ async function fetchPEOnlineQuestionWindow(index) {
 }
 
 async function ensurePEOnlineQuestionLoaded(index) {
-    if (!peOnlineMode || activeData[index]) return activeData[index];
-    await fetchPEOnlineQuestionWindow(index);
+    if (!peOnlineMode) return activeData[index];
+    if (!activeData[index]) {
+        await fetchPEOnlineQuestionWindow(index);
+    }
     if (activeData[index]) {
         await fetchSelectedQuestionMedia([activeData[index]]);
     }
@@ -624,10 +626,15 @@ async function ensurePEOnlineQuestionLoaded(index) {
 }
 
 async function prefetchPEOnlineQuestion(index) {
-    if (!peOnlineMode || index < 0 || index >= activeData.length || activeData[index]) return;
+    if (!peOnlineMode || index < 0 || index >= activeData.length) return;
     try {
-        const rows = await fetchPEOnlineQuestionWindow(index);
-        const warmable = rows.map(entry => entry.question).filter(Boolean);
+        let warmable = [];
+        if (activeData[index]) {
+            warmable = [activeData[index]];
+        } else {
+            const rows = await fetchPEOnlineQuestionWindow(index);
+            warmable = rows.map(entry => entry.question).filter(Boolean);
+        }
         if (warmable.length) {
             await fetchSelectedQuestionMedia(warmable);
             await warmQuestionAssets(warmable, { reportProgress: false });
@@ -2489,6 +2496,7 @@ async function peoSyncWorkspaceView() {
 
     await ensurePEOnlineQuestionLoaded(currentIdx);
     const q = activeData[currentIdx];
+    if (!q) return;
     const workspace = document.getElementById("peo-workspace");
     const imgNode = document.getElementById("peo-graph-img");
     let stage = document.getElementById("peo-question-stage");
