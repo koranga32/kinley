@@ -6,6 +6,7 @@ const DB_TIMEOUT_MS = 60000;
 const API_TIMEOUT_MS = 20000;
 const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
 const SECONDS_PER_QUESTION = 30;
+const PE_BCSC_MAIN_TYPE = "BCSC(main)";
 
 // ─── STATE ───────────────────────────────────────────
 let questionPool = [];
@@ -32,7 +33,7 @@ let activeExamTotal = 0;
 let normalExamMode = false;
 let peOnlineMode = false;
 let peOnlineCatalog = {
-    counts: { Mock: 0, "Past Paper": 0, "Data Interpretation": 0, "Current Affairs": 0 },
+    counts: { "Past Paper": 0, "Data Interpretation": 0, "Current Affairs": 0 },
     total: 0
 };
 let questionMediaCache = new Map();
@@ -253,7 +254,7 @@ function bindStaticUiEvents() {
 	// PE questions are stored using the existing `category` column with a
 	// special prefix so NO new Supabase columns are required and the normal
 	// exam question flow is never touched or put at risk.
-	// Format: "__PE__::<Mock|Past Paper>::<Topic Name>"
+	// Format: "__PE__::<BCSC(main)|Past Paper|Data Interpretation>::<Topic Name>"
 	function isPECategory(cat) {
 	    return typeof cat === "string" && cat.startsWith("__PE__::");
 	}
@@ -261,14 +262,16 @@ function bindStaticUiEvents() {
 	function parsePECategory(cat) {
 	    if (!isPECategory(cat)) return null;
 	    const parts = cat.split("::");
+        const rawType = parts[1] || PE_BCSC_MAIN_TYPE;
 	    return {
-	        peType: parts[1] || "Mock",
+	        peType: rawType === "Mock" ? PE_BCSC_MAIN_TYPE : rawType,
 	        topic: parts[2] || "General"
 	    };
 	}
 
 	function buildPECategory(peType, topic) {
-	    return `__PE__::${peType}::${(topic || "General").trim()}`;
+	    const normalizedType = peType === "Mock" ? PE_BCSC_MAIN_TYPE : (peType || PE_BCSC_MAIN_TYPE);
+	    return `__PE__::${normalizedType}::${(topic || "General").trim()}`;
 	}
 
 	function parseCorrectAnswer(value) {
@@ -2341,7 +2344,7 @@ function renderPEHomeGrid() {
     renderPETopicGrid("pe-home-grid", "all", "pe-home-search", "#f44336");
 }
 function renderPEMockGrid() {
-    renderPETopicGrid("pe-mock-grid", "Mock", "pe-mock-search", "#00bcd4");
+    renderPETopicGrid("pe-mock-grid", PE_BCSC_MAIN_TYPE, "pe-mock-search", "#00bcd4");
 }
 function renderPEPastGrid() {
     renderPETopicGrid("pe-past-grid", "Past Paper", "pe-past-search", "#4caf50");
@@ -2358,14 +2361,11 @@ async function loadPEOnlineQuestionBank() {
 }
 
 function updatePEOnlineCount() {
-    const mockCount = Number(peOnlineCatalog.counts.Mock || 0);
     const pastCount = Number(peOnlineCatalog.counts["Past Paper"] || 0);
     const diCount = Number(peOnlineCatalog.counts["Data Interpretation"] || 0);
     const caCount = Number(peOnlineCatalog.counts["Current Affairs"] || 0);
 
-    const mockEl = document.getElementById("pe-online-mock-count");
     const pastEl = document.getElementById("pe-online-past-count");
-    if (mockEl) mockEl.textContent = mockCount;
     if (pastEl) pastEl.textContent = pastCount;
     const diEl = document.getElementById("pe-online-di-count");
     if (diEl) diEl.textContent = diCount;
@@ -2679,7 +2679,7 @@ function showPEFolderScreen() {
     const returnType = peActiveTopic.peType;
     peActiveTopic = null;
 
-    const targetPanelId = returnType === "Mock" ? "pe-mock-panel"
+    const targetPanelId = returnType === PE_BCSC_MAIN_TYPE ? "pe-mock-panel"
         : returnType === "Past Paper" ? "pe-past-panel"
         : "pe-home-panel";
 

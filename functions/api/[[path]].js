@@ -136,7 +136,7 @@ async function handlePEOnlineQuestions(context) {
     const view = url.searchParams.get("view") || "text";
     if (view === "catalog") {
         const rows = await supabaseServerRequest(context.env, "PEOnlineExam?select=category&order=id.asc");
-        const counts = { Mock: 0, "Past Paper": 0, "Data Interpretation": 0, "Current Affairs": 0 };
+        const counts = { "Past Paper": 0, "Data Interpretation": 0, "Current Affairs": 0 };
         for (const row of rows || []) {
             const info = parsePECategory(row.category);
             if (info && Object.hasOwn(counts, info.peType)) counts[info.peType] += 1;
@@ -230,13 +230,14 @@ function parsePECategory(value) {
     const category = String(value || "");
     if (!category.startsWith("__PE__::")) return null;
     const parts = category.split("::");
-    return { peType: parts[1] || "Mock", topic: parts[2] || "General" };
+    const rawType = parts[1] || "BCSC(main)";
+    return { peType: rawType === "Mock" ? "BCSC(main)" : rawType, topic: parts[2] || "General" };
 }
 
 function calculatePEOnlineTotal(counts) {
     const di = Math.min(Number(counts["Data Interpretation"] || 0), 20);
     const currentAffairs = Math.min(Number(counts["Current Affairs"] || 0), 20);
-    return Math.min(100, di + currentAffairs + Number(counts.Mock || 0) + Number(counts["Past Paper"] || 0));
+    return Math.min(100, di + currentAffairs + Number(counts["Past Paper"] || 0));
 }
 
 function parseAnswerIndex(value) {
@@ -577,7 +578,6 @@ function buildQuestionWindow(publicQuestions, startIndex = 0, count = 2) {
 
 function selectPEOnlineRows(rows) {
     const byType = type => (rows || []).filter(row => parsePECategory(row.category)?.peType === type);
-    const mockPool = shuffled(byType("Mock"));
     const pastPool = shuffled(byType("Past Paper"));
     const currentAffairs = shuffled(byType("Current Affairs")).slice(0, 20);
 
@@ -594,13 +594,8 @@ function selectPEOnlineRows(rows) {
     }
 
     const remaining = Math.max(100 - dataInterpretation.length - currentAffairs.length, 0);
-    const mockTarget = Math.ceil(remaining / 2);
-    const pastTarget = remaining - mockTarget;
-    let mock = mockPool.slice(0, mockTarget);
-    let past = pastPool.slice(0, pastTarget);
-    if (mock.length < mockTarget) past = past.concat(pastPool.slice(past.length, past.length + mockTarget - mock.length));
-    if (past.length < pastTarget) mock = mock.concat(mockPool.slice(mock.length, mock.length + pastTarget - past.length));
-    return [...shuffled([...mock, ...past, ...currentAffairs]), ...dataInterpretation];
+    const past = pastPool.slice(0, remaining);
+    return [...shuffled([...past, ...currentAffairs]), ...dataInterpretation];
 }
 
 async function handleFlashcardAnswer(context) {
