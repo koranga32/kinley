@@ -46,6 +46,17 @@
             padding-top: 64px;
         }
 
+        .q-text,
+        .option-item,
+        .review-q-text,
+        .answer-tag,
+        .peo-question-text,
+        .peo-option-row,
+        .pe-question-text,
+        .pe-option {
+            font-family: 'DM Sans', 'Noto Sans Tibetan', 'Jomolhari', sans-serif;
+        }
+
         /* ─── LIGHT DECORATIVE BACKGROUND ──────────── */
         body::before {
             content: '';
