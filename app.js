@@ -1112,18 +1112,22 @@ async function prefetchPEDISetGraph(setName, { blockForMs = 0 } = {}) {
 
     if (!peDIGraphPrefetch.has(normalizedSetName)) {
         const setQuestions = getPEDISetQuestions(normalizedSetName);
-        const sharedGraphQuestion = setQuestions[0];
-        if (!sharedGraphQuestion) return;
+        if (!setQuestions.length) return;
 
         const promise = (async () => {
-            await fetchSelectedQuestionMedia([sharedGraphQuestion], { persistCache: false });
-            const graphSource = safeMediaURL(sharedGraphQuestion.imageCode, "image");
-            if (graphSource) {
-                await preloadImageAsset(graphSource);
-            }
+            // A reused set name can contain more than one chart. Fetch every
+            // question's media so each newly uploaded chart can begin its own
+            // group instead of silently inheriting the first chart forever.
+            await fetchSelectedQuestionMedia(setQuestions, { persistCache: false });
+            const graphSources = [...new Set(setQuestions
+                .map(question => safeMediaURL(question.imageCode, "image"))
+                .filter(Boolean))];
+            if (graphSources[0]) await preloadImageAsset(graphSources[0]);
+            graphSources.slice(1).forEach(source => {
+                void preloadImageAsset(source);
+            });
             const audioQuestions = setQuestions.filter(q => q.audioCode).slice(0, 2);
             if (audioQuestions.length) {
-                await fetchSelectedQuestionMedia(audioQuestions, { persistCache: false });
                 await warmQuestionAssets(audioQuestions, { reportProgress: false });
             }
         })().catch(error => {
@@ -2679,6 +2683,7 @@ function showPEFolderScreen() {
 // Chart pane stays fixed on the left (position: sticky) while the
 // question pane on the right shows one question at a time with // Next/Previous — same model GMAT/GRE/CAT use for chart-based sets.
 let peDIActiveSet = null; // the set/topic name currently open in the viewer
+let peDIQuestionObserver = null;
 
 function renderPEDIGrid() {
     const grid = document.getElementById("pe-di-grid");
@@ -2739,17 +2744,22 @@ async function openPEDIViewer(setName) {
     document.getElementById("pe-di-set-title").textContent = setName;
     renderPEDIQuestion();
 
-    const sharedGraphQuestion = setQuestions[0];
-    const cachedGraph = sharedGraphQuestion ? safeMediaURL(sharedGraphQuestion.imageCode, "image") : "";
-    if (cachedGraph) chartImg.src = cachedGraph;
+    const firstCachedGraph = setQuestions
+        .map(question => safeMediaURL(question.imageCode, "image"))
+        .find(Boolean) || "";
+    if (firstCachedGraph) chartImg.src = firstCachedGraph;
     else chartImg.removeAttribute("src");
-    if (!sharedGraphQuestion || cachedGraph) return;
+    if (!setQuestions.length) return;
     try {
         await prefetchPEDISetGraph(setName, { blockForMs: 1200 });
+        // The short wait keeps opening responsive; then finish the queued
+        // media request so a slower second/third chart is never skipped.
+        const mediaPromise = peDIGraphPrefetch.get(String(setName || "").trim());
+        if (mediaPromise) await mediaPromise;
         if (peDIActiveSet !== setName) return;
-        const graphSource = safeMediaURL(sharedGraphQuestion.imageCode, "image");
-        if (graphSource) chartImg.src = graphSource;
-        else chartImg.removeAttribute("src");
+        // Re-render after media arrives. This assigns every question to the
+        // correct sequential chart group and resets numbering for that group.
+        renderPEDIQuestion();
     } catch (error) {
         console.error("Data Interpretation graph load failed:", error);
         if (peDIActiveSet === setName) {
@@ -2759,6 +2769,8 @@ async function openPEDIViewer(setName) {
 }
 
 function closePEDIViewer() {
+    peDIQuestionObserver?.disconnect();
+    peDIQuestionObserver = null;
     peDIActiveSet = null;
     document.querySelectorAll("#pe-list .pe-list-item").forEach(li => {
         li.classList.toggle("active", li.dataset.target === "pe-di-panel");
@@ -2775,6 +2787,59 @@ function getPEDISetQuestions(setName) {
     });
 }
 
+function buildPEDIQuestionGroups(setQuestions) {
+    let activeGraph = "";
+    let groupIndex = -1;
+    let questionNumber = 0;
+
+    return (setQuestions || []).map(question => {
+        const uploadedGraph = safeMediaURL(question.imageCode, "image");
+        if (uploadedGraph && uploadedGraph !== activeGraph) {
+            activeGraph = uploadedGraph;
+            groupIndex += 1;
+            questionNumber = 0;
+        } else if (groupIndex < 0) {
+            groupIndex = 0;
+        }
+        questionNumber += 1;
+        return { question, graphSource: activeGraph, groupIndex, questionNumber };
+    });
+}
+
+function showPEDIChartForCard(card) {
+    const chartImg = document.getElementById("pe-di-chart-img");
+    if (!chartImg || !card) return;
+    const graphSource = String(card.dataset.diGraphSrc || "").trim();
+    if (graphSource && chartImg.src !== graphSource) chartImg.src = graphSource;
+    else if (!graphSource) chartImg.removeAttribute("src");
+}
+
+function observePEDIChartGroups(container) {
+    peDIQuestionObserver?.disconnect();
+    peDIQuestionObserver = null;
+    const cards = [...container.querySelectorAll("[data-di-graph-src]")];
+    if (!cards.length) return;
+
+    showPEDIChartForCard(cards[0]);
+    cards.forEach(card => {
+        card.addEventListener("mouseenter", () => showPEDIChartForCard(card), { passive: true });
+        card.addEventListener("focusin", () => showPEDIChartForCard(card));
+    });
+
+    if (!("IntersectionObserver" in window)) return;
+    peDIQuestionObserver = new IntersectionObserver(entries => {
+        const visible = entries
+            .filter(entry => entry.isIntersecting)
+            .sort((a, b) => Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top));
+        if (visible[0]) showPEDIChartForCard(visible[0].target);
+    }, {
+        root: null,
+        rootMargin: "-15% 0px -55% 0px",
+        threshold: [0, 0.25, 0.5]
+    });
+    cards.forEach(card => peDIQuestionObserver.observe(card));
+}
+
 function renderPEDIQuestion() {
     const container = document.getElementById("pe-di-questions-container");
     if (!peDIActiveSet) { container.innerHTML = ""; return; }
@@ -2786,7 +2851,8 @@ function renderPEDIQuestion() {
     }
 
     pePracticeQuestionsByDomId.clear();
-    container.innerHTML = setQuestions.map((q, questionIndex) => {
+    const groupedQuestions = buildPEDIQuestionGroups(setQuestions);
+    container.innerHTML = groupedQuestions.map(({ question: q, graphSource, groupIndex, questionNumber }, questionIndex) => {
         const options = Array.isArray(q.options) ? q.options : [];
         const qId = `pe-di-q-${questionIndex}`;
         pePracticeQuestionsByDomId.set(qId, q);
@@ -2797,9 +2863,11 @@ function renderPEDIQuestion() {
             </button>
         `).join("");
         return `
-            <div class="pe-question-card accent-purple">
+            <div class="pe-question-card accent-purple"
+                 data-di-graph-src="${escapeHTML(graphSource)}"
+                 data-di-graph-group="${groupIndex}">
                 <div class="pe-question-meta">
-                    <div class="pe-question-num">${questionIndex + 1}</div>
+                    <div class="pe-question-num">${questionNumber}</div>
                     <span class="pe-question-tag">Data Interpretation</span>
                     <span class="pe-question-tag">${escapePEHtml(peDIActiveSet)}</span>
                 </div>
@@ -2820,6 +2888,7 @@ function renderPEDIQuestion() {
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
     });
+    observePEDIChartGroups(container);
 }
 
 // ─── Question attempt flow (attempt first, then reveal) ────
