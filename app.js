@@ -2684,8 +2684,7 @@ function showPEFolderScreen() {
 // question pane on the right shows one question at a time with // Next/Previous — same model GMAT/GRE/CAT use for chart-based sets.
 let peDIActiveSet = null; // the set/topic name currently open in the viewer
 let peDIQuestionObserver = null;
-let peDIGroupIndex = 0;   // which graph (0-based) is currently shown in the chart pane
-let peDIGroupCount = 1;   // how many distinct graphs exist in the active set
+let peDIActiveGraphIndex = 0;
 
 function renderPEDIGrid() {
     const grid = document.getElementById("pe-di-grid");
@@ -2737,6 +2736,7 @@ function renderPEDIGrid() {
 
 async function openPEDIViewer(setName) {
     peDIActiveSet = setName;
+    peDIActiveGraphIndex = 0;
 
     const setQuestions = getPEDISetQuestions(setName);
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
@@ -2774,10 +2774,7 @@ function closePEDIViewer() {
     peDIQuestionObserver?.disconnect();
     peDIQuestionObserver = null;
     peDIActiveSet = null;
-    peDIGroupIndex = 0;
-    peDIGroupCount = 1;
-    const nav = document.getElementById("pe-di-graph-nav");
-    if (nav) nav.classList.add("pe-di-graph-nav-hidden");
+    peDIActiveGraphIndex = 0;
     document.querySelectorAll("#pe-list .pe-list-item").forEach(li => {
         li.classList.toggle("active", li.dataset.target === "pe-di-panel");
     });
@@ -2795,95 +2792,65 @@ function getPEDISetQuestions(setName) {
 
 function buildPEDIQuestionGroups(setQuestions) {
     let activeGraph = "";
-    let groupIndex = -1;
-    let questionNumber = 0;
+    const groups = [];
 
-    return (setQuestions || []).map(question => {
+    (setQuestions || []).forEach(question => {
         const uploadedGraph = safeMediaURL(question.imageCode, "image");
-        if (uploadedGraph && uploadedGraph !== activeGraph) {
+        if (!groups.length || (uploadedGraph && uploadedGraph !== activeGraph)) {
             activeGraph = uploadedGraph;
-            groupIndex += 1;
-            questionNumber = 0;
-        } else if (groupIndex < 0) {
-            groupIndex = 0;
+            groups.push({ graphSource: activeGraph, questions: [] });
         }
-        questionNumber += 1;
-        return { question, graphSource: activeGraph, groupIndex, questionNumber };
+        groups[groups.length - 1].questions.push(question);
     });
+
+    return groups;
 }
 
-function showPEDIChartForCard(card) {
+function showPEDIChart(graphSource) {
     const chartImg = document.getElementById("pe-di-chart-img");
-    if (!chartImg || !card) return;
-    const graphSource = String(card.dataset.diGraphSrc || "").trim();
+    if (!chartImg) return;
+    graphSource = String(graphSource || "").trim();
     if (graphSource && chartImg.src !== graphSource) chartImg.src = graphSource;
     else if (!graphSource) chartImg.removeAttribute("src");
-
-    const groupIndex = Number(card.dataset.diGraphGroup);
-    if (Number.isFinite(groupIndex) && groupIndex !== peDIGroupIndex) {
-        peDIGroupIndex = groupIndex;
-    }
-    updatePEDIGraphNav();
 }
 
-// Creates (once) a small "‹ Prev Graph  |  Graph 2 of 3  |  Next Graph ›"
-// control directly under the chart image, so it's obvious when a set
-// contains more than one graph and which one is currently on screen.
-function ensurePEDIGraphNav() {
-    let nav = document.getElementById("pe-di-graph-nav");
-    if (nav) return nav;
-    const chartImg = document.getElementById("pe-di-chart-img");
-    if (!chartImg) return null;
-
-    nav = document.createElement("div");
-    nav.id = "pe-di-graph-nav";
-    nav.className = "pe-di-graph-nav";
-    nav.innerHTML = `
-        <button type="button" id="pe-di-graph-prev" class="pe-di-graph-nav-btn" aria-label="Previous graph">‹ Prev Graph</button>
-        <span id="pe-di-graph-label" class="pe-di-graph-nav-label">Graph 1 of 1</span>
-        <button type="button" id="pe-di-graph-next" class="pe-di-graph-nav-btn" aria-label="Next graph">Next Graph ›</button>
-    `;
-
-    // Your markup wraps the chart image + set title inside a shared
-    // ".pe-di-split-left" column — append the nav as the last thing in
-    // that column so it sits below both the chart and the title, not
-    // wedged between them.
-    const leftColumn = chartImg.closest(".pe-di-split-left");
-    if (leftColumn) {
-        leftColumn.appendChild(nav);
-    } else {
-        const chartBox = chartImg.closest(".pe-di-chart-panel, .pe-di-chart-box, .pe-di-chart-wrap") || chartImg.parentElement || chartImg;
-        chartBox.insertAdjacentElement("afterend", nav);
+function ensurePEDIGraphControls() {
+    const title = document.getElementById("pe-di-set-title");
+    if (!title || !title.parentElement) return null;
+    let controls = document.getElementById("pe-di-graph-controls");
+    if (!controls) {
+        controls = document.createElement("div");
+        controls.id = "pe-di-graph-controls";
+        controls.className = "pe-di-graph-controls";
+        title.insertAdjacentElement("afterend", controls);
     }
-
-    nav.querySelector("#pe-di-graph-prev").addEventListener("click", () => stepPEDIGraphGroup(-1));
-    nav.querySelector("#pe-di-graph-next").addEventListener("click", () => stepPEDIGraphGroup(1));
-    return nav;
+    return controls;
 }
 
-function updatePEDIGraphNav() {
-    const nav = ensurePEDIGraphNav();
-    if (!nav) return;
-    if (peDIGroupCount <= 1) {
-        nav.classList.add("pe-di-graph-nav-hidden");
+function renderPEDIGraphControls(groupCount) {
+    const controls = ensurePEDIGraphControls();
+    if (!controls) return;
+    if (groupCount <= 1) {
+        controls.innerHTML = "";
         return;
     }
-    nav.classList.remove("pe-di-graph-nav-hidden");
-    nav.querySelector("#pe-di-graph-label").textContent = `Graph ${peDIGroupIndex + 1} of ${peDIGroupCount}`;
-    nav.querySelector("#pe-di-graph-prev").disabled = peDIGroupIndex <= 0;
-    nav.querySelector("#pe-di-graph-next").disabled = peDIGroupIndex >= peDIGroupCount - 1;
-}
 
-// Jumps the chart pane + scroll position to the next/previous graph group
-// within the same set (delta is +1 or -1).
-function stepPEDIGraphGroup(delta) {
-    const container = document.getElementById("pe-di-questions-container");
-    if (!container) return;
-    const targetGroup = peDIGroupIndex + delta;
-    const targetCard = container.querySelector(`[data-di-graph-group="${targetGroup}"]`);
-    if (!targetCard) return;
-    showPEDIChartForCard(targetCard);
-    targetCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    controls.innerHTML = `
+        <div class="pe-di-graph-count">Graph ${peDIActiveGraphIndex + 1} of ${groupCount}</div>
+        <div class="pe-di-graph-buttons">
+            <button type="button" class="pe-di-graph-btn" data-di-graph-nav="prev" ${peDIActiveGraphIndex <= 0 ? "disabled" : ""}>Previous graph</button>
+            <button type="button" class="pe-di-graph-btn primary" data-di-graph-nav="next" ${peDIActiveGraphIndex >= groupCount - 1 ? "disabled" : ""}>Next graph</button>
+        </div>
+    `;
+
+    controls.querySelectorAll("[data-di-graph-nav]").forEach(button => {
+        button.addEventListener("click", () => {
+            const direction = button.dataset.diGraphNav === "next" ? 1 : -1;
+            peDIActiveGraphIndex = Math.min(groupCount - 1, Math.max(0, peDIActiveGraphIndex + direction));
+            renderPEDIQuestion();
+            document.getElementById("pe-di-viewer-screen")?.scrollIntoView({ block: "start" });
+        });
+    });
 }
 
 function observePEDIChartGroups(container) {
@@ -2892,45 +2859,36 @@ function observePEDIChartGroups(container) {
     const cards = [...container.querySelectorAll("[data-di-graph-src]")];
     if (!cards.length) return;
 
-    showPEDIChartForCard(cards[0]);
-    cards.forEach(card => {
-        card.addEventListener("mouseenter", () => showPEDIChartForCard(card), { passive: true });
-        card.addEventListener("focusin", () => showPEDIChartForCard(card));
-    });
-
-    if (!("IntersectionObserver" in window)) return;
-    peDIQuestionObserver = new IntersectionObserver(entries => {
-        const visible = entries
-            .filter(entry => entry.isIntersecting)
-            .sort((a, b) => Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top));
-        if (visible[0]) showPEDIChartForCard(visible[0].target);
-    }, {
-        root: null,
-        rootMargin: "-15% 0px -55% 0px",
-        threshold: [0, 0.25, 0.5]
-    });
-    cards.forEach(card => peDIQuestionObserver.observe(card));
+    showPEDIChart(cards[0].dataset.diGraphSrc || "");
 }
 
 function renderPEDIQuestion() {
     const container = document.getElementById("pe-di-questions-container");
-    if (!peDIActiveSet) { container.innerHTML = ""; return; }
+    if (!peDIActiveSet) {
+        container.innerHTML = "";
+        renderPEDIGraphControls(0);
+        showPEDIChart("");
+        return;
+    }
 
     const setQuestions = getPEDISetQuestions(peDIActiveSet);
     if (setQuestions.length === 0) {
         container.innerHTML = '<div class="pe-empty-msg">No questions in this set.</div>';
+        renderPEDIGraphControls(0);
+        showPEDIChart("");
         return;
     }
 
     pePracticeQuestionsByDomId.clear();
     const groupedQuestions = buildPEDIQuestionGroups(setQuestions);
-    peDIGroupCount = groupedQuestions.length
-        ? Math.max(...groupedQuestions.map(g => g.groupIndex)) + 1
-        : 1;
-    peDIGroupIndex = 0;
-    container.innerHTML = groupedQuestions.map(({ question: q, graphSource, groupIndex, questionNumber }, questionIndex) => {
+    peDIActiveGraphIndex = Math.min(groupedQuestions.length - 1, Math.max(0, peDIActiveGraphIndex));
+    const activeGroup = groupedQuestions[peDIActiveGraphIndex] || { graphSource: "", questions: [] };
+    renderPEDIGraphControls(groupedQuestions.length);
+    showPEDIChart(activeGroup.graphSource);
+
+    container.innerHTML = activeGroup.questions.map((q, questionIndex) => {
         const options = Array.isArray(q.options) ? q.options : [];
-        const qId = `pe-di-q-${questionIndex}`;
+        const qId = `pe-di-g-${peDIActiveGraphIndex}-q-${questionIndex}`;
         pePracticeQuestionsByDomId.set(qId, q);
         const optionsHtml = options.slice(0, 4).map((opt, optionIndex) => `
             <button type="button" class="pe-option" id="${qId}-opt-${optionIndex}"
@@ -2940,10 +2898,10 @@ function renderPEDIQuestion() {
         `).join("");
         return `
             <div class="pe-question-card accent-purple"
-                 data-di-graph-src="${escapeHTML(graphSource)}"
-                 data-di-graph-group="${groupIndex}">
+                 data-di-graph-src="${escapeHTML(activeGroup.graphSource)}"
+                 data-di-graph-group="${peDIActiveGraphIndex}">
                 <div class="pe-question-meta">
-                    <div class="pe-question-num">${questionNumber}</div>
+                    <div class="pe-question-num">${questionIndex + 1}</div>
                     <span class="pe-question-tag">Data Interpretation</span>
                     <span class="pe-question-tag">${escapePEHtml(peDIActiveSet)}</span>
                 </div>
@@ -2965,7 +2923,6 @@ function renderPEDIQuestion() {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
     });
     observePEDIChartGroups(container);
-    updatePEDIGraphNav();
 }
 
 // ─── Question attempt flow (attempt first, then reveal) ────
