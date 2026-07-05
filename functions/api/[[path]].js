@@ -198,7 +198,7 @@ async function handleAdminQuestionMedia(context) {
 }
 
 function normalizeOption(value) {
-    const text = String(value || "").normalize("NFKC").trim();
+    const text = String(value || "").trim();
     const isoDateOnly = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d{3})?Z$/;
     if (!isoDateOnly.test(text)) return text;
     const date = new Date(text);

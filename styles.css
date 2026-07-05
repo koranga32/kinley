@@ -53,7 +53,8 @@
         .peo-question-text,
         .peo-option-row,
         .pe-question-text,
-        .pe-option {
+        .pe-option,
+        .daily-quote-track {
             font-family: 'DM Sans', 'Noto Sans Tibetan', 'Jomolhari', sans-serif;
         }
 

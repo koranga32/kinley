@@ -19,7 +19,9 @@ function cleanText(value, label, { min = 1, max, pattern } = {}) {
     if (typeof value !== "string") {
         throw validationError("invalid_type", `${label} must be text.`);
     }
-    const normalized = value.normalize("NFKC").trim();
+    // Preserve multilingual content exactly as entered. Compatibility
+    // normalization can decompose or replace valid Tibetan/Dzongkha glyphs.
+    const normalized = value.trim();
     const unsupportedControls = normalized.replace(/[\n\r\t]/g, "");
     if (/\p{Cc}/u.test(unsupportedControls)) {
         throw validationError("invalid_characters", `${label} contains unsupported control characters.`);
