@@ -2848,7 +2848,7 @@ function renderPEDIGraphControls(groupCount) {
             const direction = button.dataset.diGraphNav === "next" ? 1 : -1;
             peDIActiveGraphIndex = Math.min(groupCount - 1, Math.max(0, peDIActiveGraphIndex + direction));
             renderPEDIQuestion();
-            document.getElementById("pe-di-viewer-screen")?.scrollIntoView({ block: "start" });
+            document.querySelector(".pe-di-split-right")?.scrollTo({ top: 0, behavior: "smooth" });
         });
     });
 }
@@ -3020,12 +3020,19 @@ async function answerPEQuestion(qId, chosenIndex) {
     lockPEOptions(qId);
     const chosenBtn = document.getElementById(`${qId}-opt-${chosenIndex}`);
     const feedback = document.getElementById(`${qId}-feedback`);
+    const solution = document.getElementById(`${qId}-solution`);
+    const solutionText = solution?.querySelector(".pe-solution-text");
+    const serverExplanation = typeof result.explanation === "string" ? result.explanation.trim() : "";
+    if (serverExplanation && solutionText) {
+        solutionText.textContent = serverExplanation;
+    }
+    solution?.classList.add("open");
 
     if (result.correct === true) {
-        chosenBtn.classList.add("pe-correct");
+        chosenBtn?.classList.add("pe-correct");
         if (feedback) { feedback.textContent = "✓ Correct!"; feedback.className = "pe-feedback-msg correct"; }
     } else {
-        chosenBtn.classList.add("pe-incorrect");
+        chosenBtn?.classList.add("pe-incorrect");
         if (feedback) { feedback.textContent = "✕ Not quite."; feedback.className = "pe-feedback-msg incorrect"; }
     }
 }

@@ -3588,6 +3588,24 @@
         .pe-di-split-right {
             flex: 1;
             min-width: 0;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+            padding-right: 8px;
+            scroll-behavior: smooth;
+        }
+
+        .pe-di-split-right::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .pe-di-split-right::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.04);
+            border-radius: 999px;
+        }
+
+        .pe-di-split-right::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.22);
+            border-radius: 999px;
         }
 
         @media (max-width: 860px) {
@@ -3617,6 +3635,13 @@
 
             .pe-di-set-title {
                 margin-top: 6px;
+            }
+
+            .pe-di-split-right {
+                width: 100%;
+                max-height: none;
+                overflow-y: visible;
+                padding-right: 0;
             }
 
             .pe-di-split-right .pe-question-card {
