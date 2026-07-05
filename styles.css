@@ -3797,6 +3797,24 @@
             flex-wrap: wrap;
         }
 
+        .pe-answer-toggle {
+            border: 1px solid #4a5260;
+            background: #20232a;
+            color: #f5f7fb;
+            border-radius: 999px;
+            padding: 8px 13px;
+            font-size: 12.5px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+        }
+
+        .pe-answer-toggle:hover {
+            background: #2b313c;
+            border-color: var(--clr, #4caf50);
+            transform: translateY(-1px);
+        }
+
         .pe-feedback-msg { font-size: 13px; font-weight: 700; padding: 6px 0; }
         .pe-feedback-msg.correct { color: #6ee08c; }
         .pe-feedback-msg.incorrect { color: #ff8a8a; }

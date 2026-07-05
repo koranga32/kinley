@@ -2792,15 +2792,20 @@ function getPEDISetQuestions(setName) {
 
 function buildPEDIQuestionGroups(setQuestions) {
     let activeGraph = "";
+    let previousQuestionHadGraph = false;
     const groups = [];
 
     (setQuestions || []).forEach(question => {
         const uploadedGraph = safeMediaURL(question.imageCode, "image");
-        if (!groups.length || (uploadedGraph && uploadedGraph !== activeGraph)) {
+        const shouldStartNewGraph = !groups.length
+            || (uploadedGraph && uploadedGraph !== activeGraph && !previousQuestionHadGraph);
+
+        if (shouldStartNewGraph) {
             activeGraph = uploadedGraph;
             groups.push({ graphSource: activeGraph, questions: [] });
         }
         groups[groups.length - 1].questions.push(question);
+        previousQuestionHadGraph = Boolean(uploadedGraph);
     });
 
     return groups;
@@ -2909,11 +2914,12 @@ function renderPEDIQuestion() {
                 ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
                 <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
                 <div class="pe-question-actions">
+                    <button type="button" class="pe-answer-toggle" data-pe-solution-toggle="${qId}" aria-expanded="false">Show answer</button>
                     <div class="pe-feedback-msg" id="${qId}-feedback"></div>
                 </div>
                 <div class="pe-solution-box accent-purple" id="${qId}-solution">
                     <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
-                    <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
+                    <div class="pe-solution-text">${escapePEHtml(q.explanation || "No explanation has been added yet.")}</div>
                 </div>
             </div>
         `;
@@ -2922,6 +2928,7 @@ function renderPEDIQuestion() {
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
     });
+    bindPESolutionToggles(container);
     observePEDIChartGroups(container);
 }
 
@@ -2961,7 +2968,7 @@ function renderPEQuestionList() {
         const explanationHtml = `
             <div class="pe-solution-box ${accentClass}" id="${qId}-solution">
                 <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
-                <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
+                <div class="pe-solution-text">${escapePEHtml(q.explanation || "No explanation has been added yet.")}</div>
             </div>
         `;
 
@@ -2977,6 +2984,7 @@ function renderPEQuestionList() {
                 ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
                 <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
                 <div class="pe-question-actions">
+                    <button type="button" class="pe-answer-toggle" data-pe-solution-toggle="${qId}" aria-expanded="false">Show answer</button>
                     <div class="pe-feedback-msg" id="${qId}-feedback"></div>
                 </div>
                 ${explanationHtml}
@@ -2986,6 +2994,26 @@ function renderPEQuestionList() {
 
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
+    });
+    bindPESolutionToggles(container);
+}
+
+function togglePESolution(qId, forceOpen = null) {
+    const solution = document.getElementById(`${qId}-solution`);
+    const toggle = [...document.querySelectorAll("[data-pe-solution-toggle]")]
+        .find(button => button.dataset.peSolutionToggle === qId);
+    if (!solution) return;
+    const shouldOpen = forceOpen === null ? !solution.classList.contains("open") : Boolean(forceOpen);
+    solution.classList.toggle("open", shouldOpen);
+    if (toggle) {
+        toggle.textContent = shouldOpen ? "Hide answer" : "Show answer";
+        toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    }
+}
+
+function bindPESolutionToggles(container) {
+    container.querySelectorAll("[data-pe-solution-toggle]").forEach(button => {
+        button.addEventListener("click", () => togglePESolution(button.dataset.peSolutionToggle || ""));
     });
 }
 
@@ -3020,13 +3048,12 @@ async function answerPEQuestion(qId, chosenIndex) {
     lockPEOptions(qId);
     const chosenBtn = document.getElementById(`${qId}-opt-${chosenIndex}`);
     const feedback = document.getElementById(`${qId}-feedback`);
-    const solution = document.getElementById(`${qId}-solution`);
-    const solutionText = solution?.querySelector(".pe-solution-text");
+    const solutionText = document.getElementById(`${qId}-solution`)?.querySelector(".pe-solution-text");
     const serverExplanation = typeof result.explanation === "string" ? result.explanation.trim() : "";
     if (serverExplanation && solutionText) {
         solutionText.textContent = serverExplanation;
     }
-    solution?.classList.add("open");
+    togglePESolution(qId, true);
 
     if (result.correct === true) {
         chosenBtn?.classList.add("pe-correct");

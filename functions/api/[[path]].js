@@ -70,7 +70,13 @@ async function handleQuestions(context) {
         const rows = await supabaseServerRequest(context.env, `Exam?select=${fields}&order=id.asc`);
         return json((rows || [])
             .filter(row => String(row.category || "").startsWith("__PE__::"))
-            .map(row => ({ ...row, question: publicQuestionText(row.question) })), 200, PUBLIC_CACHE_SHORT);
+            .map(row => ({
+                ...row,
+                // PE practice needs the embedded explanation so the public
+                // app can show the Solution & Explanation box. Normal/secure
+                // exam views still strip it before students start an exam.
+                question: view === "pe-practice" ? String(row.question || "") : publicQuestionText(row.question)
+            })), 200, PUBLIC_CACHE_SHORT);
     }
     if (view === "media") {
         const ids = validateMediaIds(url.searchParams.get("ids"));
