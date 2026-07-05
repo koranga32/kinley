@@ -1533,22 +1533,11 @@ async function navigate(idx) {
         syncNormalSubmitVisibility();
         return;
     }
-    const outgoingCard = document.getElementById("normal-question-stage");
-    await animateContentOut(outgoingCard, {
-        toOpacity: 0.68,
-        duration: 105,
-        easing: "cubic-bezier(0.4, 0, 0.2, 1)"
-    });
     await ensureNormalExamQuestionLoaded(idx);
     currentIdx = idx;
     renderActiveNormalQuestion();
     refreshNormalOmrState();
     const activeCard = document.getElementById("normal-question-stage");
-    animateContentIn(activeCard, {
-        fromOpacity: 0.46,
-        duration: 235,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)"
-    });
     if (window.innerWidth < 768 && activeCard) {
         activeCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
