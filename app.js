@@ -2792,20 +2792,15 @@ function getPEDISetQuestions(setName) {
 
 function buildPEDIQuestionGroups(setQuestions) {
     let activeGraph = "";
-    let previousQuestionHadGraph = false;
     const groups = [];
 
     (setQuestions || []).forEach(question => {
         const uploadedGraph = safeMediaURL(question.imageCode, "image");
-        const shouldStartNewGraph = !groups.length
-            || (uploadedGraph && uploadedGraph !== activeGraph && !previousQuestionHadGraph);
-
-        if (shouldStartNewGraph) {
+        if (!groups.length || (uploadedGraph && uploadedGraph !== activeGraph)) {
             activeGraph = uploadedGraph;
             groups.push({ graphSource: activeGraph, questions: [] });
         }
         groups[groups.length - 1].questions.push(question);
-        previousQuestionHadGraph = Boolean(uploadedGraph);
     });
 
     return groups;
