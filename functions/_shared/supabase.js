@@ -16,11 +16,24 @@ export async function supabaseServerRequest(env, path, { method = "GET", body, p
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (prefer) headers.Prefer = prefer;
 
-    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body)
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    let response;
+    try {
+        response = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
+            method,
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
+            signal: controller.signal
+        });
+    } catch (error) {
+        if (controller.signal.aborted) {
+            throw validationError("upstream_timeout", "Database request timed out.", 504);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
 
     if (!response.ok) {
         console.error("Supabase proxy failure", response.status, await response.text());

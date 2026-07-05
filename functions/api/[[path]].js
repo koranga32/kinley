@@ -17,6 +17,7 @@ import {
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
+const QUESTION_WINDOW_SIZE = 5;
 const PUBLIC_CACHE_SHORT = {
     "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=120"
 };
@@ -627,7 +628,7 @@ async function handleExamStart(context) {
         publicQuestions,
         gradingItems: prepared.map(item => item.gradingItem)
     });
-    const initialWindow = buildQuestionWindow(publicQuestions, 0, 2);
+    const initialWindow = buildQuestionWindow(publicQuestions, 0, QUESTION_WINDOW_SIZE);
     return json({
         ok: true,
         session_id: sessionId,
@@ -665,7 +666,7 @@ async function handleExamQuestion(context) {
     return json({
         ok: true,
         total: normalized.publicQuestions.length,
-        questions: buildQuestionWindow(normalized.publicQuestions, index, 2)
+        questions: buildQuestionWindow(normalized.publicQuestions, index, QUESTION_WINDOW_SIZE)
     }, 200);
 }
 
@@ -687,7 +688,7 @@ async function handlePEOnlineStart(context) {
         ok: true,
         session_id: sessionId,
         total: publicQuestions.length,
-        questions: buildQuestionWindow(publicQuestions, 0, 2)
+        questions: buildQuestionWindow(publicQuestions, 0, QUESTION_WINDOW_SIZE)
     }, 201);
 }
 
@@ -720,7 +721,7 @@ async function handlePEOnlineQuestion(context) {
     return json({
         ok: true,
         total: normalized.publicQuestions.length,
-        questions: buildQuestionWindow(normalized.publicQuestions, index, 2)
+        questions: buildQuestionWindow(normalized.publicQuestions, index, QUESTION_WINDOW_SIZE)
     }, 200);
 }
 
@@ -785,13 +786,18 @@ async function handleResponses(context) {
             status: grading[index].status
         }))
     };
-    await supabaseServerRequest(context.env, "Response", {
+    const saveResponse = supabaseServerRequest(context.env, "Response", {
         method: "POST",
         body: payload,
         prefer: "return=minimal"
+    }).catch(error => {
+        console.error("Exam response history save failed:", error);
     });
+    if (typeof context.waitUntil === "function") context.waitUntil(saveResponse);
+    else await saveResponse;
     return json({
         ok: true,
+        save_queued: true,
         result: {
             correct,
             wrong,

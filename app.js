@@ -3,6 +3,7 @@
 // Supabase secrets and privileged credentials never belong in this file.
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
+const API_TIMEOUT_MS = 20000;
 const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
 const SECONDS_PER_QUESTION = 30;
 
@@ -44,6 +45,8 @@ let peQuestionsCache = [];
 let peTopicBuckets = new Map();
 let cafStateLoaded = false;
 let cafStatePromise = null;
+let submitInProgress = false;
+const QUESTION_PREFETCH_AHEAD = 5;
 
 function bindStaticUiEvents() {
     document.getElementById("contact-modal")?.addEventListener("click", handleContactBackdropClick);
@@ -381,12 +384,28 @@ async function apiRequest(path, { method = "GET", body, headers = {} } = {}) {
 async function fetchApiJson(path, { method = "GET", body, headers = {} } = {}) {
     const requestHeaders = { ...headers };
     if (body) requestHeaders["Content-Type"] = "application/json";
-    const response = await fetch(`/api/${path}`, {
-        method,
-        headers: Object.keys(requestHeaders).length ? requestHeaders : undefined,
-        body: body ? JSON.stringify(body) : undefined,
-        credentials: "same-origin"
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    let response;
+    try {
+        response = await fetch(`/api/${path}`, {
+            method,
+            headers: Object.keys(requestHeaders).length ? requestHeaders : undefined,
+            body: body ? JSON.stringify(body) : undefined,
+            credentials: "same-origin",
+            signal: controller.signal
+        });
+    } catch (error) {
+        if (controller.signal.aborted) {
+            const timeoutError = new Error("The server took too long to respond. Please try again.");
+            timeoutError.code = "request_timeout";
+            timeoutError.status = 504;
+            throw timeoutError;
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
 
     const data = await response.json().catch(() => null);
     if (!response.ok) {
@@ -1306,7 +1325,7 @@ function buildExam() {
     updateProgress();
     syncNormalSubmitVisibility();
     handleQuestionAudio(0); // autoplay/timer for the first question if it has audio
-    void prefetchNormalExamQuestion(2);
+    void prefetchNormalExamQuestion(QUESTION_PREFETCH_AHEAD);
 }
 
 function renderActiveNormalQuestion() {
@@ -1534,7 +1553,7 @@ async function navigate(idx) {
         activeCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
     handleQuestionAudio(currentIdx);
-    void prefetchNormalExamQuestion(currentIdx + 1);
+    void prefetchNormalExamQuestion(currentIdx + QUESTION_PREFETCH_AHEAD);
 }
 
 // Music/audio questions autoplay for exactly 30 seconds as soon as the
@@ -1622,6 +1641,8 @@ function startTimer() {
 
 // ─── SUBMIT ───────────────────────────────────────────
 async function submitExam() {
+    if (submitInProgress) return;
+    submitInProgress = true;
     clearInterval(timerInterval);
     if (audioQuestionTimer) { clearInterval(audioQuestionTimer); audioQuestionTimer = null; }
     document.querySelectorAll(".q-audio").forEach(el => el.pause());
@@ -1653,9 +1674,11 @@ async function submitExam() {
                 : `Result not saved: ${e.message}`,
             "error"
         );
+        submitInProgress = false;
         return;
     }
 
+    try {
     const correct = gradedResult.correct;
     const wrong = gradedResult.wrong;
     const skipped = gradedResult.skipped;
@@ -1689,7 +1712,7 @@ async function submitExam() {
     // Review cards
     document.getElementById("review-container").innerHTML = activeData.map((q, i) => {
         const ans = responses[i];
-        const isCorrect = gradedResult.grading[i]?.status === "CORRECT";
+        const isCorrect = gradedResult.grading?.[i]?.status === "CORRECT";
         const isSkipped = ans === null;
         const cls = isSkipped ? "skipped" : isCorrect ? "correct" : "wrong";
         const verdict = isSkipped
@@ -1699,9 +1722,9 @@ async function submitExam() {
             : `<span class="review-verdict wrong">✕ Incorrect</span>`;
         return `
         <div class="review-item ${cls}">
-            <div class="review-q-text">Q${i+1}: ${escapeHTML(q.question)}</div>
+            <div class="review-q-text">Q${i+1}: ${escapeHTML(q?.question || `Question ${i + 1}`)}</div>
             <div class="review-answers">
-                ${!isSkipped ? `<span class="answer-tag ${isCorrect?'correct-ans':'wrong-ans'}">Your answer: ${ALPHA[ans]}) ${escapeHTML(q.options[ans])}</span>` : ''}
+                ${!isSkipped ? `<span class="answer-tag ${isCorrect?'correct-ans':'wrong-ans'}">Your answer: ${ALPHA[ans]}) ${escapeHTML(q?.options?.[ans] || "Answer recorded")}</span>` : ''}
                 ${isSkipped ? `<span class="answer-tag your-ans">Not answered</span>` : ''}
                 ${verdict}
             </div>
@@ -1721,6 +1744,17 @@ async function submitExam() {
 
     // Animate ring after render
     setTimeout(() => { ring.style.strokeDashoffset = offset; }, 300);
+    } catch (error) {
+        console.error("Result display error:", error);
+        document.getElementById("exam-view").classList.remove("show");
+        document.getElementById("exam-view").style.display = "none";
+        document.getElementById("results-view").style.display = "";
+        document.getElementById("results-view").classList.add("show");
+        showToast("Your score was saved, but some review details could not be displayed.", "error");
+    } finally {
+        submitInProgress = false;
+        showLoading(false);
+    }
 }
 
 
