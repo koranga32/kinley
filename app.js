@@ -40,6 +40,7 @@ let categoryMediaPrefetch = { category: "", promise: null };
 let peOnlineMediaPrefetchPromise = null;
 let peTopicMediaPrefetch = new Map();
 let peDIGraphPrefetch = new Map();
+let peDIGraphFingerprintCache = new Map();
 let publicApiCache = new Map();
 let peQuestionsCache = [];
 let peTopicBuckets = new Map();
@@ -348,6 +349,7 @@ function clearDatabaseCache() {
     peOnlineMediaPrefetchPromise = null;
     peTopicMediaPrefetch = new Map();
     peDIGraphPrefetch = new Map();
+    peDIGraphFingerprintCache = new Map();
     clearPublicApiCache();
 }
 
@@ -1119,6 +1121,7 @@ async function prefetchPEDISetGraph(setName, { blockForMs = 0 } = {}) {
             // question's media so each newly uploaded chart can begin its own
             // group instead of silently inheriting the first chart forever.
             await fetchSelectedQuestionMedia(setQuestions, { persistCache: false });
+            await preparePEDIGraphFingerprints(normalizedSetName);
             const graphSources = [...new Set(setQuestions
                 .map(question => safeMediaURL(question.imageCode, "image"))
                 .filter(Boolean))];
@@ -2790,14 +2793,85 @@ function getPEDISetQuestions(setName) {
     });
 }
 
+function hammingDistance(a, b) {
+    if (!a || !b || a.length !== b.length) return Number.POSITIVE_INFINITY;
+    let distance = 0;
+    for (let i = 0; i < a.length; i += 1) {
+        if (a[i] !== b[i]) distance += 1;
+    }
+    return distance;
+}
+
+function isSamePEDIGraphKey(nextKey, activeKey) {
+    if (!nextKey || !activeKey) return false;
+    if (nextKey === activeKey) return true;
+    if (nextKey.startsWith("hash:") && activeKey.startsWith("hash:")) {
+        // 16x16 average hash = 256 bits. Re-uploaded copies of the same chart
+        // can differ a little after compression/cropping, so allow a small gap.
+        return hammingDistance(nextKey.slice(5), activeKey.slice(5)) <= 18;
+    }
+    return false;
+}
+
+async function getPEDIGraphFingerprint(source) {
+    source = String(source || "").trim();
+    if (!source) return "";
+    if (peDIGraphFingerprintCache.has(source)) return peDIGraphFingerprintCache.get(source);
+
+    const promise = new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            try {
+                const size = 16;
+                const canvas = document.createElement("canvas");
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext("2d", { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0, size, size);
+                const data = ctx.getImageData(0, 0, size, size).data;
+                const grayscale = [];
+                for (let i = 0; i < data.length; i += 4) {
+                    grayscale.push((data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114));
+                }
+                const average = grayscale.reduce((sum, value) => sum + value, 0) / grayscale.length;
+                resolve(`hash:${grayscale.map(value => value >= average ? "1" : "0").join("")}`);
+            } catch (error) {
+                // If the browser blocks canvas reads for a remote image, fall
+                // back to the exact source string. Data/blob images still hash.
+                resolve(`src:${source}`);
+            }
+        };
+        img.onerror = () => resolve(`src:${source}`);
+        img.src = source;
+    });
+
+    peDIGraphFingerprintCache.set(source, promise);
+    const key = await promise;
+    peDIGraphFingerprintCache.set(source, key);
+    return key;
+}
+
+async function preparePEDIGraphFingerprints(setName) {
+    const setQuestions = getPEDISetQuestions(setName);
+    await Promise.all(setQuestions.map(async question => {
+        const source = safeMediaURL(question.imageCode, "image");
+        question._diGraphSource = source;
+        question._diGraphKey = source ? await getPEDIGraphFingerprint(source) : "";
+    }));
+}
+
 function buildPEDIQuestionGroups(setQuestions) {
     let activeGraph = "";
+    let activeGraphKey = "";
     const groups = [];
 
     (setQuestions || []).forEach(question => {
         const uploadedGraph = safeMediaURL(question.imageCode, "image");
-        if (!groups.length || (uploadedGraph && uploadedGraph !== activeGraph)) {
+        const uploadedGraphKey = question._diGraphKey || uploadedGraph;
+        if (!groups.length || (uploadedGraph && !isSamePEDIGraphKey(uploadedGraphKey, activeGraphKey))) {
             activeGraph = uploadedGraph;
+            activeGraphKey = uploadedGraphKey;
             groups.push({ graphSource: activeGraph, questions: [] });
         }
         groups[groups.length - 1].questions.push(question);
