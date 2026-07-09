@@ -3652,22 +3652,23 @@
                 position: sticky;
                 top: 0;
                 z-index: 24;
-                width: 100%;
-                margin-bottom: 10px;
-                padding: 8px 0;
-                background: rgba(34, 37, 42, 0.92);
-                backdrop-filter: blur(6px);
+                width: auto;
+                align-self: flex-start;
+                margin-bottom: 6px;
+                padding: 4px 0;
+                background: transparent;
+                backdrop-filter: none;
             }
 
             .pe-di-split {
                 flex: 0 0 auto;
                 flex-direction: column;
-                gap: 16px;
+                gap: 10px;
                 overflow: visible;
             }
             .pe-di-split-left {
                 position: sticky;
-                top: 38px;
+                top: 32px;
                 z-index: 22;
                 max-height: none;
                 height: auto;
@@ -3679,7 +3680,7 @@
 
             .pe-di-chart-wrap {
                 flex: none;
-                height: clamp(280px, 42vh, 430px);
+                height: clamp(220px, 34vh, 340px);
                 max-height: none;
                 padding: 6px;
                 overflow: hidden;
