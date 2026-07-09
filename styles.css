@@ -3529,7 +3529,7 @@
             border: 1px solid #383d46;
             border-radius: 14px;
             padding: 18px;
-            height: 100%;
+            height: calc(100% - 32px);
             overflow: hidden;
             display: flex;
             flex-direction: column;
