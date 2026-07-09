@@ -284,6 +284,22 @@ function bindStaticUiEvents() {
 	    return -1;
 	}
 
+	function randomizePEPracticeQuestionSet(questions, { shuffleQuestions = true } = {}) {
+	    const orderedQuestions = shuffleQuestions ? shuffleArray(questions) : [...questions];
+	    return orderedQuestions.map(question => {
+	        const optionItems = (Array.isArray(question.options) ? question.options : [])
+	            .slice(0, 4)
+	            .map((text, originalIndex) => ({ text, originalIndex }));
+	        const shuffledOptions = shuffleArray(optionItems);
+	        return {
+	            ...question,
+	            options: shuffledOptions.map(item => item.text),
+	            _optionOriginalIndexes: shuffledOptions.map(item => item.originalIndex),
+	            _peRandomSort: Math.random()
+	        };
+	    });
+	}
+
 // ─── LOADING ─────────────────────────────────────────
 function showLoading(on, msg = "Loading…") {
     const el = document.getElementById("loading-overlay");
@@ -500,7 +516,9 @@ async function fetchQuestions() {
 
 async function fetchPEPracticeTopicQuestions(peType, topic) {
     const path = `questions?view=pe-practice&pe_type=${encodeURIComponent(peType)}&topic=${encodeURIComponent(topic)}`;
-    return mapExamRows(await apiRequest(path));
+    return randomizePEPracticeQuestionSet(mapExamRows(await apiRequest(path)), {
+        shuffleQuestions: peType !== "Data Interpretation"
+    });
 }
 
 
@@ -1994,7 +2012,7 @@ function cafSelectRegion(region) {
 
 function cafFilterData(resetPage = true) {
     const selectedCategory = document.getElementById("caf-category-dropdown")?.value || cafCategoriesForScope(cafSelectedScope)[0] || "";
-    cafFilteredItems = cafNotes.filter(note => note.scope === cafSelectedScope && note.category === selectedCategory);
+    cafFilteredItems = shuffleArray(cafNotes.filter(note => note.scope === cafSelectedScope && note.category === selectedCategory));
     cafClearAllTimers();
     cafRenderPageGrid();
     if (resetPage) document.getElementById("caf-note-wall")?.scrollTo({ left: 0, top: 0 });
@@ -2851,10 +2869,7 @@ function closePEDIViewer() {
 }
 
 function getPEDISetQuestions(setName) {
-    return getPEQuestions().filter(q => {
-        const info = parsePECategory(q.category);
-        return info.peType === "Data Interpretation" && info.topic === setName;
-    });
+    return getPETopicQuestions("Data Interpretation", setName);
 }
 
 function hammingDistance(a, b) {
@@ -2941,7 +2956,10 @@ function buildPEDIQuestionGroups(setQuestions) {
         groups[groups.length - 1].questions.push(question);
     });
 
-    return groups;
+    return groups.map(group => ({
+        ...group,
+        questions: [...group.questions].sort((a, b) => (a._peRandomSort || 0) - (b._peRandomSort || 0))
+    }));
 }
 
 function showPEDIChart(graphSource) {
@@ -3070,10 +3088,7 @@ function renderPEQuestionList() {
     const container = document.getElementById("pe-questions-container");
     if (!peActiveTopic) { container.innerHTML = ""; return; }
 
-    const list = getPEQuestions().filter(q => {
-        const info = parsePECategory(q.category);
-        return info.peType === peActiveTopic.peType && info.topic === peActiveTopic.topic;
-    });
+    const list = getPETopicQuestions(peActiveTopic.peType, peActiveTopic.topic);
 
     if (list.length === 0) {
         container.innerHTML = '<div class="pe-empty-msg">No questions in this topic yet.</div>';
@@ -3169,9 +3184,13 @@ async function answerPEQuestion(qId, chosenIndex) {
     try {
         const question = pePracticeQuestionsByDomId.get(qId);
         if (!question) throw new Error("Question is no longer available.");
+        const originalOptionIndexes = Array.isArray(question._optionOriginalIndexes) ? question._optionOriginalIndexes : [];
+        const originalSelectedIndex = Number.isInteger(originalOptionIndexes[chosenIndex])
+            ? originalOptionIndexes[chosenIndex]
+            : chosenIndex;
         result = await apiRequest("question-solution", {
             method: "POST",
-            body: { id: String(question.id), selected_index: chosenIndex }
+            body: { id: String(question.id), selected_index: originalSelectedIndex }
         });
     } catch (error) {
         setPEQuestionLoading(qId, false);
