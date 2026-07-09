@@ -246,29 +246,6 @@ function closeImageZoom() {
 	    return copy;
 	}
 
-	function isTimestampOption(value) {
-	    const text = String(value || "").trim();
-	    if (!text) return false;
-	    return /^\d{1,2}\/\d{1,2}\/\d{2,4}[,\s]+\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?$/i.test(text)
-	        || /^Timestamp$/i.test(text);
-	}
-
-	function formatOptionText(value) {
-	    const text = String(value || "").trim();
-	    const isoDateOnly = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d{3})?Z$/;
-	    if (!isoDateOnly.test(text)) return text;
-
-	    const date = new Date(text);
-	    if (Number.isNaN(date.getTime())) return text;
-
-	    return new Intl.DateTimeFormat("en-GB", {
-	        timeZone: "Asia/Thimphu",
-	        day: "numeric",
-	        month: "long",
-	        year: "numeric"
-	    }).format(date);
-    }
-
     function escapeHTML(value) {
         return String(value ?? "").replace(/[&<>"']/g, char => ({
             "&": "&amp;",
@@ -292,45 +269,6 @@ function closeImageZoom() {
         return escapeHTML(safeMediaURL(value, mediaType));
     }
 
-	function cleanQuestionOptions(question) {
-	    const rawOptions = Array.isArray(question.options) ? question.options : [];
-	    const answerIndex = Number.isInteger(question.answer)
-	        ? question.answer
-	        : parseInt(question.answer, 10);
-	    let cleanedOptions = rawOptions
-	        .map(text => String(text || "").trim())
-	        .filter(Boolean);
-
-	    if (cleanedOptions.length > 4) {
-	        const withoutExtraTimestamps = cleanedOptions.filter(text => !isTimestampOption(text));
-	        if (withoutExtraTimestamps.length >= 4) cleanedOptions = withoutExtraTimestamps;
-	    }
-
-	    cleanedOptions = cleanedOptions.slice(0, 4).map(formatOptionText);
-
-	    return {
-	        options: cleanedOptions,
-	        answerIndex: answerIndex >= 0 && answerIndex <= 3 ? answerIndex : 0
-	    };
-	}
-
-	function prepareRandomizedQuestion(question) {
-	    const { options, answerIndex } = cleanQuestionOptions(question);
-	    const hasAnswer = Number.isInteger(question.answer) && question.answer >= 0 && question.answer <= 3;
-	    const optionItems = options.map((text, index) => ({
-	        text,
-	        wasCorrect: hasAnswer && index === answerIndex
-	    }));
-	    const shuffledOptions = shuffleArray(optionItems);
-	    return {
-	        ...question,
-	        options: shuffledOptions.map(item => item.text),
-	        answer: hasAnswer ? shuffledOptions.findIndex(item => item.wasCorrect) : -1
-	    };
-	}
-
-
-
 	// ─── PE CATEGORY ENCODING HELPERS ──────────────────
 	// PE questions are stored using the existing `category` column with a
 	// special prefix so NO new Supabase columns are required and the normal
@@ -348,11 +286,6 @@ function closeImageZoom() {
 	        peType: rawType === "Mock" ? PE_BCSC_MAIN_TYPE : rawType,
 	        topic: parts[2] || "General"
 	    };
-	}
-
-	function buildPECategory(peType, topic) {
-	    const normalizedType = peType === "Mock" ? PE_BCSC_MAIN_TYPE : (peType || PE_BCSC_MAIN_TYPE);
-	    return `__PE__::${normalizedType}::${(topic || "General").trim()}`;
 	}
 
 	function parseCorrectAnswer(value) {
@@ -1127,7 +1060,6 @@ function processData(data) {
     } else {
         btn.innerHTML = "<span>Continue</span> →";
     }
-    const catalogTotal = [...examCategoryCounts.values()].reduce((sum, count) => sum + count, 0);
     if (document.getElementById("pe-view") && document.getElementById("pe-view").style.display !== "none") {
         const activePanel = document.querySelector(".pe-content .pe-section.active")?.id;
         if (peActiveTopic) renderPEQuestionList();
@@ -1640,24 +1572,6 @@ function animateContentIn(element, {
         ],
         { duration, easing }
     );
-}
-
-async function animateContentOut(element, {
-    toOpacity = 0.62,
-    duration = 110,
-    easing = "cubic-bezier(0.4, 0, 0.2, 1)"
-} = {}) {
-    if (!element || typeof element.animate !== "function") return;
-    resetAnimatedPresentation(element);
-    try {
-        await element.animate(
-            [
-                { opacity: 1 },
-                { opacity: toOpacity }
-            ],
-            { duration, easing, fill: "forwards" }
-        ).finished;
-    } catch {}
 }
 
 function syncNormalSubmitVisibility() {
