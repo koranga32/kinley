@@ -2656,22 +2656,43 @@ async function peoSyncWorkspaceView() {
         document.getElementById("peo-question-content")?.appendChild(stage);
     }
     const graphSource = safeMediaURL(q.imageCode, "image");
+    const currentGraphSource = imgNode?.getAttribute("src") || "";
 
     if (graphSource) {
-        if (imgNode.getAttribute("src") !== graphSource) {
-            // Cross-fade when the chart image itself actually changes // (moving between two different DI sets), rather than just
-            // swapping the src instantly mid-transition.
-            imgNode.style.opacity = "0";
-            setTimeout(() => {
+        if (imgNode && currentGraphSource !== graphSource) {
+            if (imgNode.dataset.graphTimer) {
+                clearTimeout(Number(imgNode.dataset.graphTimer));
+                delete imgNode.dataset.graphTimer;
+            }
+            const hadGraph = Boolean(currentGraphSource);
+            if (hadGraph) imgNode.style.opacity = "0";
+            const applyGraph = () => {
                 imgNode.src = graphSource;
                 imgNode.style.opacity = "1";
-            }, 150);
+                delete imgNode.dataset.graphTimer;
+            };
+            if (hadGraph) {
+                imgNode.dataset.graphTimer = String(setTimeout(applyGraph, 120));
+            } else {
+                applyGraph();
+            }
+        } else if (imgNode) {
+            imgNode.style.opacity = "1";
         }
         workspace.classList.add("split-mode");
     } else {
         workspace.classList.remove("split-mode");
-        imgNode.style.opacity = "0";
-        setTimeout(() => { imgNode.src = ""; }, 350); // wait for the panel-collapse transition to finish
+        if (imgNode && currentGraphSource) {
+            if (imgNode.dataset.graphTimer) {
+                clearTimeout(Number(imgNode.dataset.graphTimer));
+                delete imgNode.dataset.graphTimer;
+            }
+            imgNode.style.opacity = "0";
+            imgNode.dataset.graphTimer = String(setTimeout(() => {
+                imgNode.src = "";
+                delete imgNode.dataset.graphTimer;
+            }, 250));
+        }
     }
 
     for (let i = 0; i < activeData.length; i++) {

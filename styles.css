@@ -3641,6 +3641,7 @@
         @media (max-width: 860px) {
             .pe-content:has(#pe-di-viewer-screen.active) {
                 overflow-y: auto;
+                padding-top: 6px;
             }
 
             #pe-di-viewer-screen.active {
@@ -3654,8 +3655,8 @@
                 z-index: 24;
                 width: auto;
                 align-self: flex-start;
-                margin-bottom: 0;
-                padding: 0;
+                margin-bottom: 2px;
+                padding: 0 0 2px;
                 line-height: 1.1;
                 background: transparent;
                 backdrop-filter: none;
@@ -3664,18 +3665,18 @@
             .pe-di-split {
                 flex: 0 0 auto;
                 flex-direction: column;
-                gap: 4px;
+                gap: 2px;
                 overflow: visible;
-                margin-top: -4px;
+                margin-top: 0;
             }
             .pe-di-split-left {
                 position: sticky;
-                top: 22px;
+                top: 18px;
                 z-index: 22;
                 max-height: none;
                 height: auto;
                 width: 100%;
-                padding: 10px;
+                padding: 8px;
                 overflow: visible;
                 box-shadow: 0 10px 24px rgba(0,0,0,0.28);
             }
