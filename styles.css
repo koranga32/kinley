@@ -2409,6 +2409,18 @@
             animation: peFadeIn 0.22s ease-out;
         }
 
+        @media (min-width: 861px) {
+            #pe-home-panel.active,
+            #pe-mock-panel.active,
+            #pe-past-panel.active,
+            #pe-di-panel.active,
+            #pe-online-panel.active {
+                width: min(1180px, calc(100% - 96px));
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+
         .pe-content:has(#pe-current-affair-panel.active) {
             overflow: hidden;
         }
@@ -2542,6 +2554,12 @@
         .pe-note-toolbar button { min-width: 34px; }
         .pe-note-editor { min-height: 210px; padding: 12px; border: 1px solid #4a5260; border-radius: 6px; background: #1f232b; color: #f5f7fb; outline: none; }
         .pe-note-editor:focus { border-color: #60a5fa; box-shadow: 0 0 0 2px rgba(96,165,250,0.2); }
+        .pe-note-editor ul,
+        .pe-note-editor ol {
+            margin: 8px 0;
+            padding-left: 0;
+            list-style-position: inside;
+        }
 
         .pe-filter-bar {
             display: flex;
