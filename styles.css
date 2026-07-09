@@ -3648,25 +3648,39 @@
                 min-height: 100%;
             }
 
+            #pe-di-viewer-screen > .pe-back-link {
+                position: sticky;
+                top: 0;
+                z-index: 24;
+                width: 100%;
+                margin-bottom: 10px;
+                padding: 8px 0;
+                background: rgba(34, 37, 42, 0.92);
+                backdrop-filter: blur(6px);
+            }
+
             .pe-di-split {
                 flex: 0 0 auto;
                 flex-direction: column;
+                gap: 16px;
                 overflow: visible;
             }
             .pe-di-split-left {
                 position: sticky;
-                top: 0;
-                z-index: 12;
+                top: 38px;
+                z-index: 22;
                 max-height: none;
                 height: auto;
                 width: 100%;
                 padding: 10px;
-                overflow: hidden;
+                overflow: visible;
                 box-shadow: 0 10px 24px rgba(0,0,0,0.28);
             }
 
             .pe-di-chart-wrap {
-                height: clamp(190px, 32vh, 300px);
+                flex: none;
+                height: clamp(280px, 42vh, 430px);
+                max-height: none;
                 padding: 6px;
                 overflow: hidden;
             }
@@ -3680,6 +3694,24 @@
 
             .pe-di-set-title {
                 margin-top: 6px;
+                font-size: 13px;
+                line-height: 1.25;
+            }
+
+            .pe-di-graph-controls {
+                margin-top: 8px;
+                margin-bottom: 2px;
+                gap: 7px;
+            }
+
+            .pe-di-graph-buttons {
+                gap: 8px;
+            }
+
+            .pe-di-graph-btn {
+                padding: 8px 11px;
+                font-size: 12px;
+                line-height: 1.15;
             }
 
             .pe-di-split-right {
