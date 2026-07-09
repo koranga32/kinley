@@ -546,16 +546,6 @@ function buildSecureQuestions(rows, idPrefix = "") {
     return prepared;
 }
 
-async function storeExamSession(db, gradingItems) {
-    await ensureExamSessionSchema(db);
-    const sessionId = crypto.randomUUID();
-    const now = Date.now();
-    await db.prepare(
-        "insert into exam_sessions (session_id, payload, expires_at, used_at) values (?1, ?2, ?3, null)"
-    ).bind(sessionId, JSON.stringify(gradingItems), now + 3 * HOUR).run();
-    return sessionId;
-}
-
 async function storeRichExamSession(db, payload) {
     await ensureExamSessionSchema(db);
     const sessionId = crypto.randomUUID();
