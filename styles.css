@@ -3488,6 +3488,7 @@
 
         .pe-content:has(#pe-di-viewer-screen.active) {
             overflow: hidden;
+            padding-top: 0;
         }
 
         #pe-di-viewer-screen.active {
@@ -3499,6 +3500,13 @@
 
         #pe-di-viewer-screen > .pe-back-link {
             flex: 0 0 auto;
+            position: sticky;
+            top: 0;
+            z-index: 24;
+            align-self: flex-start;
+            margin-bottom: 4px;
+            padding: 8px 0 4px;
+            line-height: 1.1;
         }
 
         /* ── Data Interpretation: GMAT/GRE-style split screen ──
@@ -3506,7 +3514,7 @@
            Right pane: one question at a time, scrolls independently. ── */
         .pe-di-split {
             display: flex;
-            gap: 24px;
+            gap: 16px;
             align-items: stretch;
             flex: 1 1 auto;
             min-height: 0;
