@@ -3486,26 +3486,45 @@
 
         .pe-back-link:hover { color: #fff; }
 
+        .pe-content:has(#pe-di-viewer-screen.active) {
+            overflow: hidden;
+        }
+
+        #pe-di-viewer-screen.active {
+            height: 100%;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #pe-di-viewer-screen > .pe-back-link {
+            flex: 0 0 auto;
+        }
+
         /* ── Data Interpretation: GMAT/GRE-style split screen ──
            Left pane: chart image, sticky/fixed in place.
            Right pane: one question at a time, scrolls independently. ── */
         .pe-di-split {
             display: flex;
             gap: 24px;
-            align-items: flex-start;
+            align-items: stretch;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
         }
 
         .pe-di-split-left {
-            flex: 1;
+            flex: 0 0 min(46vw, 680px);
             min-width: 0;
-            position: sticky;
-            top: 20px;
+            position: relative;
             background: #2b2f36;
             border: 1px solid #383d46;
             border-radius: 14px;
             padding: 18px;
-            max-height: calc(100vh - 120px);
-            overflow-y: auto;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .pe-di-chart-wrap {
@@ -3513,13 +3532,22 @@
             border-radius: 8px;
             padding: 10px;
             display: flex;
+            align-items: center;
             justify-content: center;
+            flex: 1 1 auto;
+            min-height: 0;
+            height: auto;
+            overflow: hidden;
+            box-sizing: border-box;
         }
 
         .pe-di-chart-wrap img {
+            width: 100%;
+            height: 100%;
             max-width: 100%;
-            height: auto;
+            max-height: 100%;
             display: block;
+            object-fit: contain;
             border-radius: 4px;
         }
 
@@ -3589,7 +3617,8 @@
         .pe-di-split-right {
             flex: 1;
             min-width: 0;
-            max-height: calc(100vh - 120px);
+            height: 100%;
+            max-height: none;
             overflow-y: auto;
             padding-right: 8px;
             scroll-behavior: smooth;
@@ -3610,12 +3639,26 @@
         }
 
         @media (max-width: 860px) {
-            .pe-di-split { flex-direction: column; }
+            .pe-content:has(#pe-di-viewer-screen.active) {
+                overflow-y: auto;
+            }
+
+            #pe-di-viewer-screen.active {
+                height: auto;
+                min-height: 100%;
+            }
+
+            .pe-di-split {
+                flex: 0 0 auto;
+                flex-direction: column;
+                overflow: visible;
+            }
             .pe-di-split-left {
                 position: sticky;
                 top: 0;
                 z-index: 12;
-                max-height: 42vh;
+                max-height: none;
+                height: auto;
                 width: 100%;
                 padding: 10px;
                 overflow: hidden;
@@ -3623,14 +3666,15 @@
             }
 
             .pe-di-chart-wrap {
-                max-height: 32vh;
+                height: clamp(190px, 32vh, 300px);
                 padding: 6px;
                 overflow: hidden;
             }
 
             .pe-di-chart-wrap img {
-                width: auto;
-                max-height: 30vh;
+                width: 100%;
+                height: 100%;
+                max-height: 100%;
                 object-fit: contain;
             }
 
@@ -3640,6 +3684,7 @@
 
             .pe-di-split-right {
                 width: 100%;
+                height: auto;
                 max-height: none;
                 overflow-y: visible;
                 padding-right: 0;
