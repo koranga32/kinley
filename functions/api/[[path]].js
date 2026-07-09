@@ -33,6 +33,8 @@ const MEDIA_MIME_TYPES = new Set([
 const POLICIES = {
     health: { windowMs: MINUTE, ipLimit: 30, sessionLimit: 30 },
     questions: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-overview": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-resources": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "exam-start": { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
     "exam-question": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 180 },
     "question-solution": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 90 },
@@ -120,6 +122,42 @@ async function handleQuestions(context) {
         return json((rows || []).map(row => normalizePublicMediaRow(context.env, row)), 200, PUBLIC_CACHE_MEDIA);
     }
     return apiError(400, "invalid_view", "Question view must be catalog, pe-catalog, pe-practice, media, or category-media.");
+}
+
+async function handlePEOverview(context) {
+    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
+    const rows = await supabaseServerRequest(context.env, "Exam?select=category,image&order=id.asc");
+    const types = new Map();
+    for (const row of rows || []) {
+        const info = parsePECategory(row.category);
+        if (!info) continue;
+        const current = types.get(info.peType) || { type: info.peType, questions: 0, graphPaths: new Set() };
+        current.questions += 1;
+        if (info.peType === "Data Interpretation" && String(row.image || "").trim()) {
+            current.graphPaths.add(String(row.image).trim());
+        }
+        types.set(info.peType, current);
+    }
+    const categories = [...types.values()].map(item => ({
+        type: item.type,
+        questions: item.questions,
+        graphs: item.graphPaths.size
+    }));
+    return json({ categories }, 200, PUBLIC_CACHE_SHORT);
+}
+
+async function handlePEResources(context) {
+    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
+    const fields = "id,kind,title,content,practice_prompt,practice_answer,document_url,preview_url,updated_at";
+    const rows = await supabaseServerRequest(
+        context.env,
+        `PEResources?select=${fields}&published=eq.true&order=sort_order.asc,id.asc`
+    );
+    return json((rows || []).map(row => ({
+        ...row,
+        document_url: normalizePublicMediaValue(context.env, row.document_url, "application"),
+        preview_url: normalizePublicMediaValue(context.env, row.preview_url, "image")
+    })), 200, PUBLIC_CACHE_SHORT);
 }
 
 async function handleQuestionSolution(context) {
@@ -1047,6 +1085,8 @@ export async function onRequest(context) {
         let response;
         if (name === "health") response = json({ ok: true, service: "ExamPortal API" });
         else if (name === "questions") response = await handleQuestions(context);
+        else if (name === "pe-overview") response = await handlePEOverview(context);
+        else if (name === "pe-resources") response = await handlePEResources(context);
         else if (name === "exam-start") response = await handleExamStart(context);
         else if (name === "exam-question") response = await handleExamQuestion(context);
         else if (name === "question-solution") response = await handleQuestionSolution(context);

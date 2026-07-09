@@ -46,6 +46,12 @@ let publicApiCache = new Map();
 let peQuestionsCache = [];
 let peTopicBuckets = new Map();
 let peTopicQuestionCache = new Map();
+let peOverviewCatalog = [];
+let peResourcesCatalog = [];
+let peHomeDashboardLoadPromise = null;
+let peActiveResourceTab = "formula";
+let peGuideCarouselIndex = 0;
+let peGuideCarouselTimer = null;
 let cafStateLoaded = false;
 let cafStatePromise = null;
 let submitInProgress = false;
@@ -77,6 +83,7 @@ function bindStaticUiEvents() {
     document.getElementById("results-return-home-btn")?.addEventListener("click", retakeExam);
 
     document.getElementById("pe-home-search")?.addEventListener("input", renderPEHomeGrid);
+    document.getElementById("pe-home-panel")?.addEventListener("click", handlePEHomeDashboardClick);
     document.getElementById("caf-bhutan-box")?.addEventListener("click", () => cafSelectRegion("Bhutan"));
     document.getElementById("caf-intl-box")?.addEventListener("click", () => cafSelectRegion("International"));
     document.getElementById("caf-category-dropdown")?.addEventListener("change", () => cafFilterData());
@@ -1182,6 +1189,10 @@ function clearPETopicQuestionsFromMemory(peType, topic) {
 }
 
 function clearActivePEPracticeMemory() {
+    if (peGuideCarouselTimer) {
+        clearInterval(peGuideCarouselTimer);
+        peGuideCarouselTimer = null;
+    }
     if (peActiveTopic) {
         clearPETopicQuestionsFromMemory(peActiveTopic.peType, peActiveTopic.topic);
     }
@@ -1965,6 +1976,7 @@ async function caLoadState({ render = true, force = false } = {}) {
         try {
             const rows = await apiRequest("flashcards");
             cafNotes = cafNormalizeRows(rows);
+            if (document.getElementById("pe-home-panel")?.classList.contains("active")) renderPEHomeDashboard();
         } catch (e) {
             cafNotes = cafSeedNotes.map((item, idx) => ({ ...item, id: null, _seedIndex: idx }));
         }
@@ -2398,8 +2410,255 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
     });
 }
 
+const PE_NOTE_DRAFT_KEY = "examportal_pe_self_note_draft_v1";
+
+function getPEOverview(type) {
+    return peOverviewCatalog.find(item => item.type === type) || { questions: 0, graphs: 0 };
+}
+
+async function loadPEHomeDashboard() {
+    if (peHomeDashboardLoadPromise) return peHomeDashboardLoadPromise;
+    peHomeDashboardLoadPromise = Promise.all([
+        apiRequest("pe-overview"),
+        apiRequest("pe-resources")
+    ]).then(([overview, resources]) => {
+        peOverviewCatalog = Array.isArray(overview?.categories) ? overview.categories : [];
+        peResourcesCatalog = Array.isArray(resources) ? resources : [];
+        renderPEHomeDashboard();
+    }).catch(error => {
+        console.error("PE home dashboard load failed:", error);
+        renderPEHomeDashboard();
+    }).finally(() => {
+        peHomeDashboardLoadPromise = null;
+    });
+    return peHomeDashboardLoadPromise;
+}
+
+function renderPEHomeDashboard() {
+    const overview = document.getElementById("pe-overview-card");
+    if (!overview) return;
+    const bcss = getPEOverview(PE_BCSC_MAIN_TYPE);
+    const past = getPEOverview("Past Paper");
+    const di = getPEOverview("Data Interpretation");
+    const currentAffairs = Array.isArray(cafNotes) ? cafNotes.length : 0;
+    const cards = [
+        ["bi-clipboard-check", "BCSC(main)", bcss.questions, "Questions"],
+        ["bi-book", "Past Paper", past.questions, "Questions"],
+        ["bi-bar-chart-line", "Data Interpretation", di.questions, `${di.questions === 1 ? "Question" : "Questions"} · ${di.graphs} graph${di.graphs === 1 ? "" : "s"}`],
+        ["bi-newspaper", "Current Affairs", currentAffairs, "Questions"]
+    ];
+    const questionTotal = cards.reduce((total, [, , count]) => total + Number(count || 0), 0);
+    overview.innerHTML = `
+        <div class="pe-overview-circles">
+            ${cards.map(([icon, label, count, detail]) => `
+                <div class="pe-overview-item">
+                    <div class="pe-overview-circle">
+                        <i class="bi ${icon}" aria-hidden="true"></i>
+                        <strong class="pe-overview-value">${Number(count || 0)}</strong>
+                        <span class="pe-overview-label">${escapeHTML(detail)}</span>
+                    </div>
+                    <span>${escapeHTML(label)}</span>
+                </div>
+            `).join("")}
+        </div>
+        <p class="pe-overview-total">Total available: <strong>${questionTotal} questions</strong> · <strong>${di.graphs} graph${di.graphs === 1 ? "" : "s"}</strong></p>
+    `;
+    renderPEResourceTabs();
+}
+
+function renderPEResourceTabs() {
+    document.querySelectorAll("[data-pe-resource-tab]").forEach(button => {
+        const active = button.dataset.peResourceTab === peActiveResourceTab;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", String(active));
+    });
+    const panels = {
+        formula: document.getElementById("pe-resource-formula"),
+        guide: document.getElementById("pe-resource-guide"),
+        note: document.getElementById("pe-resource-note")
+    };
+    Object.entries(panels).forEach(([name, panel]) => {
+        if (panel) panel.hidden = name !== peActiveResourceTab;
+    });
+    renderPEFormulaPanel(panels.formula);
+    renderPEGuidePanel(panels.guide);
+    renderPESelfNotePanel(panels.note);
+}
+
+function renderPEFormulaPanel(panel) {
+    if (!panel) return;
+    const formula = peResourcesCatalog.find(item => item.kind === "formula");
+    if (!formula) {
+        panel.innerHTML = '<div class="pe-empty-msg">Formula sheets will appear here when published.</div>';
+        return;
+    }
+    const prompt = String(formula.practice_prompt || "").trim();
+    panel.innerHTML = `
+        <h3>${escapeHTML(formula.title || "Formula Sheet")}</h3>
+        <div class="pe-resource-document">${escapeHTML(formula.content || "").replace(/\n/g, "<br>") || "No formula text has been published yet."}</div>
+        ${formula.document_url ? `<div class="pe-resource-actions"><a class="pe-di-graph-btn" href="${escapeHTML(safeMediaURL(formula.document_url, "image") || formula.document_url)}" target="_blank" rel="noopener noreferrer">Open document</a></div>` : ""}
+        ${prompt ? `
+            <div class="pe-resource-practice">
+                <h3>Practice</h3>
+                <label>${escapeHTML(prompt)}</label>
+                <div><input type="text" class="pe-resource-answer" aria-label="Formula practice answer" data-formula-answer></div>
+                <div class="pe-resource-actions">
+                    <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula">Check answer</button>
+                    <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
+                </div>
+            </div>
+        ` : ""}
+    `;
+}
+
+function renderPEGuidePanel(panel) {
+    if (!panel) return;
+    const guides = peResourcesCatalog.filter(item => item.kind === "guide");
+    if (peGuideCarouselTimer) {
+        clearInterval(peGuideCarouselTimer);
+        peGuideCarouselTimer = null;
+    }
+    if (!guides.length) {
+        panel.innerHTML = '<div class="pe-empty-msg">Published guides will appear here.</div>';
+        return;
+    }
+    peGuideCarouselIndex %= guides.length;
+    const guide = guides[peGuideCarouselIndex];
+    const preview = safeMediaURL(guide.preview_url, "image");
+    const documentUrl = safeMediaURL(guide.document_url, "image") || String(guide.document_url || "");
+    panel.innerHTML = `
+        <div class="pe-guide-carousel">
+            <a class="pe-guide-link" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">
+                <div class="pe-guide-preview">
+                    ${preview ? `<img src="${escapeHTML(preview)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div>Document preview</div></div>'}
+                </div>
+                <h3>${escapeHTML(guide.title || "Guide")}</h3>
+                <p class="pe-guide-meta">Opens in a new tab</p>
+            </a>
+            <p class="pe-guide-meta">Guide ${peGuideCarouselIndex + 1} of ${guides.length}</p>
+        </div>
+    `;
+    if (guides.length > 1 && peActiveResourceTab === "guide" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        peGuideCarouselTimer = setInterval(() => {
+            peGuideCarouselIndex = (peGuideCarouselIndex + 1) % guides.length;
+            renderPEGuidePanel(panel);
+        }, 4000);
+    }
+}
+
+function renderPESelfNotePanel(panel) {
+    if (!panel) return;
+    let draft = "";
+    try { draft = sessionStorage.getItem(PE_NOTE_DRAFT_KEY) || ""; } catch (e) {}
+    panel.innerHTML = `
+        <h3>Self Note</h3>
+        <div class="pe-note-toolbar" aria-label="Text formatting">
+            <button type="button" class="pe-di-graph-btn" data-note-command="bold" aria-label="Bold">B</button>
+            <button type="button" class="pe-di-graph-btn" data-note-command="italic" aria-label="Italic">I</button>
+            <button type="button" class="pe-di-graph-btn" data-note-command="underline" aria-label="Underline">U</button>
+            <button type="button" class="pe-di-graph-btn" data-note-command="insertUnorderedList">List</button>
+        </div>
+        <div class="pe-note-editor" id="pe-note-editor" contenteditable="true" role="textbox" aria-multiline="true">${draft || "Write your notes here..."}</div>
+        <div class="pe-resource-actions">
+            <button type="button" class="pe-di-graph-btn" data-pe-resource-action="save-draft">Save draft</button>
+            <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="export-note">Export DOCX</button>
+            <span class="pe-resource-feedback" data-note-feedback aria-live="polite"></span>
+        </div>
+    `;
+}
+
+function handlePEHomeDashboardClick(event) {
+    const tab = event.target.closest("[data-pe-resource-tab]");
+    if (tab) {
+        peActiveResourceTab = tab.dataset.peResourceTab || "formula";
+        renderPEResourceTabs();
+        return;
+    }
+    const noteCommand = event.target.closest("[data-note-command]");
+    if (noteCommand) {
+        document.getElementById("pe-note-editor")?.focus();
+        document.execCommand(noteCommand.dataset.noteCommand || "", false, null);
+        return;
+    }
+    const action = event.target.closest("[data-pe-resource-action]")?.dataset.peResourceAction;
+    if (action === "check-formula") {
+        const formula = peResourcesCatalog.find(item => item.kind === "formula");
+        const answer = document.querySelector("[data-formula-answer]")?.value.trim().toLowerCase() || "";
+        const expected = String(formula?.practice_answer || "").trim().toLowerCase();
+        const feedback = document.querySelector("[data-formula-feedback]");
+        if (feedback) feedback.textContent = expected && answer === expected ? "Correct" : "Try again";
+    } else if (action === "save-draft") {
+        const editor = document.getElementById("pe-note-editor");
+        try { sessionStorage.setItem(PE_NOTE_DRAFT_KEY, editor?.innerHTML || ""); } catch (e) {}
+        const feedback = document.querySelector("[data-note-feedback]");
+        if (feedback) feedback.textContent = "Draft saved for this browser session";
+    } else if (action === "export-note") {
+        exportPESelfNoteDocx();
+    }
+}
+
+function xmlEscape(value) {
+    return String(value || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]);
+}
+
+function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (const byte of bytes) {
+        crc ^= byte;
+        for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+}
+
+function buildStoredZip(files) {
+    const encoder = new TextEncoder();
+    const chunks = [];
+    const central = [];
+    let offset = 0;
+    const write16 = value => Uint8Array.of(value & 255, (value >>> 8) & 255);
+    const write32 = value => Uint8Array.of(value & 255, (value >>> 8) & 255, (value >>> 16) & 255, (value >>> 24) & 255);
+    for (const [name, body] of files) {
+        const nameBytes = encoder.encode(name);
+        const bodyBytes = encoder.encode(body);
+        const crc = crc32(bodyBytes);
+        const local = [write32(0x04034b50), write16(20), write16(0), write16(0), write16(0), write16(0), write32(crc), write32(bodyBytes.length), write32(bodyBytes.length), write16(nameBytes.length), write16(0), nameBytes, bodyBytes];
+        chunks.push(...local);
+        central.push(write32(0x02014b50), write16(20), write16(20), write16(0), write16(0), write16(0), write16(0), write32(crc), write32(bodyBytes.length), write32(bodyBytes.length), write16(nameBytes.length), write16(0), write16(0), write16(0), write16(0), write32(0), write32(offset), nameBytes);
+        offset += local.reduce((total, part) => total + part.length, 0);
+    }
+    const centralSize = central.reduce((total, part) => total + part.length, 0);
+    const end = [write32(0x06054b50), write16(0), write16(0), write16(files.length), write16(files.length), write32(centralSize), write32(offset), write16(0)];
+    return new Blob([...chunks, ...central, ...end], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+}
+
+function exportPESelfNoteDocx() {
+    const editor = document.getElementById("pe-note-editor");
+    const text = String(editor?.innerText || "").trim();
+    const feedback = document.querySelector("[data-note-feedback]");
+    if (!text) {
+        if (feedback) feedback.textContent = "Write a note before exporting";
+        return;
+    }
+    const paragraphs = text.split(/\n+/).map(line => `<w:p><w:r><w:t xml:space="preserve">${xmlEscape(line)}</w:t></w:r></w:p>`).join("");
+    const files = [
+        ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
+        ["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+        ["word/document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs}<w:sectPr/></w:body></w:document>`]
+    ];
+    const url = URL.createObjectURL(buildStoredZip(files));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "examportal-self-note.docx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    if (feedback) feedback.textContent = "DOCX exported";
+}
+
 function renderPEHomeGrid() {
-    renderPETopicGrid("pe-home-grid", "all", "pe-home-search", "#f44336");
+    renderPEHomeDashboard();
+    void loadPEHomeDashboard();
 }
 function renderPEMockGrid() {
     renderPETopicGrid("pe-mock-grid", PE_BCSC_MAIN_TYPE, "pe-mock-search", "#00bcd4");

@@ -343,15 +343,23 @@
             <!-- ─── Main Content ─── -->
             <div class="pe-content">
 
-                <!-- HOME: overview of all PE topics, grouped -->
+                <!-- HOME: PE practice dashboard -->
                 <div id="pe-home-panel" class="pe-section active">
-                    <h2>Practice and Learn</h2>
-                    <p class="pe-section-desc"> Current Affair & PE examination questions with step-by-step solutions.</p>
-                    <div class="pe-filter-bar">
-                        <span class="pe-filter-icon">☰</span>
-                        <input type="text" id="pe-home-search" class="pe-filter-input" placeholder="Filter topics…">
-                    </div>
-                    <div class="pe-grid" id="pe-home-grid"></div>
+                    <section class="pe-home-dashboard-section" aria-labelledby="pe-overview-title">
+                        <h2 id="pe-overview-title">Practice Overview</h2>
+                        <div class="pe-overview-card" id="pe-overview-card" aria-live="polite"></div>
+                    </section>
+                    <section class="pe-home-dashboard-section" aria-labelledby="pe-resources-title">
+                        <h2 id="pe-resources-title">Formulas &amp; Study Guides</h2>
+                        <div class="pe-resource-tabs" role="tablist" aria-label="Study resources">
+                            <button type="button" class="pe-resource-tab active" id="pe-resource-tab-formula" role="tab" aria-selected="true" aria-controls="pe-resource-formula" data-pe-resource-tab="formula">Formula Sheet</button>
+                            <button type="button" class="pe-resource-tab" id="pe-resource-tab-guide" role="tab" aria-selected="false" aria-controls="pe-resource-guide" data-pe-resource-tab="guide">Guide</button>
+                            <button type="button" class="pe-resource-tab" id="pe-resource-tab-note" role="tab" aria-selected="false" aria-controls="pe-resource-note" data-pe-resource-tab="note">Self Note</button>
+                        </div>
+                        <section class="pe-resource-panel" id="pe-resource-formula" role="tabpanel" aria-labelledby="pe-resource-tab-formula"></section>
+                        <section class="pe-resource-panel" id="pe-resource-guide" role="tabpanel" aria-labelledby="pe-resource-tab-guide" hidden></section>
+                        <section class="pe-resource-panel" id="pe-resource-note" role="tabpanel" aria-labelledby="pe-resource-tab-note" hidden></section>
+                    </section>
                 </div>
 
                 <!-- CURRENT AFFAIR: sticky-note flashcard wall -->
