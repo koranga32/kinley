@@ -2477,32 +2477,37 @@
             flex-direction: column;
         }
 
+        #pe-home-panel.active h2 {
+            margin-bottom: 6px;
+            font-size: 1.3rem;
+        }
+
         .pe-overview-card,
         .pe-resource-panel {
             background: #2b2f36;
             border: 1px solid #383d46;
             border-radius: 10px;
-            padding: 20px;
+            padding: 12px;
         }
 
         .pe-overview-circles {
             display: flex;
             flex-wrap: wrap;
             justify-content: space-evenly;
-            gap: 18px;
+            gap: 10px;
         }
 
         .pe-overview-item {
             display: grid;
             justify-items: center;
-            gap: 7px;
-            min-width: 132px;
+            gap: 4px;
+            min-width: 96px;
             color: #f5f7fb;
             text-align: center;
         }
 
         .pe-overview-circle {
-            width: 112px;
+            width: 84px;
             aspect-ratio: 1;
             display: grid;
             align-content: center;
@@ -2513,16 +2518,16 @@
             color: #e8ebf1;
         }
 
-        .pe-overview-circle i { color: #aeb4c0; font-size: 19px; }
-        .pe-overview-value { font-size: 24px; font-weight: 800; line-height: 1; }
-        .pe-overview-label { color: #aeb4c0; font-size: 11px; }
-        .pe-overview-total { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid #383d46; color: #c9ccd2; text-align: center; font-size: 13px; }
+        .pe-overview-circle i { color: #aeb4c0; font-size: 15px; }
+        .pe-overview-value { font-size: 19px; font-weight: 800; line-height: 1; }
+        .pe-overview-label { color: #aeb4c0; font-size: 9px; }
+        .pe-overview-total { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid #383d46; color: #c9ccd2; text-align: center; font-size: 11px; }
 
         .pe-resource-tabs {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 12px;
+            gap: 6px;
+            margin-bottom: 6px;
         }
 
         .pe-resource-tab {
@@ -2530,21 +2535,21 @@
             background: #1f232b;
             color: #d9dde5;
             border-radius: 6px;
-            padding: 8px 12px;
+            padding: 5px 9px;
             cursor: pointer;
             font: inherit;
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 700;
         }
 
         .pe-resource-tab.active { background: #2563eb; border-color: #60a5fa; color: #fff; }
         .pe-resource-panel { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
-        .pe-resource-document { white-space: pre-wrap; color: #e8ebf1; line-height: 1.65; }
-        .pe-resource-practice { margin-top: 18px; padding-top: 16px; border-top: 1px solid #383d46; }
+        .pe-resource-document { white-space: pre-wrap; color: #e8ebf1; font-size: 12px; line-height: 1.35; }
+        .pe-resource-practice { margin-top: 8px; padding-top: 8px; border-top: 1px solid #383d46; }
         .pe-resource-practice input { width: min(160px, 100%); margin: 4px; }
-        .pe-resource-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+        .pe-resource-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 7px; }
         .pe-resource-feedback { color: #b8e8c5; font-size: 13px; font-weight: 700; }
-        .pe-guide-carousel { width: min(100%, 540px); margin: 0 auto; }
+        .pe-guide-carousel { width: min(100%, 360px); margin: 0 auto; }
         .pe-guide-link { display: block; color: inherit; text-decoration: none; }
         .pe-guide-preview { display: grid; place-items: center; aspect-ratio: 16 / 10; overflow: hidden; background: #1f232b; border: 1px solid #4a5260; border-radius: 8px; }
         .pe-guide-preview img { width: 100%; height: 100%; object-fit: contain; }
