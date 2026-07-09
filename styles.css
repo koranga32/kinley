@@ -2442,6 +2442,29 @@
             margin-top: 30px;
         }
 
+        .pe-content:has(#pe-home-panel.active) {
+            overflow: hidden;
+            padding: 16px 24px;
+        }
+
+        #pe-home-panel.active {
+            height: 100%;
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            gap: 16px;
+        }
+
+        #pe-home-panel.active .pe-home-dashboard-section + .pe-home-dashboard-section {
+            margin-top: 0;
+        }
+
+        #pe-home-panel.active .pe-home-dashboard-section:last-child {
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
         .pe-overview-card,
         .pe-resource-panel {
             background: #2b2f36;
@@ -2467,7 +2490,7 @@
         }
 
         .pe-overview-circle {
-            width: 128px;
+            width: 112px;
             aspect-ratio: 1;
             display: grid;
             align-content: center;
@@ -2503,7 +2526,7 @@
         }
 
         .pe-resource-tab.active { background: #2563eb; border-color: #60a5fa; color: #fff; }
-        .pe-resource-panel { min-height: 220px; }
+        .pe-resource-panel { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
         .pe-resource-document { white-space: pre-wrap; color: #e8ebf1; line-height: 1.65; }
         .pe-resource-practice { margin-top: 18px; padding-top: 16px; border-top: 1px solid #383d46; }
         .pe-resource-practice input { width: min(160px, 100%); margin: 4px; }
@@ -3729,6 +3752,24 @@
         }
 
         @media (max-width: 860px) {
+            .pe-content:has(#pe-home-panel.active) {
+                overflow-y: auto;
+                padding: 18px 14px 86px;
+            }
+
+            #pe-home-panel.active {
+                height: auto;
+                min-height: 0;
+                display: block;
+            }
+
+            #pe-home-panel.active .pe-home-dashboard-section + .pe-home-dashboard-section {
+                margin-top: 24px;
+            }
+
+            #pe-home-panel.active .pe-home-dashboard-section:last-child { display: block; }
+            .pe-resource-panel { min-height: 220px; overflow-y: visible; }
+
             .pe-content:has(#pe-di-viewer-screen.active) {
                 overflow-y: auto;
                 padding-top: 6px;
