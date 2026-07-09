@@ -4,7 +4,7 @@
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const API_TIMEOUT_MS = 20000;
-const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
+const DB_CACHE_KEY = "supabase_exam_catalog_v3_counts_only";
 const SECONDS_PER_QUESTION = 30;
 const PE_BCSC_MAIN_TYPE = "BCSC(main)";
 
@@ -45,6 +45,7 @@ let peDIGraphFingerprintCache = new Map();
 let publicApiCache = new Map();
 let peQuestionsCache = [];
 let peTopicBuckets = new Map();
+let peTopicQuestionCache = new Map();
 let cafStateLoaded = false;
 let cafStatePromise = null;
 let submitInProgress = false;
@@ -128,8 +129,8 @@ function bindStaticUiEvents() {
                 loadPEOnlineQuestionBank().then(updatePEOnlineCount)
             ];
             Promise.allSettled(lightweightLoads).then(() => {
-                // The full PE practice bank is larger. Start it after the small
-                // startup requests so they do not all compete for bandwidth.
+                // Load only the PE practice catalog after the small startup
+                // requests; individual topics fetch their questions on click.
                 setTimeout(() => loadDatabase({ silent: true }).catch(() => {}), 120);
             });
         };
@@ -353,6 +354,7 @@ function clearDatabaseCache() {
     peTopicMediaPrefetch = new Map();
     peDIGraphPrefetch = new Map();
     peDIGraphFingerprintCache = new Map();
+    peTopicQuestionCache = new Map();
     clearPublicApiCache();
 }
 
@@ -425,7 +427,7 @@ async function fetchApiJson(path, { method = "GET", body, headers = {} } = {}) {
 
 function getPublicApiCacheTTL(path) {
     if (path === "questions?view=catalog") return 5 * 60 * 1000;
-    if (path === "questions?view=pe-practice") return 5 * 60 * 1000;
+    if (path === "questions?view=pe-catalog") return 5 * 60 * 1000;
     if (path === "pe-online-questions?view=catalog") return 5 * 60 * 1000;
     if (path === "pe-online-questions?view=all-media") return 10 * 60 * 1000;
     if (path === "flashcards") return 60 * 1000;
@@ -488,11 +490,17 @@ function mapSecureExamRows(rows) {
 }
 
 async function fetchQuestions() {
-    // Lightweight fetch — excludes image/audio columns, which can each hold
-    // multi-megabyte base64 data. This keeps initial load fast; media is
-    // fetched separately afterward without blocking first render.
-    const rows = await apiRequest("questions?view=pe-practice");
-    return mapExamRows(rows);
+    const rows = await apiRequest("questions?view=pe-catalog");
+    return (rows || []).map(row => ({
+        peType: String(row.peType || ""),
+        topic: String(row.topic || ""),
+        count: Number(row.count || 0)
+    })).filter(row => row.peType && row.topic && row.count > 0);
+}
+
+async function fetchPEPracticeTopicQuestions(peType, topic) {
+    const path = `questions?view=pe-practice&pe_type=${encodeURIComponent(peType)}&topic=${encodeURIComponent(topic)}`;
+    return mapExamRows(await apiRequest(path));
 }
 
 
@@ -976,20 +984,29 @@ async function loadDatabaseOnce(silent) {
 }
 
 function processData(data) {
-    questionPool = data || [];
-    peQuestionsCache = questionPool.filter(q => isPECategory(q.category));
+    const rows = Array.isArray(data) ? data : [];
+    const isCatalogOnly = rows.every(row => row && Object.hasOwn(row, "peType") && Object.hasOwn(row, "topic") && Object.hasOwn(row, "count"));
+    questionPool = isCatalogOnly ? [] : rows;
+    peQuestionsCache = isCatalogOnly ? [] : questionPool.filter(q => isPECategory(q.category));
     peTopicBuckets = new Map();
-    peQuestionsCache.forEach(q => {
-        const info = parsePECategory(q.category);
-        if (!info) return;
+    const addPETopicBucket = (info, count = 1) => {
         const typeKey = info.peType;
         const allKey = `all::${info.topic}`;
         const typeTopicKey = `${typeKey}::${info.topic}`;
         if (!peTopicBuckets.has(allKey)) peTopicBuckets.set(allKey, { topic: info.topic, peType: typeKey, count: 0 });
         if (!peTopicBuckets.has(typeTopicKey)) peTopicBuckets.set(typeTopicKey, { topic: info.topic, peType: typeKey, count: 0 });
-        peTopicBuckets.get(allKey).count += 1;
-        peTopicBuckets.get(typeTopicKey).count += 1;
-    });
+        peTopicBuckets.get(allKey).count += count;
+        peTopicBuckets.get(typeTopicKey).count += count;
+    };
+    if (isCatalogOnly) {
+        rows.forEach(row => addPETopicBucket({ peType: row.peType, topic: row.topic }, Number(row.count || 0)));
+    } else {
+        peQuestionsCache.forEach(q => {
+            const info = parsePECategory(q.category);
+            if (!info) return;
+            addPETopicBucket(info);
+        });
+    }
     // Exam categories must exclude PE-tagged questions so the normal
     // exam flow (category select, start exam, counts) is unaffected.
     const examQuestions = questionPool.filter(q => !isPECategory(q.category));
@@ -1075,6 +1092,8 @@ function queuePEOnlineMediaPrefetch() {
 }
 
 function getPETopicQuestions(peType, topic) {
+    const key = getPETopicPrefetchKey(peType, topic);
+    if (peTopicQuestionCache.has(key)) return peTopicQuestionCache.get(key);
     return getPEQuestions().filter(q => {
         const info = parsePECategory(q.category);
         return info.peType === peType && info.topic === topic;
@@ -1116,6 +1135,37 @@ async function prefetchPETopicMedia(peType, topic, { blockForMs = 0 } = {}) {
             new Promise(resolve => setTimeout(resolve, blockForMs))
         ]);
     }
+}
+
+async function ensurePETopicQuestions(peType, topic, { force = false } = {}) {
+    const key = getPETopicPrefetchKey(peType, topic);
+    if (!force && peTopicQuestionCache.has(key)) return peTopicQuestionCache.get(key);
+    const questions = await fetchPEPracticeTopicQuestions(peType, topic);
+    peTopicQuestionCache.set(key, questions);
+    return questions;
+}
+
+function clearPETopicQuestionsFromMemory(peType, topic) {
+    const key = getPETopicPrefetchKey(peType, topic);
+    peTopicQuestionCache.delete(key);
+    peTopicMediaPrefetch.delete(key);
+}
+
+function clearActivePEPracticeMemory() {
+    if (peActiveTopic) {
+        clearPETopicQuestionsFromMemory(peActiveTopic.peType, peActiveTopic.topic);
+    }
+    if (peDIActiveSet) {
+        clearPETopicQuestionsFromMemory("Data Interpretation", peDIActiveSet);
+        peDIGraphPrefetch.delete(String(peDIActiveSet || "").trim());
+    }
+    pePracticeQuestionsByDomId.clear();
+    const topicContainer = document.getElementById("pe-questions-container");
+    const diContainer = document.getElementById("pe-di-questions-container");
+    const diChart = document.getElementById("pe-di-chart-img");
+    if (topicContainer) topicContainer.innerHTML = "";
+    if (diContainer) diContainer.innerHTML = "";
+    if (diChart) diChart.removeAttribute("src");
 }
 
 async function prefetchPEDISetGraph(setName, { blockForMs = 0 } = {}) {
@@ -2211,7 +2261,10 @@ function wirePESidebar() {
             listItems.forEach((li) => li.classList.remove("active"));
             item.classList.add("active");
 
+            clearActivePEPracticeMemory();
             peActiveTopic = null; // returning to a top-level panel exits question view
+            peDIActiveSet = null;
+            peDIActiveGraphIndex = 0;
 
             const targetPanelId = item.getAttribute("data-target");
             contentSections.forEach((section) => section.classList.remove("active"));
@@ -2239,7 +2292,10 @@ async function openPEPortal() {
 
     // Reset to Home panel and a collapsed sidebar every time PE is opened.
     // On desktop the hover handlers will expand it when the cursor enters.
+    clearActivePEPracticeMemory();
+    peTopicQuestionCache = new Map();
     peActiveTopic = null;
+    peDIActiveSet = null;
     document.getElementById("pe-navigation").classList.remove("open");
     document.getElementById("pe-navigation-spacer").classList.remove("open");
     document.querySelectorAll("#pe-list .pe-list-item").forEach(li => {
@@ -2324,19 +2380,9 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
     `).join("");
 
     grid.querySelectorAll(".pe-card[data-pe-type][data-pe-topic]").forEach(card => {
-        const queueCardMedia = () => {
-            void prefetchPETopicMedia(card.dataset.peType || "", card.dataset.peTopic || "").catch(() => {});
-        };
-        card.addEventListener("mouseenter", queueCardMedia, { passive: true });
-        card.addEventListener("focusin", queueCardMedia);
-        card.addEventListener("touchstart", queueCardMedia, { passive: true });
         card.addEventListener("click", () => {
             openPETopic(card.dataset.peType || "", card.dataset.peTopic || "");
         });
-    });
-
-    topics.slice(0, 1).forEach(topic => {
-        void prefetchPETopicMedia(topic.peType, topic.topic).catch(() => {});
     });
 }
 
@@ -2652,15 +2698,27 @@ function peoSubmitOnlineTest() {
 
 // ─── Opening a topic → question attempt screen ─────────────
 async function openPETopic(peType, topic) {
+    clearActivePEPracticeMemory();
     if (peType === "Data Interpretation") {
         openPEDIViewer(topic);
         return;
     }
     peActiveTopic = { peType, topic };
-
-    const topicQuestions = getPETopicQuestions(peType, topic);
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-question-screen").classList.add("active");
+    const container = document.getElementById("pe-questions-container");
+    if (container) container.innerHTML = '<div class="pe-empty-msg">Loading questions…</div>';
+
+    try {
+        await ensurePETopicQuestions(peType, topic);
+    } catch (error) {
+        console.error("PE topic question load failed:", error);
+        if (container) container.innerHTML = '<div class="pe-empty-msg">Could not load this topic. Please try again.</div>';
+        showToast("Could not load this topic. Please try again.", "error");
+        return;
+    }
+
+    if (!peActiveTopic || peActiveTopic.peType !== peType || peActiveTopic.topic !== topic) return;
     renderPEQuestionList();
 
     try {
@@ -2677,6 +2735,7 @@ async function openPETopic(peType, topic) {
 function showPEFolderScreen() {
     if (!peActiveTopic) return;
     const returnType = peActiveTopic.peType;
+    clearActivePEPracticeMemory();
     peActiveTopic = null;
 
     const targetPanelId = returnType === PE_BCSC_MAIN_TYPE ? "pe-mock-panel"
@@ -2708,53 +2767,49 @@ function renderPEDIGrid() {
         return;
     }
 
-    grid.innerHTML = sets.map(s => {
-        const firstQ = getPEQuestions().find(q => {
-            const info = parsePECategory(q.category);
-            return info.peType === "Data Interpretation" && info.topic === s.topic;
-        });
-        const thumbnailSource = firstQ ? safeMediaSource(firstQ.imageCode, "image") : "";
-        const thumb = thumbnailSource
-            ? `<img src="${thumbnailSource}" class="pe-card-thumb" alt="" loading="lazy" decoding="async">`
-            : `<i class="bi bi-bar-chart-line pe-card-icon"></i>`;
-        return `
+    grid.innerHTML = sets.map(s => `
             <div class="pe-card accent-purple" data-di-topic="${escapeHTML(s.topic)}">
-                ${thumb}
+                <i class="bi bi-bar-chart-line pe-card-icon"></i>
                 <div class="pe-card-info">
                     <div class="pe-card-title">${escapePEHtml(s.topic)}</div>
                     <div class="pe-card-meta"> ${s.count} question${s.count === 1 ? "" : "s"}</div>
                 </div>
             </div>
-        `;
-    }).join("");
+    `).join("");
 
     grid.querySelectorAll(".pe-card[data-di-topic]").forEach(card => {
-        const queueDISetMedia = () => {
-            void prefetchPEDISetGraph(card.dataset.diTopic || "").catch(() => {});
-        };
-        card.addEventListener("mouseenter", queueDISetMedia, { passive: true });
-        card.addEventListener("focusin", queueDISetMedia);
-        card.addEventListener("touchstart", queueDISetMedia, { passive: true });
         card.addEventListener("click", () => {
             openPEDIViewer(card.dataset.diTopic || "");
         });
     });
-
-    sets.slice(0, 1).forEach(set => {
-        void prefetchPEDISetGraph(set.topic).catch(() => {});
-    });
 }
 
 async function openPEDIViewer(setName) {
+    clearActivePEPracticeMemory();
     peDIActiveSet = setName;
     peDIActiveGraphIndex = 0;
 
-    const setQuestions = getPEDISetQuestions(setName);
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-di-viewer-screen").classList.add("active");
 
     const chartImg = document.getElementById("pe-di-chart-img");
     document.getElementById("pe-di-set-title").textContent = setName;
+    document.getElementById("pe-di-questions-container").innerHTML = '<div class="pe-empty-msg">Loading questions…</div>';
+
+    let setQuestions = [];
+    try {
+        setQuestions = await ensurePETopicQuestions("Data Interpretation", setName);
+    } catch (error) {
+        console.error("Data Interpretation question load failed:", error);
+        if (peDIActiveSet === setName) {
+            document.getElementById("pe-di-questions-container").innerHTML = '<div class="pe-empty-msg">Could not load this set. Please try again.</div>';
+            showPEDIChart("");
+            renderPEDIGraphControls(0);
+            showToast("Could not load this Data Interpretation set. Please try again.", "error");
+        }
+        return;
+    }
+    if (peDIActiveSet !== setName) return;
     renderPEDIQuestion();
 
     const firstCachedGraph = setQuestions
@@ -2784,6 +2839,7 @@ async function openPEDIViewer(setName) {
 function closePEDIViewer() {
     peDIQuestionObserver?.disconnect();
     peDIQuestionObserver = null;
+    clearActivePEPracticeMemory();
     peDIActiveSet = null;
     peDIActiveGraphIndex = 0;
     document.querySelectorAll("#pe-list .pe-list-item").forEach(li => {

@@ -65,18 +65,37 @@ async function handleQuestions(context) {
         }
         return json([...counts].map(([category, count]) => ({ category, count })), 200, PUBLIC_CACHE_SHORT);
     }
-    if (view === "text" || view === "pe-practice") {
+    if (view === "pe-catalog") {
+        const rows = await supabaseServerRequest(context.env, "Exam?select=category&order=id.asc");
+        const counts = new Map();
+        for (const row of rows || []) {
+            const info = parsePECategory(row.category);
+            if (!info) continue;
+            const key = `${info.peType}::${info.topic}`;
+            const current = counts.get(key) || { peType: info.peType, topic: info.topic, count: 0 };
+            current.count += 1;
+            counts.set(key, current);
+        }
+        return json([...counts.values()], 200, PUBLIC_CACHE_SHORT);
+    }
+    if (view === "pe-practice") {
+        const peType = String(url.searchParams.get("pe_type") || "").normalize("NFKC").trim();
+        const topic = String(url.searchParams.get("topic") || "").normalize("NFKC").trim();
+        if (!peType || peType.length > 80 || !topic || topic.length > 160) {
+            return apiError(400, "invalid_pe_topic", "A valid PE type and topic are required.");
+        }
         const fields = "id,category,question,optionA,optionB,optionC,optionD";
-        const rows = await supabaseServerRequest(context.env, `Exam?select=${fields}&order=id.asc`);
-        return json((rows || [])
-            .filter(row => String(row.category || "").startsWith("__PE__::"))
-            .map(row => ({
-                ...row,
-                // PE practice needs the embedded explanation so the public
-                // app can show the Solution & Explanation box. Normal/secure
-                // exam views still strip it before students start an exam.
-                question: view === "pe-practice" ? String(row.question || "") : publicQuestionText(row.question)
-            })), 200, PUBLIC_CACHE_SHORT);
+        const categories = [`__PE__::${peType}::${topic}`];
+        if (peType === "BCSC(main)") categories.push(`__PE__::Mock::${topic}`);
+        const responses = await Promise.all(categories.map(category => {
+            const params = new URLSearchParams({
+                select: fields,
+                order: "id.asc"
+            });
+            params.set("category", `eq.${category}`);
+            return supabaseServerRequest(context.env, `Exam?${params.toString()}`);
+        }));
+        return json(responses.flatMap(rows => rows || []), 200, PUBLIC_CACHE_SHORT);
     }
     if (view === "media") {
         const ids = validateMediaIds(url.searchParams.get("ids"));
@@ -100,7 +119,7 @@ async function handleQuestions(context) {
         const rows = await supabaseServerRequest(context.env, `Exam?${params.toString()}`);
         return json((rows || []).map(row => normalizePublicMediaRow(context.env, row)), 200, PUBLIC_CACHE_MEDIA);
     }
-    return apiError(400, "invalid_view", "Question view must be catalog, pe-practice, media, or category-media.");
+    return apiError(400, "invalid_view", "Question view must be catalog, pe-catalog, pe-practice, media, or category-media.");
 }
 
 async function handleQuestionSolution(context) {
