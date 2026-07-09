@@ -3654,8 +3654,9 @@
                 z-index: 24;
                 width: auto;
                 align-self: flex-start;
-                margin-bottom: 6px;
-                padding: 4px 0;
+                margin-bottom: 0;
+                padding: 0;
+                line-height: 1.1;
                 background: transparent;
                 backdrop-filter: none;
             }
@@ -3663,12 +3664,13 @@
             .pe-di-split {
                 flex: 0 0 auto;
                 flex-direction: column;
-                gap: 6px;
+                gap: 4px;
                 overflow: visible;
+                margin-top: -4px;
             }
             .pe-di-split-left {
                 position: sticky;
-                top: 32px;
+                top: 22px;
                 z-index: 22;
                 max-height: none;
                 height: auto;
