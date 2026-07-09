@@ -88,9 +88,89 @@ function bindStaticUiEvents() {
     document.getElementById("pe-online-start-btn")?.addEventListener("click", startPEOnlineTest);
     document.getElementById("pe-question-back-btn")?.addEventListener("click", showPEFolderScreen);
     document.getElementById("pe-di-back-btn")?.addEventListener("click", closePEDIViewer);
+    bindImageZoomEvents();
 }
 
-	// ─── INIT ────────────────────────────────────────────
+const IMAGE_ZOOM_SELECTOR = [
+    "#pe-di-chart-img",
+    "#peo-graph-img",
+    ".q-image",
+    ".pe-question-image"
+].join(",");
+let imageZoomLastTap = { target: null, time: 0 };
+
+function bindImageZoomEvents() {
+    document.addEventListener("dblclick", handleImageZoomRequest);
+    document.addEventListener("click", handleImageZoomTap);
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeImageZoom();
+    });
+}
+
+function getZoomableImage(target) {
+    const image = target?.closest?.(IMAGE_ZOOM_SELECTOR);
+    if (!image || !image.getAttribute("src")) return null;
+    return image;
+}
+
+function handleImageZoomRequest(event) {
+    const image = getZoomableImage(event.target);
+    if (!image) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openImageZoom(image);
+}
+
+function handleImageZoomTap(event) {
+    if (event.target.closest?.(".image-zoom-overlay")) {
+        closeImageZoom();
+        return;
+    }
+
+    const image = getZoomableImage(event.target);
+    if (!image) return;
+
+    const now = Date.now();
+    if (imageZoomLastTap.target === image && now - imageZoomLastTap.time < 320) {
+        event.preventDefault();
+        event.stopPropagation();
+        imageZoomLastTap = { target: null, time: 0 };
+        openImageZoom(image);
+        return;
+    }
+
+    imageZoomLastTap = { target: image, time: now };
+}
+
+function openImageZoom(sourceImage) {
+    const source = sourceImage.currentSrc || sourceImage.src || sourceImage.getAttribute("src");
+    if (!source) return;
+
+    closeImageZoom();
+
+    const overlay = document.createElement("div");
+    overlay.className = "image-zoom-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "Zoomed image");
+
+    const image = document.createElement("img");
+    image.className = "image-zoom-img";
+    image.src = source;
+    image.alt = sourceImage.alt || "Zoomed image";
+    image.decoding = "async";
+
+    overlay.appendChild(image);
+    document.body.appendChild(overlay);
+    document.body.classList.add("image-zoom-open");
+}
+
+function closeImageZoom() {
+    document.querySelector(".image-zoom-overlay")?.remove();
+    document.body.classList.remove("image-zoom-open");
+}
+
+		// ─── INIT ────────────────────────────────────────────
 	if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", initializeApp, { once: true });
     } else {

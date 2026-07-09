@@ -4050,3 +4050,36 @@
             .brand-text p { display: none; }
             .header-right .btn { padding-left: 6px; padding-right: 6px; }
         }
+
+        #pe-di-chart-img,
+        #peo-graph-img,
+        .q-image,
+        .pe-question-image {
+            cursor: zoom-in;
+        }
+
+        body.image-zoom-open {
+            overflow: hidden;
+        }
+
+        .image-zoom-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(12px, 3vw, 32px);
+            background: rgba(7, 12, 24, 0.86);
+            cursor: zoom-out;
+        }
+
+        .image-zoom-img {
+            display: block;
+            max-width: 96vw;
+            max-height: 92vh;
+            object-fit: contain;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
+        }
