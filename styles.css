@@ -1843,6 +1843,7 @@
             font-weight: 600;
             color: var(--ink);
             margin-bottom: 10px;
+            white-space: pre-wrap;
         }
 
         .review-answers {
@@ -3132,7 +3133,7 @@
         .peo-badge-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 8px; }
         .peo-q-badge { background: var(--navy); color: #fff; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 13px; }
         .peo-cat-badge { background: var(--gold-pale, #f5ecd0); color: var(--gold); padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; letter-spacing: 0.3px; }
-        .peo-question-text { font-size: 15.5px; font-weight: 600; line-height: 1.6; margin-bottom: 26px; color: var(--ink); }
+        .peo-question-text { font-size: 15.5px; font-weight: 600; line-height: 1.6; margin-bottom: 26px; color: var(--ink); white-space: pre-wrap; }
 
         .peo-options-container { display: grid; grid-template-columns: 1fr; gap: 12px; }
         .peo-test-workspace.split-mode .peo-options-container {
@@ -3733,6 +3734,7 @@
             color: #fff;
             margin-bottom: 16px;
             line-height: 1.5;
+            white-space: pre-wrap;
         }
 
         .pe-question-image {
