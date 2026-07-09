@@ -84,6 +84,7 @@ function bindStaticUiEvents() {
 
     document.getElementById("pe-home-search")?.addEventListener("input", renderPEHomeGrid);
     document.getElementById("pe-home-panel")?.addEventListener("click", handlePEHomeDashboardClick);
+    document.getElementById("pe-home-panel")?.addEventListener("paste", handlePESelfNotePaste);
     document.getElementById("caf-bhutan-box")?.addEventListener("click", () => cafSelectRegion("Bhutan"));
     document.getElementById("caf-intl-box")?.addEventListener("click", () => cafSelectRegion("International"));
     document.getElementById("caf-category-dropdown")?.addEventListener("change", () => cafFilterData());
@@ -2493,22 +2494,28 @@ function renderPEFormulaPanel(panel) {
         return;
     }
     const prompt = String(formula.practice_prompt || "").trim();
+    const documentUrl = safeResourceUrl(formula.document_url);
     panel.innerHTML = `
         <h3>${escapeHTML(formula.title || "Formula Sheet")}</h3>
         <div class="pe-resource-document">${escapeHTML(formula.content || "").replace(/\n/g, "<br>") || "No formula text has been published yet."}</div>
-        ${formula.document_url ? `<div class="pe-resource-actions"><a class="pe-di-graph-btn" href="${escapeHTML(safeMediaURL(formula.document_url, "image") || formula.document_url)}" target="_blank" rel="noopener noreferrer">Open document</a></div>` : ""}
+        ${documentUrl ? `<div class="pe-resource-actions"><a class="pe-di-graph-btn" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">Open document</a></div>` : ""}
         ${prompt ? `
             <div class="pe-resource-practice">
                 <h3>Practice</h3>
                 <label>${escapeHTML(prompt)}</label>
                 <div><input type="text" class="pe-resource-answer" aria-label="Formula practice answer" data-formula-answer></div>
                 <div class="pe-resource-actions">
-                    <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula">Check answer</button>
+                    <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula" data-formula-id="${escapeHTML(String(formula.id || ""))}">Check answer</button>
                     <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
                 </div>
             </div>
         ` : ""}
     `;
+}
+
+function safeResourceUrl(value) {
+    const source = String(value || "").trim();
+    return /^https:\/\/[^\s]+$/i.test(source) ? source : "";
 }
 
 function renderPEGuidePanel(panel) {
@@ -2525,16 +2532,17 @@ function renderPEGuidePanel(panel) {
     peGuideCarouselIndex %= guides.length;
     const guide = guides[peGuideCarouselIndex];
     const preview = safeMediaURL(guide.preview_url, "image");
-    const documentUrl = safeMediaURL(guide.document_url, "image") || String(guide.document_url || "");
+    const documentUrl = safeResourceUrl(guide.document_url);
+    const guideBody = `
+        <div class="pe-guide-preview">
+            ${preview ? `<img src="${escapeHTML(preview)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div>Document preview</div></div>'}
+        </div>
+        <h3>${escapeHTML(guide.title || "Guide")}</h3>
+        <p class="pe-guide-meta">${documentUrl ? "Opens in a new tab" : "Document preview"}</p>
+    `;
     panel.innerHTML = `
         <div class="pe-guide-carousel">
-            <a class="pe-guide-link" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">
-                <div class="pe-guide-preview">
-                    ${preview ? `<img src="${escapeHTML(preview)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div>Document preview</div></div>'}
-                </div>
-                <h3>${escapeHTML(guide.title || "Guide")}</h3>
-                <p class="pe-guide-meta">Opens in a new tab</p>
-            </a>
+            ${documentUrl ? `<a class="pe-guide-link" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">${guideBody}</a>` : guideBody}
             <p class="pe-guide-meta">Guide ${peGuideCarouselIndex + 1} of ${guides.length}</p>
         </div>
     `;
@@ -2558,13 +2566,19 @@ function renderPESelfNotePanel(panel) {
             <button type="button" class="pe-di-graph-btn" data-note-command="underline" aria-label="Underline">U</button>
             <button type="button" class="pe-di-graph-btn" data-note-command="insertUnorderedList">List</button>
         </div>
-        <div class="pe-note-editor" id="pe-note-editor" contenteditable="true" role="textbox" aria-multiline="true">${draft || "Write your notes here..."}</div>
+        <div class="pe-note-editor" id="pe-note-editor" contenteditable="true" role="textbox" aria-multiline="true"></div>
         <div class="pe-resource-actions">
             <button type="button" class="pe-di-graph-btn" data-pe-resource-action="save-draft">Save draft</button>
             <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="export-note">Export DOCX</button>
             <span class="pe-resource-feedback" data-note-feedback aria-live="polite"></span>
         </div>
     `;
+    const editor = panel.querySelector("#pe-note-editor");
+    if (editor) {
+        const safeDraft = sanitizePESelfNoteHtml(draft);
+        if (safeDraft) editor.innerHTML = safeDraft;
+        else editor.textContent = "Write your notes here...";
+    }
 }
 
 function handlePEHomeDashboardClick(event) {
@@ -2582,18 +2596,54 @@ function handlePEHomeDashboardClick(event) {
     }
     const action = event.target.closest("[data-pe-resource-action]")?.dataset.peResourceAction;
     if (action === "check-formula") {
-        const formula = peResourcesCatalog.find(item => item.kind === "formula");
-        const answer = document.querySelector("[data-formula-answer]")?.value.trim().toLowerCase() || "";
-        const expected = String(formula?.practice_answer || "").trim().toLowerCase();
-        const feedback = document.querySelector("[data-formula-feedback]");
-        if (feedback) feedback.textContent = expected && answer === expected ? "Correct" : "Try again";
+        void checkPEFormulaAnswer(event.target.closest("[data-formula-id]")?.dataset.formulaId || "");
     } else if (action === "save-draft") {
         const editor = document.getElementById("pe-note-editor");
-        try { sessionStorage.setItem(PE_NOTE_DRAFT_KEY, editor?.innerHTML || ""); } catch (e) {}
+        try { sessionStorage.setItem(PE_NOTE_DRAFT_KEY, sanitizePESelfNoteHtml(editor?.innerHTML || "")); } catch (e) {}
         const feedback = document.querySelector("[data-note-feedback]");
         if (feedback) feedback.textContent = "Draft saved for this browser session";
     } else if (action === "export-note") {
         exportPESelfNoteDocx();
+    }
+}
+
+function sanitizePESelfNoteHtml(value) {
+    const allowedTags = new Set(["b", "strong", "i", "em", "u", "ul", "ol", "li", "p", "div", "br"]);
+    const template = document.createElement("template");
+    template.innerHTML = String(value || "");
+    const sanitizeNode = node => {
+        if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.nodeValue || "");
+        if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment();
+        const tag = node.tagName.toLowerCase();
+        const target = allowedTags.has(tag) ? document.createElement(tag) : document.createDocumentFragment();
+        [...node.childNodes].forEach(child => target.appendChild(sanitizeNode(child)));
+        return target;
+    };
+    const container = document.createElement("div");
+    [...template.content.childNodes].forEach(node => container.appendChild(sanitizeNode(node)));
+    return container.innerHTML;
+}
+
+function handlePESelfNotePaste(event) {
+    if (!event.target.closest?.("#pe-note-editor")) return;
+    event.preventDefault();
+    const text = event.clipboardData?.getData("text/plain") || "";
+    document.execCommand("insertText", false, text);
+}
+
+async function checkPEFormulaAnswer(id) {
+    const answer = document.querySelector("[data-formula-answer]")?.value.trim() || "";
+    const feedback = document.querySelector("[data-formula-feedback]");
+    if (!id || !answer) {
+        if (feedback) feedback.textContent = "Enter an answer first";
+        return;
+    }
+    if (feedback) feedback.textContent = "Checking...";
+    try {
+        const result = await apiRequest("pe-resource-answer", { method: "POST", body: { id, answer } });
+        if (feedback) feedback.textContent = result?.correct ? "Correct" : "Try again";
+    } catch (error) {
+        if (feedback) feedback.textContent = "Could not check answer";
     }
 }
 
@@ -2631,6 +2681,54 @@ function buildStoredZip(files) {
     return new Blob([...chunks, ...central, ...end], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
 }
 
+function buildDocxParagraphs(editor) {
+    const paragraphs = [[]];
+    const current = () => paragraphs[paragraphs.length - 1];
+    const finish = () => { if (current().length) paragraphs.push([]); };
+    const addText = (value, format) => {
+        const parts = String(value || "").replace(/\r/g, "").split("\n");
+        parts.forEach((part, index) => {
+            if (part) current().push({ text: part, format });
+            if (index < parts.length - 1) finish();
+        });
+    };
+    const visit = (node, format = {}) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            addText(node.nodeValue, format);
+            return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        const tag = node.tagName.toLowerCase();
+        if (tag === "br") {
+            finish();
+            return;
+        }
+        const nextFormat = {
+            bold: format.bold || tag === "b" || tag === "strong",
+            italic: format.italic || tag === "i" || tag === "em",
+            underline: format.underline || tag === "u"
+        };
+        if (tag === "ul" || tag === "ol") {
+            [...node.children].forEach((item, index) => {
+                if (item.tagName?.toLowerCase() !== "li") return;
+                addText(tag === "ol" ? `${index + 1}. ` : "• ", nextFormat);
+                [...item.childNodes].forEach(child => visit(child, nextFormat));
+                finish();
+            });
+            return;
+        }
+        [...node.childNodes].forEach(child => visit(child, nextFormat));
+        if (tag === "p" || tag === "div") finish();
+    };
+    [...editor.childNodes].forEach(node => visit(node));
+    return paragraphs.filter(paragraph => paragraph.length).map(runs => `<w:p>${runs.map(run => {
+        const properties = run.format.bold || run.format.italic || run.format.underline
+            ? `<w:rPr>${run.format.bold ? "<w:b/>" : ""}${run.format.italic ? "<w:i/>" : ""}${run.format.underline ? '<w:u w:val="single"/>' : ""}</w:rPr>`
+            : "";
+        return `<w:r>${properties}<w:t xml:space="preserve">${xmlEscape(run.text)}</w:t></w:r>`;
+    }).join("")}</w:p>`).join("");
+}
+
 function exportPESelfNoteDocx() {
     const editor = document.getElementById("pe-note-editor");
     const text = String(editor?.innerText || "").trim();
@@ -2639,7 +2737,7 @@ function exportPESelfNoteDocx() {
         if (feedback) feedback.textContent = "Write a note before exporting";
         return;
     }
-    const paragraphs = text.split(/\n+/).map(line => `<w:p><w:r><w:t xml:space="preserve">${xmlEscape(line)}</w:t></w:r></w:p>`).join("");
+    const paragraphs = buildDocxParagraphs(editor);
     const files = [
         ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
         ["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],

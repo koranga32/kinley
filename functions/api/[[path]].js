@@ -35,6 +35,7 @@ const POLICIES = {
     questions: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "pe-overview": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "pe-resources": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-resource-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 90 },
     "exam-start": { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
     "exam-question": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 180 },
     "question-solution": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 90 },
@@ -148,7 +149,7 @@ async function handlePEOverview(context) {
 
 async function handlePEResources(context) {
     if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const fields = "id,kind,title,content,practice_prompt,practice_answer,document_url,preview_url,updated_at";
+    const fields = "id,kind,title,content,practice_prompt,document_url,preview_url,updated_at";
     const rows = await supabaseServerRequest(
         context.env,
         `PEResources?select=${fields}&published=eq.true&order=sort_order.asc,id.asc`
@@ -158,6 +159,29 @@ async function handlePEResources(context) {
         document_url: normalizePublicMediaValue(context.env, row.document_url, "application"),
         preview_url: normalizePublicMediaValue(context.env, row.preview_url, "image")
     })), 200, PUBLIC_CACHE_SHORT);
+}
+
+async function handlePEResourceAnswer(context) {
+    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
+    const payload = await readJson(context.request, 2048);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)
+        || Object.keys(payload).some(key => !["id", "answer"].includes(key))) {
+        return apiError(400, "invalid_formula_answer", "A formula resource ID and answer are required.");
+    }
+    const id = String(payload.id || "").trim();
+    const answer = String(payload.answer || "").normalize("NFKC").trim().toLocaleLowerCase();
+    if (!/^\d{1,12}$/.test(id) || !answer || answer.length > 500) {
+        return apiError(400, "invalid_formula_answer", "The formula answer is invalid.");
+    }
+    const rows = await supabaseServerRequest(
+        context.env,
+        `PEResources?select=id,practice_answer&id=eq.${encodeURIComponent(id)}&kind=eq.formula&published=eq.true&limit=1`
+    );
+    if (!rows?.length || !String(rows[0].practice_answer || "").trim()) {
+        return apiError(404, "formula_not_found", "Formula practice is not available.");
+    }
+    const expected = String(rows[0].practice_answer).normalize("NFKC").trim().toLocaleLowerCase();
+    return json({ id: String(rows[0].id), correct: answer === expected });
 }
 
 async function handleQuestionSolution(context) {
@@ -1087,6 +1111,7 @@ export async function onRequest(context) {
         else if (name === "questions") response = await handleQuestions(context);
         else if (name === "pe-overview") response = await handlePEOverview(context);
         else if (name === "pe-resources") response = await handlePEResources(context);
+        else if (name === "pe-resource-answer") response = await handlePEResourceAnswer(context);
         else if (name === "exam-start") response = await handleExamStart(context);
         else if (name === "exam-question") response = await handleExamQuestion(context);
         else if (name === "question-solution") response = await handleQuestionSolution(context);
