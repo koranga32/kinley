@@ -2628,18 +2628,12 @@
             width: 100%;
             height: calc(100vh - 128px);
             min-height: 0;
-            background-color: #f4f0e8;
-            background-image:
-                linear-gradient(135deg, rgba(15,27,53,0.05), rgba(201,168,76,0.08)),
-                linear-gradient(rgba(15,27,53,0.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(15,27,53,0.035) 1px, transparent 1px);
-            background-size: 100% 100%, 34px 34px, 34px 34px;
-            background-position: center, center, center;
-            border-radius: 14px;
+            background: transparent;
+            border-radius: 0;
             padding: 14px;
-            color: #1f2937;
-            border: 1px solid rgba(15,27,53,0.08);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
+            color: #f5f7fb;
+            border: 0;
+            box-shadow: none;
             overflow: hidden;
         }
 
@@ -2824,7 +2818,7 @@
             width: 100%;
             height: 100%;
             position: relative;
-            transition: filter 0.24s ease, transform 0.24s ease;
+            transition: filter 0.14s ease, transform 0.12s ease;
         }
 
         .caf-card-container.flipped .caf-hanging-card {
@@ -2847,7 +2841,7 @@
             opacity: 0;
             pointer-events: none;
             transform: scale(0.985);
-            transition: opacity 0.24s ease, transform 0.24s ease;
+            transition: opacity 0.12s ease-out, transform 0.12s ease-out;
         }
 
         .caf-card-container:not(.flipped) .caf-card-front,
