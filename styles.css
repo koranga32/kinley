@@ -2671,13 +2671,13 @@
         }
 
         .caf-top-interface {
-            background: rgba(255,255,255,0.94);
+            background: rgba(255,255,255,0.12);
             width: 90%;
             max-width: 820px;
             padding: 8px;
             border-radius: 10px;
-            border: 1px solid rgba(15,27,53,0.08);
-            box-shadow: 0 12px 32px rgba(15,27,53,0.08);
+            border: 1px solid rgba(255,255,255,0.22);
+            box-shadow: 0 8px 22px rgba(15,27,53,0.1);
             margin: 0 auto 10px;
             backdrop-filter: blur(8px);
             flex-shrink: 0;
@@ -2692,24 +2692,24 @@
 
         .caf-region-box {
             flex: 1;
-            background: #fff;
+            background: rgba(255,255,255,0.16);
             padding: 7px 10px;
             border-radius: 6px;
             text-align: center;
             font-weight: 800;
             font-size: 13px;
-            color: #4b5563;
+            color: #f8fafc;
             cursor: pointer;
-            border: 1px solid rgba(15,27,53,0.08);
-            box-shadow: 0 2px 8px rgba(15,27,53,0.04);
+            border: 1px solid rgba(255,255,255,0.22);
+            box-shadow: 0 2px 8px rgba(15,27,53,0.1);
             transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.18s ease;
         }
 
-        .caf-region-box:hover { background: #fafafa; transform: translateY(-1px); }
+        .caf-region-box:hover { background: rgba(255,255,255,0.25); transform: translateY(-1px); }
         .caf-region-box.active {
-            border-color: var(--navy);
-            color: var(--navy);
-            background: #eef3ff;
+            border-color: rgba(255,255,255,0.68);
+            color: #fff;
+            background: rgba(15,27,53,0.46);
         }
 
         .caf-sub-filter {
@@ -2723,21 +2723,22 @@
         .caf-sub-filter label {
             font-weight: 800;
             font-size: 13px;
-            color: #4b5563;
+            color: #f8fafc;
+            text-shadow: 0 1px 2px rgba(15,27,53,0.4);
         }
 
         .caf-sub-filter select {
             width: min(100%, 280px);
             padding: 7px 10px;
             border-radius: 6px;
-            border: 1px solid rgba(15,27,53,0.16);
+            border: 1px solid rgba(255,255,255,0.32);
             font-family: inherit;
             font-size: 13px;
             font-weight: 800;
             outline: none;
             cursor: pointer;
-            background: #fff;
-            color: #4b5563;
+            background: rgba(255,255,255,0.88);
+            color: #172033;
         }
 
         .caf-carousel-wrapper {
@@ -2769,7 +2770,7 @@
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            background: var(--navy);
+            background: rgba(15,27,53,0.62);
             color: white;
             border: none;
             width: 44px;
@@ -2780,7 +2781,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 8px 18px rgba(15,27,53,0.18);
+            box-shadow: 0 8px 18px rgba(15,27,53,0.14);
+            opacity: 0.72;
             transition: background 0.2s, opacity 0.2s, transform 0.16s ease, box-shadow 0.2s ease;
             user-select: none;
             z-index: 10;
@@ -2789,7 +2791,7 @@
         .caf-slider-btn:active { transform: translateY(-50%) scale(0.92); }
         #caf-slide-left { left: 0; }
         #caf-slide-right { right: 0; }
-        .caf-slider-btn:hover { background: var(--navy-mid); box-shadow: 0 10px 24px rgba(15,27,53,0.22); }
+        .caf-slider-btn:hover { background: var(--navy-mid); box-shadow: 0 10px 24px rgba(15,27,53,0.22); opacity: 1; }
         .caf-slider-btn:disabled { background: #bbb; opacity: 0.4; cursor: not-allowed; }
 
         .caf-wall-grid {
