@@ -6,13 +6,8 @@ import {
     validateAdminFlashcardPayload,
     validateAdminOtpRequestPayload,
     validateAdminOtpVerifyPayload,
-    validateAdminPasswordRecoveryPayload,
-    validateAdminProfilePayload,
     validateAdminQuestionPayload,
-    validateAdminPEResourcePayload,
     validateAdminQuotePayload,
-    validateAdminRolePayload,
-    validateAdminRoleDeletePayload,
     validateContactPayload,
     validateEmptyPayload,
     validateExamStartPayload,
@@ -30,32 +25,28 @@ const PUBLIC_CACHE_MEDIA = {
     "Cache-Control": "public, max-age=300, s-maxage=1800, stale-while-revalidate=600"
 };
 const MEDIA_BUCKET = "exam-media";
-const ADMIN_SESSION_COOKIE = "ep_admin_session";
-const ADMIN_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
-const ADMIN_SESSION_MAX_AGE_MS = ADMIN_SESSION_MAX_AGE_SECONDS * 1000;
 const MEDIA_MIME_TYPES = new Set([
     "image/jpeg", "image/png", "image/webp",
-    "audio/mpeg", "audio/mp4", "audio/wav", "application/pdf"
+    "audio/mpeg", "audio/mp4", "audio/wav"
 ]);
 
 const POLICIES = {
     health: { windowMs: MINUTE, ipLimit: 30, sessionLimit: 30 },
-    "admin-otp-request": { windowMs: 10 * MINUTE, ipLimit: 8, sessionLimit: 5 },
-    "admin-otp-verify": { windowMs: 10 * MINUTE, ipLimit: 15, sessionLimit: 10 },
-    "admin-session-refresh": { windowMs: 10 * MINUTE, ipLimit: 30, sessionLimit: 30 },
-    "admin-logout": { windowMs: 10 * MINUTE, ipLimit: 30, sessionLimit: 30 },
-    "admin-password-recovery": { windowMs: 10 * MINUTE, ipLimit: 10, sessionLimit: 10 },
-    "admin-questions": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 60 },
-    "admin-flashcards": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 60 },
-    "admin-quotes": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 60 },
-    "admin-pe-resources": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 60 },
-    "admin-question-media": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 90 },
-    "admin-question": { windowMs: 10 * MINUTE, ipLimit: 60, sessionLimit: 60 },
-    "admin-bulk-questions": { windowMs: 10 * MINUTE, ipLimit: 20, sessionLimit: 20 },
-    "admin-flashcard": { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 40 },
-    "admin-quote": { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 40 },
-    "admin-profile": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 60 },
-    "admin-roles": { windowMs: 10 * MINUTE, ipLimit: 30, sessionLimit: 30 }
+    questions: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-overview": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-resources": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-resource-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 90 },
+    "exam-start": { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
+    "exam-question": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 180 },
+    "question-solution": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 90 },
+    "pe-online-questions": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-online-start": { windowMs: 10 * MINUTE, ipLimit: 30, sessionLimit: 20 },
+    "pe-online-question": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 180 },
+    flashcards: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "flashcard-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 60 },
+    quotes: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    responses: { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
+    contact: { windowMs: HOUR, ipLimit: 3, sessionLimit: 2 }
 };
 
 function routeName(context) {
@@ -77,20 +68,46 @@ async function handleQuestions(context) {
         }
         return json([...counts].map(([category, count]) => ({ category, count })), 200, PUBLIC_CACHE_SHORT);
     }
-    if (view === "text" || view === "pe-practice") {
+    if (view === "pe-catalog") {
+        const rows = await supabaseServerRequest(context.env, "Exam?select=category&order=id.asc");
+        const counts = new Map();
+        for (const row of rows || []) {
+            const info = parsePECategory(row.category);
+            if (!info) continue;
+            const key = `${info.peType}::${info.topic}`;
+            const current = counts.get(key) || { peType: info.peType, topic: info.topic, count: 0 };
+            current.count += 1;
+            counts.set(key, current);
+        }
+        return json([...counts.values()], 200, PUBLIC_CACHE_SHORT);
+    }
+    if (view === "pe-practice") {
+        const peType = String(url.searchParams.get("pe_type") || "").normalize("NFKC").trim();
+        const topic = String(url.searchParams.get("topic") || "").normalize("NFKC").trim();
+        if (!peType || peType.length > 80 || !topic || topic.length > 160) {
+            return apiError(400, "invalid_pe_topic", "A valid PE type and topic are required.");
+        }
         const fields = "id,category,question,optionA,optionB,optionC,optionD";
-        const rows = await supabaseServerRequest(context.env, `Exam?select=${fields}&order=id.asc`);
-        return json((rows || [])
-            .filter(row => String(row.category || "").startsWith("__PE__::"))
-            .map(row => ({ ...row, question: publicQuestionText(row.question) })), 200, PUBLIC_CACHE_SHORT);
+        const categories = [`__PE__::${peType}::${topic}`];
+        if (peType === "BCSC(main)") categories.push(`__PE__::Mock::${topic}`);
+        const responses = await Promise.all(categories.map(category => {
+            const params = new URLSearchParams({
+                select: fields,
+                order: "id.asc"
+            });
+            params.set("category", `eq.${category}`);
+            return supabaseServerRequest(context.env, `Exam?${params.toString()}`);
+        }));
+        return json(responses.flatMap(rows => rows || []), 200, PUBLIC_CACHE_SHORT);
     }
     if (view === "media") {
         const ids = validateMediaIds(url.searchParams.get("ids"));
         if (!ids.length) return apiError(400, "missing_ids", "Question media IDs are required.");
-        return json(await supabaseServerRequest(
+        const rows = await supabaseServerRequest(
             context.env,
             `Exam?select=id,image,audio&id=in.(${ids.join(",")})`
-        ), 200, PUBLIC_CACHE_MEDIA);
+        );
+        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row)), 200, PUBLIC_CACHE_MEDIA);
     }
     if (view === "category-media") {
         const category = String(url.searchParams.get("category") || "").normalize("NFKC").trim();
@@ -102,9 +119,69 @@ async function handleQuestions(context) {
             order: "id.asc"
         });
         params.set("category", `eq.${category}`);
-        return json(await supabaseServerRequest(context.env, `Exam?${params.toString()}`), 200, PUBLIC_CACHE_MEDIA);
+        const rows = await supabaseServerRequest(context.env, `Exam?${params.toString()}`);
+        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row)), 200, PUBLIC_CACHE_MEDIA);
     }
-    return apiError(400, "invalid_view", "Question view must be catalog, pe-practice, media, or category-media.");
+    return apiError(400, "invalid_view", "Question view must be catalog, pe-catalog, pe-practice, media, or category-media.");
+}
+
+async function handlePEOverview(context) {
+    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
+    const rows = await supabaseServerRequest(context.env, "Exam?select=category,image&order=id.asc");
+    const types = new Map();
+    for (const row of rows || []) {
+        const info = parsePECategory(row.category);
+        if (!info) continue;
+        const current = types.get(info.peType) || { type: info.peType, questions: 0, graphPaths: new Set() };
+        current.questions += 1;
+        if (info.peType === "Data Interpretation" && String(row.image || "").trim()) {
+            current.graphPaths.add(String(row.image).trim());
+        }
+        types.set(info.peType, current);
+    }
+    const categories = [...types.values()].map(item => ({
+        type: item.type,
+        questions: item.questions,
+        graphs: item.graphPaths.size
+    }));
+    return json({ categories }, 200, PUBLIC_CACHE_SHORT);
+}
+
+async function handlePEResources(context) {
+    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
+    const fields = "id,kind,title,content,practice_prompt,document_url,preview_url,updated_at";
+    const rows = await supabaseServerRequest(
+        context.env,
+        `PEResources?select=${fields}&published=eq.true&order=sort_order.asc,id.asc`
+    );
+    return json((rows || []).map(row => ({
+        ...row,
+        document_url: normalizePublicMediaValue(context.env, row.document_url, "application"),
+        preview_url: normalizePublicMediaValue(context.env, row.preview_url, "image")
+    })), 200, PUBLIC_CACHE_SHORT);
+}
+
+async function handlePEResourceAnswer(context) {
+    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
+    const payload = await readJson(context.request, 2048);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)
+        || Object.keys(payload).some(key => !["id", "answer"].includes(key))) {
+        return apiError(400, "invalid_formula_answer", "A formula resource ID and answer are required.");
+    }
+    const id = String(payload.id || "").trim();
+    const answer = String(payload.answer || "").normalize("NFKC").trim().toLocaleLowerCase();
+    if (!/^\d{1,12}$/.test(id) || !answer || answer.length > 500) {
+        return apiError(400, "invalid_formula_answer", "The formula answer is invalid.");
+    }
+    const rows = await supabaseServerRequest(
+        context.env,
+        `PEResources?select=id,practice_answer&id=eq.${encodeURIComponent(id)}&kind=eq.formula&published=eq.true&limit=1`
+    );
+    if (!rows?.length || !String(rows[0].practice_answer || "").trim()) {
+        return apiError(404, "formula_not_found", "Formula practice is not available.");
+    }
+    const expected = String(rows[0].practice_answer).normalize("NFKC").trim().toLocaleLowerCase();
+    return json({ id: String(rows[0].id), correct: answer === expected });
 }
 
 async function handleQuestionSolution(context) {
@@ -154,22 +231,20 @@ async function handlePEOnlineQuestions(context) {
             context.env,
             `PEOnlineExam?select=id,image,audio&id=in.(${ids.join(",")})`
         );
-        return json((rows || []).map(row => ({ ...row, id: `peo:${row.id}` })), 200, PUBLIC_CACHE_MEDIA);
+        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row, value => `peo:${value}`)), 200, PUBLIC_CACHE_MEDIA);
     }
     if (view === "all-media") {
         const rows = await supabaseServerRequest(
             context.env,
             "PEOnlineExam?select=id,image,audio&order=id.asc"
         );
-        return json((rows || []).map(row => ({ ...row, id: `peo:${row.id}` })), 200, PUBLIC_CACHE_MEDIA);
+        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row, value => `peo:${value}`)), 200, PUBLIC_CACHE_MEDIA);
     }
     return apiError(400, "invalid_view", "PE Online question view must be catalog, media, or all-media.");
 }
 
 async function handleFlashcards(context) {
     if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const authFailure = await requireAdminAccess(context, "flashcards_view");
-    if (authFailure) return authFailure;
     const fields = "id,scope,category,date_stamp,exam_focus,created_at";
     return json(await supabaseServerRequest(
         context.env,
@@ -179,7 +254,7 @@ async function handleFlashcards(context) {
 
 async function handleAdminQuestions(context) {
     if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const authFailure = await requireAdminAccess(context, "questions_view");
+    const authFailure = await requireAdminAccess(context);
     if (authFailure) return authFailure;
     const fields = "id,category,question,optionA,optionB,optionC,optionD,answer";
     const [examRows, peOnlineRows] = await Promise.all([
@@ -191,7 +266,7 @@ async function handleAdminQuestions(context) {
 
 async function handleAdminQuestionMedia(context) {
     if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const authFailure = await requireAdminAccess(context, "questions_view");
+    const authFailure = await requireAdminAccess(context);
     if (authFailure) return authFailure;
     const url = new URL(context.request.url);
     const table = String(url.searchParams.get("table") || "");
@@ -261,9 +336,6 @@ function publicQuestionText(raw) {
 
 let examSessionSchemaReady = false;
 let adminOtpSchemaReady = false;
-let adminSessionSchemaReady = false;
-let adminRolesSchemaReady = false;
-let adminProfileSchemaReady = false;
 
 async function ensureExamSessionSchema(db) {
     if (examSessionSchemaReady) return;
@@ -303,129 +375,9 @@ async function ensureAdminOtpSchema(db) {
     adminOtpSchemaReady = true;
 }
 
-async function ensureAdminSessionSchema(db) {
-    if (adminSessionSchemaReady) return;
-    await db.prepare(`
-        create table if not exists admin_sessions (
-            session_hash text primary key,
-            email text not null,
-            access_token text not null,
-            refresh_token text,
-            expires_at integer not null,
-            created_at integer not null,
-            updated_at integer not null
-        )
-    `).run();
-    await db.prepare(`
-        create index if not exists admin_sessions_expiry_idx
-        on admin_sessions (expires_at)
-    `).run();
-    adminSessionSchemaReady = true;
-}
-
-async function ensureAdminRolesSchema(db) {
-    if (adminRolesSchemaReady) return;
-    await db.prepare(`
-        create table if not exists admin_roles (
-            email text primary key,
-            can_questions_view integer not null default 0,
-            can_questions_create integer not null default 0,
-            can_questions_edit integer not null default 0,
-            can_questions_bulk integer not null default 0,
-            can_flashcards_view integer not null default 0,
-            can_flashcards_create integer not null default 0,
-            can_flashcards_edit integer not null default 0,
-            can_quotes_view integer not null default 0,
-            can_quotes_create integer not null default 0,
-            can_quotes_edit integer not null default 0,
-            active integer not null default 1,
-            created_at integer not null,
-            updated_at integer not null
-        )
-    `).run();
-    const migrationStatements = [
-        "alter table admin_roles add column can_questions_view integer not null default 0",
-        "alter table admin_roles add column can_questions_create integer not null default 0",
-        "alter table admin_roles add column can_questions_edit integer not null default 0",
-        "alter table admin_roles add column can_questions_bulk integer not null default 0",
-        "alter table admin_roles add column can_flashcards_view integer not null default 0",
-        "alter table admin_roles add column can_flashcards_create integer not null default 0",
-        "alter table admin_roles add column can_flashcards_edit integer not null default 0",
-        "alter table admin_roles add column can_quotes_view integer not null default 0",
-        "alter table admin_roles add column can_quotes_create integer not null default 0",
-        "alter table admin_roles add column can_quotes_edit integer not null default 0"
-    ];
-    for (const statement of migrationStatements) {
-        await db.prepare(statement).run().catch(() => {});
-    }
-    await db.prepare(`
-        create index if not exists admin_roles_active_idx
-        on admin_roles (active)
-    `).run();
-    adminRolesSchemaReady = true;
-}
-
-async function ensureAdminProfileSchema(db) {
-    if (adminProfileSchemaReady) return;
-    await db.prepare(`
-        create table if not exists admin_profiles (
-            email text primary key,
-            display_name text not null,
-            contact_email text not null default '',
-            phone text not null default '',
-            avatar_url text not null default '',
-            updated_at integer not null
-        )
-    `).run();
-    adminProfileSchemaReady = true;
-}
-
 async function sha256Hex(value) {
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
     return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function parseCookieHeader(request) {
-    const output = {};
-    for (const part of (request.headers.get("cookie") || "").split(";")) {
-        const index = part.indexOf("=");
-        if (index > 0) output[part.slice(0, index).trim()] = part.slice(index + 1).trim();
-    }
-    return output;
-}
-
-function getAdminSessionId(request) {
-    const value = parseCookieHeader(request)[ADMIN_SESSION_COOKIE] || "";
-    return /^[a-f0-9-]{36}$/i.test(value) ? value : "";
-}
-
-async function adminSessionHash(context, sessionId) {
-    return sha256Hex(`${context.env.RATE_LIMIT_SALT}:admin-session:${sessionId}`);
-}
-
-function withAdminSessionCookie(response, sessionId, maxAgeSeconds = ADMIN_SESSION_MAX_AGE_SECONDS) {
-    const next = new Response(response.body, response);
-    next.headers.append(
-        "Set-Cookie",
-        `${ADMIN_SESSION_COOKIE}=${sessionId}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Strict`
-    );
-    return next;
-}
-
-function withClearedAdminSessionCookie(response) {
-    const next = new Response(response.body, response);
-    next.headers.append(
-        "Set-Cookie",
-        `${ADMIN_SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`
-    );
-    return next;
-}
-
-async function purgeExpiredAdminSessions(db) {
-    await db.prepare("delete from admin_sessions where expires_at < ?1")
-        .bind(Date.now())
-        .run()
-        .catch(() => {});
 }
 
 function generateOtpCode() {
@@ -472,87 +424,7 @@ async function sendTransactionalEmail(context, email) {
     return result;
 }
 
-function transactionalSender(env) {
-    return String(env.RESEND_FROM_EMAIL || env.ADMIN_OTP_FROM_EMAIL || "ExamPortal <onboarding@resend.dev>").trim();
-}
-
-async function getAdminPrincipalByEmail(context, rawEmail) {
-    const email = String(rawEmail || "").trim().toLowerCase();
-    const superEmail = String(context.env.ADMIN_EMAIL || "").trim().toLowerCase();
-    if (!email) return null;
-    if (email === superEmail) {
-        return {
-            email,
-            is_super_admin: true,
-            permissions: {
-                questions: true,
-                questions_view: true,
-                questions_create: true,
-                questions_edit: true,
-                questions_bulk: true,
-                flashcards: true,
-                flashcards_view: true,
-                flashcards_create: true,
-                flashcards_edit: true,
-                quotes: true,
-                quotes_view: true,
-                quotes_create: true,
-                quotes_edit: true,
-                roles: true
-            }
-        };
-    }
-    if (!context.env.RATE_LIMIT_DB) return null;
-    await ensureAdminRolesSchema(context.env.RATE_LIMIT_DB);
-    const row = await context.env.RATE_LIMIT_DB.prepare(`
-        select email,
-            can_questions_view,
-            can_questions_create,
-            can_questions_edit,
-            can_questions_bulk,
-            can_flashcards_view,
-            can_flashcards_create,
-            can_flashcards_edit,
-            can_quotes_view,
-            can_quotes_create,
-            can_quotes_edit,
-            active
-        from admin_roles where email = ?1 limit 1
-    `).bind(email).first();
-    if (!row || Number(row.active) !== 1) return null;
-    const questions_view = Number(row.can_questions_view) === 1;
-    const questions_create = Number(row.can_questions_create) === 1;
-    const questions_edit = Number(row.can_questions_edit) === 1;
-    const questions_bulk = Number(row.can_questions_bulk) === 1;
-    const flashcards_view = Number(row.can_flashcards_view) === 1;
-    const flashcards_create = Number(row.can_flashcards_create) === 1;
-    const flashcards_edit = Number(row.can_flashcards_edit) === 1;
-    const quotes_view = Number(row.can_quotes_view) === 1;
-    const quotes_create = Number(row.can_quotes_create) === 1;
-    const quotes_edit = Number(row.can_quotes_edit) === 1;
-    return {
-        email,
-        is_super_admin: false,
-        permissions: {
-            questions: questions_view || questions_create || questions_edit || questions_bulk,
-            questions_view,
-            questions_create,
-            questions_edit,
-            questions_bulk,
-            flashcards: flashcards_view || flashcards_create || flashcards_edit,
-            flashcards_view,
-            flashcards_create,
-            flashcards_edit,
-            quotes: quotes_view || quotes_create || quotes_edit,
-            quotes_view,
-            quotes_create,
-            quotes_edit,
-            roles: false
-        }
-    };
-}
-
-async function authenticateAdminPassword(context, email, password) {
+async function authenticateAdminPassword(context, password) {
     if (!context.env.SUPABASE_URL || !context.env.ADMIN_EMAIL || !context.env.SUPABASE_PUBLISHABLE_KEY) {
         throw new Error("security_not_configured");
     }
@@ -563,7 +435,7 @@ async function authenticateAdminPassword(context, email, password) {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({
-            email,
+            email: context.env.ADMIN_EMAIL,
             password
         })
     });
@@ -574,145 +446,29 @@ async function authenticateAdminPassword(context, email, password) {
     return result;
 }
 
-async function createDelegatedAdminAuthUser(context, email, password) {
-    if (!context.env.SUPABASE_URL || !context.env.SUPABASE_SECRET_KEY) {
-        throw new Error("security_not_configured");
+async function requireAdminAccess(context) {
+    const authorization = context.request.headers.get("authorization") || "";
+    if (!authorization.startsWith("Bearer ")) {
+        return apiError(401, "missing_admin_token", "Admin authentication is required.");
     }
-    const response = await fetch(`${context.env.SUPABASE_URL}/auth/v1/admin/users`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            apikey: context.env.SUPABASE_SECRET_KEY,
-            Authorization: `Bearer ${context.env.SUPABASE_SECRET_KEY}`
-        },
-        body: JSON.stringify({
-            email,
-            password,
-            email_confirm: true
-        })
-    });
-    if (response.ok) return true;
-    const result = await response.json().catch(() => ({}));
-    const message = String(result?.msg || result?.message || result?.error_description || result?.error || "");
-    if (/already|exists|registered/i.test(message)) {
-        throw validationError("delegated_admin_exists", "This delegated admin email already exists. Leave password blank if you are only updating role permissions.", 409);
+    if (!context.env.SUPABASE_URL || !context.env.SUPABASE_PUBLISHABLE_KEY || !context.env.ADMIN_EMAIL) {
+        return apiError(503, "security_not_configured", "Admin security is not configured yet.");
     }
-    console.error("Supabase delegated admin create failure", response.status, message || "Unknown error");
-    throw validationError("delegated_admin_create_failed", "Could not create delegated admin login.", 502);
-}
-
-async function fetchSupabaseUserByAccessToken(context, accessToken) {
     const response = await fetch(`${context.env.SUPABASE_URL}/auth/v1/user`, {
         headers: {
             apikey: context.env.SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${accessToken}`
+            Authorization: authorization
         }
     });
     const result = await response.json().catch(() => ({}));
-    const email = String(result?.email || "").toLowerCase();
-    return { ok: response.ok && Boolean(email), email };
-}
-
-async function refreshSupabaseAdminSession(context, refreshToken) {
-    if (!refreshToken) return null;
-    const response = await fetch(`${context.env.SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-        method: "POST",
-        headers: {
-            apikey: context.env.SUPABASE_PUBLISHABLE_KEY,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ refresh_token: refreshToken })
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.access_token || !result.refresh_token) return null;
-    return {
-        accessToken: String(result.access_token),
-        refreshToken: String(result.refresh_token)
-    };
-}
-
-async function resolveAdminSession(context) {
-    if (!context.env.SUPABASE_URL || !context.env.SUPABASE_PUBLISHABLE_KEY || !context.env.ADMIN_EMAIL) {
-        return { failure: apiError(503, "security_not_configured", "Admin security is not configured yet.") };
+    const email = String(result?.email || "");
+    if (!response.ok || !email) {
+        return apiError(401, "invalid_admin_token", "Admin session is invalid or expired.");
     }
-    const sessionId = getAdminSessionId(context.request);
-    if (!sessionId) {
-        return { failure: apiError(401, "missing_admin_session", "Admin authentication is required.") };
-    }
-    await ensureAdminSessionSchema(context.env.RATE_LIMIT_DB);
-    const sessionHash = await adminSessionHash(context, sessionId);
-    const row = await context.env.RATE_LIMIT_DB.prepare(`
-        select session_hash, email, access_token, refresh_token, expires_at
-        from admin_sessions
-        where session_hash = ?1
-        limit 1
-    `).bind(sessionHash).first();
-    const now = Date.now();
-    if (!row || Number(row.expires_at || 0) < now) {
-        if (row) {
-            await context.env.RATE_LIMIT_DB.prepare("delete from admin_sessions where session_hash = ?1")
-                .bind(sessionHash)
-                .run()
-                .catch(() => {});
-        }
-        return { failure: withClearedAdminSessionCookie(apiError(401, "invalid_admin_session", "Admin session is invalid or expired.")) };
-    }
-
-    let accessToken = String(row.access_token || "");
-    let refreshToken = String(row.refresh_token || "");
-    let user = await fetchSupabaseUserByAccessToken(context, accessToken);
-    if (!user.ok) {
-        const refreshed = await refreshSupabaseAdminSession(context, refreshToken);
-        if (!refreshed) {
-            await context.env.RATE_LIMIT_DB.prepare("delete from admin_sessions where session_hash = ?1")
-                .bind(sessionHash)
-                .run()
-                .catch(() => {});
-            return { failure: withClearedAdminSessionCookie(apiError(401, "invalid_admin_session", "Admin session is invalid or expired.")) };
-        }
-        accessToken = refreshed.accessToken;
-        refreshToken = refreshed.refreshToken;
-        user = await fetchSupabaseUserByAccessToken(context, accessToken);
-        if (!user.ok) {
-            await context.env.RATE_LIMIT_DB.prepare("delete from admin_sessions where session_hash = ?1")
-                .bind(sessionHash)
-                .run()
-                .catch(() => {});
-            return { failure: withClearedAdminSessionCookie(apiError(401, "invalid_admin_session", "Admin session is invalid or expired.")) };
-        }
-        await context.env.RATE_LIMIT_DB.prepare(`
-            update admin_sessions
-            set access_token = ?2, refresh_token = ?3, updated_at = ?4
-            where session_hash = ?1
-        `).bind(sessionHash, accessToken, refreshToken, now).run();
-    }
-    const principal = await getAdminPrincipalByEmail(context, user.email);
-    if (!principal) {
-        return { failure: apiError(403, "admin_forbidden", "This account is not allowed to perform admin changes.") };
-    }
-    return { sessionId, sessionHash, principal };
-}
-
-async function requireAdminAccess(context, permission = "") {
-    const resolved = await resolveAdminSession(context);
-    if (resolved.failure) return resolved.failure;
-    const principal = resolved.principal;
-    if (!principal) {
+    if (email.toLowerCase() !== String(context.env.ADMIN_EMAIL || "").toLowerCase()) {
         return apiError(403, "admin_forbidden", "This account is not allowed to perform admin changes.");
     }
-    if (permission && !principal.permissions[permission]) {
-        return apiError(403, "permission_denied", "Your admin role does not permit this action.");
-    }
-    context.data = context.data || {};
-    context.data.adminPrincipal = principal;
-    context.data.adminSessionId = resolved.sessionId;
-    context.data.adminSessionHash = resolved.sessionHash;
     return null;
-}
-
-function adminHasCapability(principal, permission = "") {
-    if (!permission) return true;
-    return Boolean(principal?.permissions?.[permission]);
 }
 
 function encodeQuestionWithExplanation(questionText, explanation) {
@@ -737,6 +493,38 @@ function toSupabaseQuestionPayload(question) {
 
 function trustedStoragePrefix(env) {
     return `${String(env.SUPABASE_URL || "").replace(/\/$/, "")}/storage/v1/object/public/${MEDIA_BUCKET}/`;
+}
+
+function normalizePublicMediaValue(env, value, expectedType) {
+    const source = String(value || "").trim();
+    if (!source) return "";
+    if (source.startsWith("https://") || source.startsWith("blob:")) return source;
+    if (source.startsWith(`data:${expectedType}/`)) return source;
+
+    const supabaseOrigin = String(env.SUPABASE_URL || "").replace(/\/$/, "");
+    const bucketPrefix = `${MEDIA_BUCKET}/`;
+
+    if (source.startsWith("/storage/v1/object/public/")) {
+        return `${supabaseOrigin}${source}`;
+    }
+    if (source.startsWith("storage/v1/object/public/")) {
+        return `${supabaseOrigin}/${source}`;
+    }
+
+    const normalizedPath = source.startsWith(bucketPrefix)
+        ? source.slice(bucketPrefix.length)
+        : source.replace(/^\/+/, "");
+
+    return `${trustedStoragePrefix(env)}${normalizedPath}`;
+}
+
+function normalizePublicMediaRow(env, row, idTransform = value => value) {
+    return {
+        ...row,
+        id: idTransform(row.id),
+        image: normalizePublicMediaValue(env, row.image, "image"),
+        audio: normalizePublicMediaValue(env, row.audio, "audio")
+    };
 }
 
 function decodeMediaDataUrl(dataUrl, expectedType) {
@@ -764,7 +552,7 @@ function decodeMediaDataUrl(dataUrl, expectedType) {
 function mediaExtension(contentType) {
     return ({
         "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
-        "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/wav": "wav", "application/pdf": "pdf"
+        "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/wav": "wav"
     })[contentType];
 }
 
@@ -792,58 +580,6 @@ async function prepareQuestionMedia(env, question) {
         storeQuestionMedia(env, question.audioCode, "audio", question.table, question.category)
     ]);
     return { ...question, imageCode, audioCode };
-}
-
-async function storePEResourceDocument(env, value) {
-    if (!value) return "";
-    if (/^https:\/\//i.test(value)) {
-        if (!value.startsWith(trustedStoragePrefix(env))) {
-            throw validationError("untrusted_document_url", "Only documents from this project's exam-media bucket are allowed.");
-        }
-        return value;
-    }
-    if (/^data:application\/pdf;base64,/i.test(value)) {
-        const { bytes, contentType } = decodeMediaDataUrl(value, "application");
-        if (contentType !== "application/pdf") throw validationError("unsupported_document_type", "Only PDF documents are supported.");
-        return supabaseStorageUpload(env, MEDIA_BUCKET, `pe-resources/document/${crypto.randomUUID()}.pdf`, bytes, contentType);
-    }
-    const { bytes, contentType } = decodeMediaDataUrl(value, "image");
-    return supabaseStorageUpload(
-        env,
-        MEDIA_BUCKET,
-        `pe-resources/document/${crypto.randomUUID()}.${mediaExtension(contentType)}`,
-        bytes,
-        contentType
-    );
-}
-
-async function preparePEResourceMedia(env, resource) {
-    const [documentUrl, previewUrl] = await Promise.all([
-        storePEResourceDocument(env, resource.document_url),
-        storeQuestionMedia(env, resource.preview_url, "image", "Exam", "__PE__::resources")
-    ]);
-    return { ...resource, document_url: documentUrl, preview_url: previewUrl };
-}
-
-async function storeAdminProfileAvatar(env, value) {
-    if (!value) return "";
-    if (/^https:\/\//i.test(value)) {
-        if (!value.startsWith(trustedStoragePrefix(env))) {
-            throw validationError("untrusted_profile_image", "Only profile images from this project's exam-media bucket are allowed.");
-        }
-        return value;
-    }
-    const { bytes, contentType } = decodeMediaDataUrl(value, "image");
-    if (bytes.length > 2 * 1024 * 1024) {
-        throw validationError("profile_image_too_large", "Profile image must be no larger than 2 MB.");
-    }
-    return supabaseStorageUpload(
-        env,
-        MEDIA_BUCKET,
-        `admin-profiles/avatar/${crypto.randomUUID()}.${mediaExtension(contentType)}`,
-        bytes,
-        contentType
-    );
 }
 
 function buildSecureQuestions(rows, idPrefix = "") {
@@ -1078,8 +814,6 @@ function queueExpiredQuoteCleanup(context, nowIso) {
 
 async function handleQuotes(context) {
     if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const authFailure = await requireAdminAccess(context, "quotes_view");
-    if (authFailure) return authFailure;
     const nowIso = new Date().toISOString();
     queueExpiredQuoteCleanup(context, nowIso);
     const now = encodeURIComponent(nowIso);
@@ -1160,7 +894,7 @@ async function handleContact(context) {
         payload.message
     ].join("\n");
     const email = {
-        from: transactionalSender(context.env),
+        from: "ExamPortal <onboarding@resend.dev>",
         to: [context.env.CONTACT_EMAIL],
         subject: `ExamPortal Contact: ${payload.subject}`,
         text: message
@@ -1180,21 +914,10 @@ async function handleAdminOtpRequest(context, sessionId) {
     if (!context.env.RESEND_API_KEY || !context.env.ADMIN_EMAIL || !context.env.ADMIN_OTP_EMAIL) {
         return apiError(503, "security_not_configured", "Admin email verification is not configured yet.");
     }
-    const { email, password } = validateAdminOtpRequestPayload(await readJson(context.request, 4096));
-    const authData = await authenticateAdminPassword(context, email, password);
+    const { password } = validateAdminOtpRequestPayload(await readJson(context.request, 4096));
+    const authData = await authenticateAdminPassword(context, password);
     if (!authData) {
-        return apiError(401, "invalid_credentials", "Admin email or password is incorrect.");
-    }
-    const principal = await getAdminPrincipalByEmail(context, email);
-    if (!principal) {
-        return apiError(403, "admin_forbidden", "This account does not have an active admin role.");
-    }
-    if (!principal.is_super_admin && !context.env.RESEND_FROM_EMAIL && !context.env.ADMIN_OTP_FROM_EMAIL) {
-        return apiError(
-            503,
-            "otp_sender_not_configured",
-            "Delegated verification requires a verified Resend sender configured in RESEND_FROM_EMAIL."
-        );
+        return apiError(401, "invalid_credentials", "Admin password is incorrect.");
     }
 
     await ensureAdminOtpSchema(context.env.RATE_LIMIT_DB);
@@ -1219,8 +942,7 @@ async function handleAdminOtpRequest(context, sessionId) {
         expiresAt
     ).run();
 
-    const otpDestination = principal.is_super_admin ? context.env.ADMIN_OTP_EMAIL : principal.email;
-    const maskedEmail = maskEmailAddress(otpDestination);
+    const maskedEmail = maskEmailAddress(context.env.ADMIN_OTP_EMAIL);
     const message = [
         "Your ExamPortal admin verification code is:",
         "",
@@ -1231,8 +953,8 @@ async function handleAdminOtpRequest(context, sessionId) {
     ].join("\n");
     try {
         await sendTransactionalEmail(context, {
-            from: transactionalSender(context.env),
-            to: [otpDestination],
+            from: "ExamPortal <onboarding@resend.dev>",
+            to: [context.env.ADMIN_OTP_EMAIL],
             subject: "ExamPortal admin verification code",
             text: message
         });
@@ -1259,9 +981,6 @@ async function handleAdminOtpVerify(context, sessionId) {
     if (!context.env.RATE_LIMIT_SALT) {
         return apiError(503, "security_not_configured", "Admin email verification is not configured yet.");
     }
-    if (!context.env.SUPABASE_URL || !context.env.SUPABASE_PUBLISHABLE_KEY || !context.env.ADMIN_EMAIL) {
-        return apiError(503, "security_not_configured", "Admin security is not configured yet.");
-    }
     const { request_id: requestId, code } = validateAdminOtpVerifyPayload(await readJson(context.request, 4096));
     await ensureAdminOtpSchema(context.env.RATE_LIMIT_DB);
     const now = Date.now();
@@ -1287,302 +1006,15 @@ async function handleAdminOtpVerify(context, sessionId) {
             .run();
         return apiError(401, "invalid_or_expired_code", "Verification code is invalid or expired.");
     }
-    const user = await fetchSupabaseUserByAccessToken(context, String(row.access_token || ""));
-    if (!user.ok) {
-        return apiError(401, "invalid_or_expired_code", "Verification session expired. Please sign in again.");
-    }
-    const principal = await getAdminPrincipalByEmail(context, user.email);
-    if (!principal) {
-        return apiError(403, "admin_forbidden", "This account no longer has admin access.");
-    }
-    await ensureAdminSessionSchema(context.env.RATE_LIMIT_DB);
-    const adminSessionId = crypto.randomUUID();
-    const sessionHash = await adminSessionHash(context, adminSessionId);
-    const expiresAt = now + ADMIN_SESSION_MAX_AGE_MS;
     await context.env.RATE_LIMIT_DB.prepare("update admin_otp_requests set used_at = ?2 where request_id = ?1")
         .bind(requestId, now)
         .run();
-    await context.env.RATE_LIMIT_DB.prepare(`
-        insert into admin_sessions (
-            session_hash, email, access_token, refresh_token, expires_at, created_at, updated_at
-        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?6)
-    `).bind(
-        sessionHash,
-        principal.email,
-        String(row.access_token || ""),
-        String(row.refresh_token || ""),
-        expiresAt,
-        now
-    ).run();
     if (Math.random() < 0.2) context.waitUntil(purgeExpiredAdminOtps(context.env.RATE_LIMIT_DB));
-    if (Math.random() < 0.2) context.waitUntil(purgeExpiredAdminSessions(context.env.RATE_LIMIT_DB));
-    return withAdminSessionCookie(json({
-        ok: true,
-        principal
-    }, 201), adminSessionId);
-}
-
-async function handleAdminSessionRefresh(context) {
-    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    validateEmptyPayload(await readJson(context.request, 1024));
-    const resolved = await resolveAdminSession(context);
-    if (resolved.failure) return resolved.failure;
-    return withAdminSessionCookie(json({
-        ok: true,
-        principal: resolved.principal
-    }, 200), resolved.sessionId);
-}
-
-async function handleAdminLogout(context) {
-    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    validateEmptyPayload(await readJson(context.request, 1024));
-    const sessionId = getAdminSessionId(context.request);
-    if (sessionId && context.env.RATE_LIMIT_SALT) {
-        await ensureAdminSessionSchema(context.env.RATE_LIMIT_DB);
-        const sessionHash = await adminSessionHash(context, sessionId);
-        await context.env.RATE_LIMIT_DB.prepare("delete from admin_sessions where session_hash = ?1")
-            .bind(sessionHash)
-            .run()
-            .catch(() => {});
-    }
-    return withClearedAdminSessionCookie(json({ ok: true }, 200));
-}
-
-async function handleAdminPasswordRecovery(context) {
-    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    if (!context.env.SUPABASE_URL || !context.env.SUPABASE_PUBLISHABLE_KEY) {
-        return apiError(503, "security_not_configured", "Admin security is not configured yet.");
-    }
-    const payload = validateAdminPasswordRecoveryPayload(await readJson(context.request, 12288));
-    const authHeaders = {
-        apikey: context.env.SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${payload.access_token}`
-    };
-    const userResponse = await fetch(`${context.env.SUPABASE_URL}/auth/v1/user`, { headers: authHeaders });
-    const user = await userResponse.json().catch(() => ({}));
-    const email = String(user?.email || "").trim().toLowerCase();
-    if (!userResponse.ok || !email) {
-        return apiError(401, "invalid_recovery_token", "This recovery link is invalid or expired.");
-    }
-    if (!(await getAdminPrincipalByEmail(context, email))) {
-        return apiError(403, "admin_forbidden", "This account does not have active admin access.");
-    }
-    const updateResponse = await fetch(`${context.env.SUPABASE_URL}/auth/v1/user`, {
-        method: "PUT",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({ password: payload.password })
-    });
-    if (!updateResponse.ok) {
-        const result = await updateResponse.json().catch(() => ({}));
-        console.error("Admin password recovery update failed", updateResponse.status, result?.message || result?.error || "Unknown error");
-        return apiError(400, "password_update_failed", "Password could not be updated. Try a different password.");
-    }
-    return json({ ok: true }, 200);
-}
-
-async function handleAdminProfile(context) {
-    const authFailure = await requireAdminAccess(context);
-    if (authFailure) return authFailure;
-    if (!["GET", "POST"].includes(context.request.method)) return methodNotAllowed(["GET", "POST"]);
-    await ensureAdminProfileSchema(context.env.RATE_LIMIT_DB);
-    const principal = context.data.adminPrincipal;
-    const email = String(principal.email || "").toLowerCase();
-
-    if (context.request.method === "GET") {
-        const profile = await context.env.RATE_LIMIT_DB.prepare(`
-            select display_name, contact_email, phone, avatar_url
-            from admin_profiles where email = ?1 limit 1
-        `).bind(email).first();
-        return json({ ok: true, principal, profile: profile || null });
-    }
-
-    const payload = validateAdminProfilePayload(await readJson(context.request, 4 * 1024 * 1024));
-    const avatarUrl = await storeAdminProfileAvatar(context.env, payload.avatar);
-    const now = Date.now();
-    await context.env.RATE_LIMIT_DB.prepare(`
-        insert into admin_profiles (email, display_name, contact_email, phone, avatar_url, updated_at)
-        values (?1, ?2, ?3, ?4, ?5, ?6)
-        on conflict(email) do update set
-            display_name = excluded.display_name,
-            contact_email = excluded.contact_email,
-            phone = excluded.phone,
-            avatar_url = excluded.avatar_url,
-            updated_at = excluded.updated_at
-    `).bind(email, payload.display_name, payload.contact_email, payload.phone, avatarUrl, now).run();
     return json({
         ok: true,
-        principal,
-        profile: {
-            display_name: payload.display_name,
-            contact_email: payload.contact_email,
-            phone: payload.phone,
-            avatar_url: avatarUrl
-        }
-    });
-}
-
-async function handleAdminRoles(context) {
-    if (!["GET", "POST", "DELETE"].includes(context.request.method)) return methodNotAllowed(["GET", "POST", "DELETE"]);
-    const authFailure = await requireAdminAccess(context, "roles");
-    if (authFailure) return authFailure;
-    await ensureAdminRolesSchema(context.env.RATE_LIMIT_DB);
-    const superEmail = String(context.env.ADMIN_EMAIL || "").trim().toLowerCase();
-
-    if (context.request.method === "GET") {
-        const result = await context.env.RATE_LIMIT_DB.prepare(`
-            select email,
-                can_questions_view,
-                can_questions_create,
-                can_questions_edit,
-                can_questions_bulk,
-                can_flashcards_view,
-                can_flashcards_create,
-                can_flashcards_edit,
-                can_quotes_view,
-                can_quotes_create,
-                can_quotes_edit,
-                active, created_at, updated_at
-            from admin_roles order by email asc
-        `).all();
-        const delegated = (result?.results || []).map(row => ({
-            email: String(row.email || ""),
-            is_super_admin: false,
-            can_questions_view: Number(row.can_questions_view) === 1,
-            can_questions_create: Number(row.can_questions_create) === 1,
-            can_questions_edit: Number(row.can_questions_edit) === 1,
-            can_questions_bulk: Number(row.can_questions_bulk) === 1,
-            can_flashcards_view: Number(row.can_flashcards_view) === 1,
-            can_flashcards_create: Number(row.can_flashcards_create) === 1,
-            can_flashcards_edit: Number(row.can_flashcards_edit) === 1,
-            can_quotes_view: Number(row.can_quotes_view) === 1,
-            can_quotes_create: Number(row.can_quotes_create) === 1,
-            can_quotes_edit: Number(row.can_quotes_edit) === 1,
-            active: Number(row.active) === 1,
-            created_at: Number(row.created_at || 0),
-            updated_at: Number(row.updated_at || 0)
-        }));
-        return json({
-            ok: true,
-            roles: [{
-                email: superEmail,
-                is_super_admin: true,
-                can_questions_view: true,
-                can_questions_create: true,
-                can_questions_edit: true,
-                can_questions_bulk: true,
-                can_flashcards_view: true,
-                can_flashcards_create: true,
-                can_flashcards_edit: true,
-                can_quotes_view: true,
-                can_quotes_create: true,
-                can_quotes_edit: true,
-                active: true
-            }, ...delegated]
-        });
-    }
-
-    if (context.request.method === "DELETE") {
-        const { email } = validateAdminRoleDeletePayload(await readJson(context.request, 4096));
-        if (!email || email === superEmail) {
-            return apiError(400, "super_admin_immutable", "The primary super-admin cannot be deleted.");
-        }
-        if (!context.env.SUPABASE_URL || !context.env.SUPABASE_SECRET_KEY) {
-            return apiError(503, "security_not_configured", "Admin user management is not configured.");
-        }
-        const listResponse = await fetch(`${context.env.SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, {
-            headers: {
-                apikey: context.env.SUPABASE_SECRET_KEY,
-                Authorization: `Bearer ${context.env.SUPABASE_SECRET_KEY}`
-            }
-        });
-        const listResult = await listResponse.json().catch(() => ({}));
-        if (!listResponse.ok) {
-            return apiError(502, "auth_user_lookup_failed", "Could not check the delegated login account.");
-        }
-        const users = Array.isArray(listResult?.users) ? listResult.users : Array.isArray(listResult) ? listResult : [];
-        const authUser = users.find(user => String(user?.email || "").trim().toLowerCase() === email);
-        if (authUser?.id) {
-            const deleteResponse = await fetch(`${context.env.SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(authUser.id)}`, {
-                method: "DELETE",
-                headers: {
-                    apikey: context.env.SUPABASE_SECRET_KEY,
-                    Authorization: `Bearer ${context.env.SUPABASE_SECRET_KEY}`
-                }
-            });
-            if (!deleteResponse.ok && deleteResponse.status !== 404) {
-                return apiError(502, "auth_user_delete_failed", "Could not delete the delegated login account.");
-            }
-        }
-        await context.env.RATE_LIMIT_DB.prepare("delete from admin_roles where email = ?1").bind(email).run();
-        return json({ ok: true }, 200);
-    }
-
-    const role = validateAdminRolePayload(await readJson(context.request, 8192));
-    if (role.email === superEmail) {
-        return apiError(400, "super_admin_immutable", "The primary super-admin role cannot be changed here.");
-    }
-    const existingRole = await context.env.RATE_LIMIT_DB.prepare(`
-        select email from admin_roles where email = ?1 limit 1
-    `).bind(role.email).first();
-    if (!existingRole && !role.password) {
-        return apiError(400, "password_required", "Set a delegated admin password of at least 6 characters for a new admin.");
-    }
-    if (role.password) {
-        await createDelegatedAdminAuthUser(context, role.email, role.password);
-    }
-    if (
-        role.active
-        && !role.can_questions_view
-        && !role.can_questions_create
-        && !role.can_questions_edit
-        && !role.can_questions_bulk
-        && !role.can_flashcards_view
-        && !role.can_flashcards_create
-        && !role.can_flashcards_edit
-        && !role.can_quotes_view
-        && !role.can_quotes_create
-        && !role.can_quotes_edit
-    ) {
-        return apiError(400, "empty_role", "An active admin must have at least one permission.");
-    }
-    const now = Date.now();
-    await context.env.RATE_LIMIT_DB.prepare(`
-        insert into admin_roles (
-            email,
-            can_questions_view, can_questions_create, can_questions_edit, can_questions_bulk,
-            can_flashcards_view, can_flashcards_create, can_flashcards_edit,
-            can_quotes_view, can_quotes_create, can_quotes_edit,
-            active, created_at, updated_at
-        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)
-        on conflict(email) do update set
-            can_questions_view = excluded.can_questions_view,
-            can_questions_create = excluded.can_questions_create,
-            can_questions_edit = excluded.can_questions_edit,
-            can_questions_bulk = excluded.can_questions_bulk,
-            can_flashcards_view = excluded.can_flashcards_view,
-            can_flashcards_create = excluded.can_flashcards_create,
-            can_flashcards_edit = excluded.can_flashcards_edit,
-            can_quotes_view = excluded.can_quotes_view,
-            can_quotes_create = excluded.can_quotes_create,
-            can_quotes_edit = excluded.can_quotes_edit,
-            active = excluded.active,
-            updated_at = excluded.updated_at
-    `).bind(
-        role.email,
-        role.can_questions_view ? 1 : 0,
-        role.can_questions_create ? 1 : 0,
-        role.can_questions_edit ? 1 : 0,
-        role.can_questions_bulk ? 1 : 0,
-        role.can_flashcards_view ? 1 : 0,
-        role.can_flashcards_create ? 1 : 0,
-        role.can_flashcards_edit ? 1 : 0,
-        role.can_quotes_view ? 1 : 0,
-        role.can_quotes_create ? 1 : 0,
-        role.can_quotes_edit ? 1 : 0,
-        role.active ? 1 : 0,
-        now
-    ).run();
-    return json({ ok: true, role }, 200);
+        access_token: String(row.access_token || ""),
+        refresh_token: String(row.refresh_token || "")
+    }, 201);
 }
 
 async function handleAdminQuestion(context) {
@@ -1590,11 +1022,6 @@ async function handleAdminQuestion(context) {
     const authFailure = await requireAdminAccess(context);
     if (authFailure) return authFailure;
     const validatedPayload = validateAdminQuestionPayload(await readJson(context.request, 20 * 1024 * 1024));
-    const principal = context.data?.adminPrincipal;
-    const requiredPermission = validatedPayload.id ? "questions_edit" : "questions_create";
-    if (!adminHasCapability(principal, requiredPermission)) {
-        return apiError(403, "permission_denied", "Your admin role does not permit this action.");
-    }
     const payload = await prepareQuestionMedia(context.env, validatedPayload);
     const path = payload.id
         ? `${payload.table}?id=eq.${encodeURIComponent(payload.id)}`
@@ -1607,36 +1034,9 @@ async function handleAdminQuestion(context) {
     return json({ ok: true }, payload.id ? 200 : 201);
 }
 
-async function handleAdminPEResources(context) {
-    const authFailure = await requireAdminAccess(context);
-    if (authFailure) return authFailure;
-    const principal = context.data?.adminPrincipal;
-    if (context.request.method === "GET") {
-        if (!adminHasCapability(principal, "questions_view")) {
-            return apiError(403, "permission_denied", "Your admin role does not permit this action.");
-        }
-        const fields = "id,kind,title,content,practice_prompt,practice_answer,document_url,preview_url,published,sort_order,updated_at";
-        return json(await supabaseServerRequest(context.env, `PEResources?select=${fields}&order=sort_order.asc,id.asc`));
-    }
-    if (context.request.method !== "POST") return methodNotAllowed(["GET", "POST"]);
-    const validated = validateAdminPEResourcePayload(await readJson(context.request, 20 * 1024 * 1024));
-    const requiredPermission = validated.id ? "questions_edit" : "questions_create";
-    if (!adminHasCapability(principal, requiredPermission)) {
-        return apiError(403, "permission_denied", "Your admin role does not permit this action.");
-    }
-    const payload = await preparePEResourceMedia(context.env, validated);
-    const path = payload.id ? `PEResources?id=eq.${encodeURIComponent(payload.id)}` : "PEResources";
-    await supabaseServerRequest(context.env, path, {
-        method: payload.id ? "PATCH" : "POST",
-        body: { ...payload, id: undefined, updated_at: new Date().toISOString() },
-        prefer: "return=minimal"
-    });
-    return json({ ok: true }, payload.id ? 200 : 201);
-}
-
 async function handleAdminBulkQuestions(context) {
     if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    const authFailure = await requireAdminAccess(context, "questions_bulk");
+    const authFailure = await requireAdminAccess(context);
     if (authFailure) return authFailure;
     const payload = validateAdminBulkQuestionsPayload(await readJson(context.request, 10 * 1024 * 1024));
     const preparedQuestions = [];
@@ -1656,11 +1056,6 @@ async function handleAdminFlashcard(context) {
     const authFailure = await requireAdminAccess(context);
     if (authFailure) return authFailure;
     const payload = validateAdminFlashcardPayload(await readJson(context.request, 16384));
-    const principal = context.data?.adminPrincipal;
-    const requiredPermission = payload.id ? "flashcards_edit" : "flashcards_create";
-    if (!adminHasCapability(principal, requiredPermission)) {
-        return apiError(403, "permission_denied", "Your admin role does not permit this action.");
-    }
     const path = payload.id
         ? `${"CurrentAffairFlashcards"}?id=eq.${encodeURIComponent(payload.id)}`
         : "CurrentAffairFlashcards";
@@ -1683,19 +1078,14 @@ async function handleAdminQuote(context) {
     const authFailure = await requireAdminAccess(context);
     if (authFailure) return authFailure;
     const payload = validateAdminQuotePayload(await readJson(context.request, 16384));
-    const principal = context.data?.adminPrincipal;
-    const requiredPermission = payload.id ? "quotes_edit" : "quotes_create";
-    if (!adminHasCapability(principal, requiredPermission)) {
-        return apiError(403, "permission_denied", "Your admin role does not permit this action.");
-    }
     const path = payload.id
         ? `${"daily_quotes"}?id=eq.${encodeURIComponent(payload.id)}`
         : "daily_quotes";
     await supabaseServerRequest(context.env, path, {
         method: payload.id ? "PATCH" : "POST",
         body: {
-            english_quote: payload.english_quote || null,
-            dzongkha_quote: payload.dzongkha_quote || null,
+            english_quote: payload.english_quote,
+            dzongkha_quote: payload.dzongkha_quote,
             expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         },
         prefer: "return=minimal"
@@ -1718,22 +1108,21 @@ export async function onRequest(context) {
 
         let response;
         if (name === "health") response = json({ ok: true, service: "ExamPortal API" });
-        else if (name === "admin-otp-request") response = await handleAdminOtpRequest(context, session.id);
-        else if (name === "admin-otp-verify") response = await handleAdminOtpVerify(context, session.id);
-        else if (name === "admin-session-refresh") response = await handleAdminSessionRefresh(context);
-        else if (name === "admin-logout") response = await handleAdminLogout(context);
-        else if (name === "admin-password-recovery") response = await handleAdminPasswordRecovery(context);
-        else if (name === "admin-questions") response = await handleAdminQuestions(context);
-        else if (name === "admin-flashcards") response = await handleFlashcards(context);
-        else if (name === "admin-quotes") response = await handleQuotes(context);
-        else if (name === "admin-pe-resources") response = await handleAdminPEResources(context);
-        else if (name === "admin-question-media") response = await handleAdminQuestionMedia(context);
-        else if (name === "admin-question") response = await handleAdminQuestion(context);
-        else if (name === "admin-bulk-questions") response = await handleAdminBulkQuestions(context);
-        else if (name === "admin-flashcard") response = await handleAdminFlashcard(context);
-        else if (name === "admin-quote") response = await handleAdminQuote(context);
-        else if (name === "admin-profile") response = await handleAdminProfile(context);
-        else if (name === "admin-roles") response = await handleAdminRoles(context);
+        else if (name === "questions") response = await handleQuestions(context);
+        else if (name === "pe-overview") response = await handlePEOverview(context);
+        else if (name === "pe-resources") response = await handlePEResources(context);
+        else if (name === "pe-resource-answer") response = await handlePEResourceAnswer(context);
+        else if (name === "exam-start") response = await handleExamStart(context);
+        else if (name === "exam-question") response = await handleExamQuestion(context);
+        else if (name === "question-solution") response = await handleQuestionSolution(context);
+        else if (name === "pe-online-questions") response = await handlePEOnlineQuestions(context);
+        else if (name === "pe-online-start") response = await handlePEOnlineStart(context);
+        else if (name === "pe-online-question") response = await handlePEOnlineQuestion(context);
+        else if (name === "flashcards") response = await handleFlashcards(context);
+        else if (name === "flashcard-answer") response = await handleFlashcardAnswer(context);
+        else if (name === "quotes") response = await handleQuotes(context);
+        else if (name === "responses") response = await handleResponses(context);
+        else if (name === "contact") response = await handleContact(context);
         else response = apiError(404, "not_found", "API endpoint not found.");
         return withSessionCookie(response, session.id, session.isNew);
     } catch (error) {

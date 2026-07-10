@@ -4,13 +4,7 @@
 const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const API_TIMEOUT_MS = 20000;
-const DB_CACHE_KEY = "supabase_exam_pool_v2_no_answers";
-const ADMIN_SESSION_KEY = "examportal_admin_session_v1";
-const ADMIN_LOGIN_EMAIL_KEY = "examportal_admin_login_email_v1";
-const ADMIN_QUESTION_CONTEXT_KEY = "examportal_admin_question_context_v1";
-const ADMIN_FLASHCARD_CONTEXT_KEY = "examportal_admin_flashcard_context_v1";
-const ADMIN_THEME_MODE_KEY = "examportal_admin_theme_mode_v1";
-const ADMIN_PROFILE_KEY = "examportal_admin_profile_v1";
+const DB_CACHE_KEY = "supabase_exam_catalog_v3_counts_only";
 const SECONDS_PER_QUESTION = 30;
 const PE_BCSC_MAIN_TYPE = "BCSC(main)";
 
@@ -24,6 +18,7 @@ let timeLeft     = 0;
 let timerInterval= null;
 let databaseReady = false;
 let databaseLoading = false;
+let databaseLoadPromise = null;
 let examCatalogReady = false;
 let examCategoryCounts = new Map();
 let setupContinued = false;
@@ -42,79 +37,27 @@ let peOnlineCatalog = {
     total: 0
 };
 let questionMediaCache = new Map();
+let categoryMediaPrefetch = { category: "", promise: null };
+let peOnlineMediaPrefetchPromise = null;
+let peTopicMediaPrefetch = new Map();
+let peDIGraphPrefetch = new Map();
+let peDIGraphFingerprintCache = new Map();
 let publicApiCache = new Map();
 let peQuestionsCache = [];
 let peTopicBuckets = new Map();
+let peTopicQuestionCache = new Map();
+let peOverviewCatalog = [];
+let peResourcesCatalog = [];
+let peHomeDashboardLoadPromise = null;
+let peActiveResourceTab = "formula";
+let peGuideCarouselIndex = 0;
+let peGuideCarouselTimer = null;
 let cafStateLoaded = false;
 let cafStatePromise = null;
-let adminSessionActive = false;
-let adminRecoveryAccessToken = "";
-let adminOtpState = null;
-let adminAuthenticationPending = false;
-let adminPrincipal = null;
-let adminProfile = null;
-let adminRoles = [];
-let activeAdminSection = "questions";
-let activeAdminAccountPanel = "profile";
-let adminSessionRefreshTimer = null;
-let adminSessionRefreshPromise = null;
-let adminSessionExpiryNoticeShown = false;
-let editingCafCardId = "";
-let editingQuoteId = "";
-let adminPEResources = [];
-let editingQuestionIndex = null;
 let submitInProgress = false;
 const QUESTION_PREFETCH_AHEAD = 5;
-let adminSidebarHoverOpenTimer = null;
-let adminSidebarHoverCloseTimer = null;
 
 function bindStaticUiEvents() {
-    document.getElementById("admin-email-input")?.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") authenticateAdmin();
-    });
-    document.getElementById("admin-pw-input")?.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") authenticateAdmin();
-    });
-    document.getElementById("admin-email-input")?.addEventListener("input", (event) => {
-        rememberAdminLoginEmail(event.target.value);
-    });
-    document.getElementById("pw-eye")?.addEventListener("click", togglePwVisibility);
-    getAdminOtpDigitInputs().forEach((input, index) => {
-        input.addEventListener("input", (event) => handleAdminOtpDigitInput(event, index));
-        input.addEventListener("keydown", (event) => handleAdminOtpDigitKeydown(event, index));
-    });
-    document.getElementById("admin-modal-clear-btn")?.addEventListener("click", clearAdminGatewayFields);
-    document.getElementById("admin-modal-auth-btn")?.addEventListener("click", authenticateAdmin);
-    document.getElementById("password-recovery-form")?.addEventListener("submit", submitRecoveredPassword);
-    document.getElementById("password-recovery-cancel-btn")?.addEventListener("click", closePasswordRecovery);
-    document.getElementById("admin-modal")?.addEventListener("pointerdown", keepAdminModalLocked);
-    document.getElementById("admin-modal")?.addEventListener("click", keepAdminModalLocked);
-    document.getElementById("admin-shell")?.classList.remove("is-hover-expanded");
-    document.getElementById("admin-shell")?.classList.add("is-collapsed");
-    document.querySelector(".admin-bank-sidebar")?.addEventListener("mouseenter", () => queueAdminSidebarHover(true));
-    document.querySelector(".admin-bank-sidebar")?.addEventListener("mouseleave", () => queueAdminSidebarHover(false));
-    document.querySelectorAll("[data-admin-section-link]").forEach((button) => {
-        button.addEventListener("click", () => setAdminSection(button.dataset.adminSectionLink || "questions"));
-    });
-    document.getElementById("admin-account-trigger")?.addEventListener("click", toggleAdminAccountMenu);
-    document.querySelectorAll("[data-admin-account-panel]").forEach((button) => {
-        button.addEventListener("click", () => setAdminAccountPanel(button.dataset.adminAccountPanel || "profile"));
-    });
-    document.querySelectorAll("[data-admin-theme]").forEach((button) => {
-        button.addEventListener("click", () => applyThemeMode(button.dataset.adminTheme || "light"));
-    });
-    document.getElementById("admin-profile-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        void saveAdminProfileCard();
-    });
-    document.getElementById("admin-profile-upload-btn")?.addEventListener("click", () => {
-        document.getElementById("admin-profile-avatar-file")?.click();
-    });
-    document.getElementById("admin-profile-avatar-file")?.addEventListener("change", handleAdminProfileAvatarUpload);
-
-    document.getElementById("question-view-modal")?.addEventListener("click", handleQuestionViewBackdropClick);
-    document.getElementById("question-view-close-btn")?.addEventListener("click", closeQuestionView);
-
     document.getElementById("contact-modal")?.addEventListener("click", handleContactBackdropClick);
     document.getElementById("contact-form")?.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -125,15 +68,12 @@ function bindStaticUiEvents() {
     document.getElementById("theme-toggle-btn")?.addEventListener("click", toggleThemeMode);
     document.getElementById("contact-btn")?.addEventListener("click", openContactModal);
     document.getElementById("pe-btn")?.addEventListener("click", openPEPortal);
-    document.getElementById("admin-btn")?.addEventListener("click", openAdminPortal);
-    document.getElementById("admin-back-btn")?.addEventListener("click", closeAdminPortal);
-    document.getElementById("admin-profile-logout-btn")?.addEventListener("click", closeAdminPortal);
     document.getElementById("pe-back-btn")?.addEventListener("click", closePEPortal);
 
     document.getElementById("student-name")?.addEventListener("keydown", (event) => {
         if (event.key === "Enter") startExam();
     });
-    document.getElementById("category-select")?.addEventListener("change", updateTestSummary);
+    document.getElementById("category-select")?.addEventListener("change", handleCategorySelectionChange);
     document.getElementById("start-btn")?.addEventListener("click", startExam);
     document.getElementById("normal-sidebar-submit-btn")?.addEventListener("click", submitExam);
 
@@ -142,70 +82,9 @@ function bindStaticUiEvents() {
     document.getElementById("pe-return-online-btn")?.addEventListener("click", returnToPEOnlineTestPage);
     document.getElementById("results-return-home-btn")?.addEventListener("click", retakeExam);
 
-    document.getElementById("admin-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        saveQuestion();
-    });
-    document.querySelectorAll('input[name="dest-mode"]').forEach((input) => {
-        input.addEventListener("change", onDestModeChange);
-    });
-    document.querySelectorAll('input[name="pe-type"]').forEach((input) => {
-        input.addEventListener("change", onPeTypeChange);
-    });
-    document.querySelectorAll('input[name="cat-mode"]').forEach((input) => {
-        input.addEventListener("change", onCatModeChange);
-    });
-    document.getElementById("adm-cat-select")?.addEventListener("change", () => rememberAdminQuestionContext());
-    document.getElementById("adm-cat-select")?.addEventListener("change", updateBulkImportPreview);
-    document.getElementById("adm-cat-input")?.addEventListener("input", () => { rememberAdminQuestionContext(); updateBulkImportPreview(); });
-    document.getElementById("adm-pe-topic")?.addEventListener("input", () => { rememberAdminQuestionContext(); updateBulkImportPreview(); });
-    document.getElementById("adm-img-file")?.addEventListener("change", (event) => handleImageUpload(event.target));
-    document.getElementById("adm-audio-file")?.addEventListener("change", (event) => handleAudioUpload(event.target));
-    document.getElementById("cancel-edit-btn")?.addEventListener("click", cancelQuestionEdit);
-
-    document.getElementById("caf-admin-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        cafSaveAdminCard();
-    });
-    document.getElementById("caf-admin-scope")?.addEventListener("change", cafPopulateAdminCategories);
-    document.getElementById("caf-admin-scope")?.addEventListener("change", () => rememberAdminFlashcardContext());
-    document.getElementById("caf-admin-category")?.addEventListener("change", () => rememberAdminFlashcardContext());
-    document.getElementById("caf-admin-category-new")?.addEventListener("input", () => rememberAdminFlashcardContext());
-    document.querySelectorAll('input[name="caf-cat-mode"]').forEach((input) => {
-        input.addEventListener("change", cafApplyAdminCategoryMode);
-    });
-    document.getElementById("caf-admin-clear-btn")?.addEventListener("click", cafResetAdminForm);
-    document.getElementById("caf-admin-cancel-btn")?.addEventListener("click", cafCancelEdit);
-
-    document.getElementById("quote-admin-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        saveDailyQuote();
-    });
-    document.getElementById("quote-admin-cancel-btn")?.addEventListener("click", cancelDailyQuoteEdit);
-    document.getElementById("pe-resource-admin-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        void saveAdminPEResource();
-    });
-    document.getElementById("pe-resource-clear-btn")?.addEventListener("click", resetAdminPEResourceForm);
-    document.getElementById("pe-resource-document-file")?.addEventListener("change", (event) => {
-        void readPEResourceDocumentFile(event.target, "pe-resource-document");
-    });
-    document.getElementById("pe-resource-preview-file")?.addEventListener("change", (event) => {
-        void readPEResourceImageFile(event.target, "pe-resource-preview");
-    });
-    document.getElementById("admin-role-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        saveAdminRole();
-    });
-    document.getElementById("admin-role-cancel-btn")?.addEventListener("click", resetAdminRoleForm);
-
-    document.getElementById("bulk-form")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-        saveBulkQuestions();
-    });
-    document.getElementById("bulk-questions")?.addEventListener("input", updateBulkImportPreview);
-
     document.getElementById("pe-home-search")?.addEventListener("input", renderPEHomeGrid);
+    document.getElementById("pe-home-panel")?.addEventListener("click", handlePEHomeDashboardClick);
+    document.getElementById("pe-home-panel")?.addEventListener("paste", handlePESelfNotePaste);
     document.getElementById("caf-bhutan-box")?.addEventListener("click", () => cafSelectRegion("Bhutan"));
     document.getElementById("caf-intl-box")?.addEventListener("click", () => cafSelectRegion("International"));
     document.getElementById("caf-category-dropdown")?.addEventListener("change", () => cafFilterData());
@@ -223,10 +102,8 @@ function bindStaticUiEvents() {
 const IMAGE_ZOOM_SELECTOR = [
     "#pe-di-chart-img",
     "#peo-graph-img",
-    "#adm-img-preview",
     ".q-image",
-    ".pe-question-image",
-    ".question-view-image"
+    ".pe-question-image"
 ].join(",");
 let imageZoomLastTap = { target: null, time: 0 };
 
@@ -321,123 +198,36 @@ function closeImageZoom() {
 	    showLoading(false);
         loadDeferredVisualStyles();
         localStorage.removeItem("exam_theme_mode");
-        localStorage.removeItem(ADMIN_PROFILE_KEY);
-        applyThemeMode(localStorage.getItem(ADMIN_THEME_MODE_KEY) || "light");
+        applyThemeMode("light");
         bindStaticUiEvents();
         const copyrightEl = document.getElementById("site-copyright");
         if (copyrightEl) copyrightEl.textContent = `© ${new Date().getFullYear()}`;
-        caHydrateAdminControls();
-        hydrateAdminProfileCard();
-        if (capturePasswordRecoverySession()) return;
-        if (await restoreAdminSession()) {
-            // Reveal the saved admin workspace immediately. Authentication and
-            // fresh data are verified quietly so refreshes do not flash a
-            // full-screen "Connecting" overlay.
-            closeAdminModal();
-            document.body.classList.add("admin-mode");
-            document.getElementById("setup-view").style.display = "none";
-            document.getElementById("admin-view")?.classList.remove("is-hidden");
-            document.getElementById("admin-top-tools")?.classList.remove("is-hidden");
-            document.getElementById("admin-back-btn")?.classList.remove("is-hidden");
-            hideTopActionButtons();
-            try {
-                await restoreAdminPortal();
-                return;
-            } catch (error) {
-                if (error?.status === 401 || error?.status === 403) clearAdminSession();
-                document.body.classList.remove("admin-mode");
-                document.getElementById("admin-view")?.classList.add("is-hidden");
-                document.getElementById("admin-top-tools")?.classList.add("is-hidden");
-                document.getElementById("admin-back-btn")?.classList.add("is-hidden");
-                showToast(
-                    error?.status === 401 || error?.status === 403
-                        ? "Admin session expired. Please sign in again."
-                        : "Admin data could not be loaded. Refresh to retry your saved session.",
-                    "info"
-                );
-            }
-        }
-	    openAdminPortal();
+        renderDailyQuoteTicker();
+        warmPublicStartupData();
+        setEntryActionButtons();
+	    document.getElementById("student-name").focus();
 	}
 
-    function capturePasswordRecoverySession() {
-        const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-        const accessToken = String(params.get("access_token") || "");
-        const recoveryType = params.get("type") === "recovery";
-        if (!recoveryType || !accessToken) return false;
-        adminRecoveryAccessToken = accessToken;
-        history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-        closeAdminModal();
-        document.getElementById("password-recovery-modal")?.classList.add("open");
-        setTimeout(() => document.getElementById("recovery-password")?.focus(), 100);
-        return true;
-    }
-
-    function closePasswordRecovery() {
-        adminRecoveryAccessToken = "";
-        document.getElementById("password-recovery-form")?.reset();
-        document.getElementById("password-recovery-modal")?.classList.remove("open");
-        openAdminPortal();
-    }
-
-    async function submitRecoveredPassword(event) {
-        event.preventDefault();
-        const password = document.getElementById("recovery-password")?.value || "";
-        const confirmation = document.getElementById("recovery-password-confirm")?.value || "";
-        const error = document.getElementById("recovery-password-error");
-        if (password.length < 8 || password !== confirmation) {
-            error.textContent = password.length < 8 ? "Use at least 8 characters." : "Passwords do not match.";
-            error.classList.add("visible");
-            return;
-        }
-        if (!adminRecoveryAccessToken) {
-            error.textContent = "This recovery link is invalid or expired.";
-            error.classList.add("visible");
-            return;
-        }
-        error.classList.remove("visible");
-        showLoading(true, "Updating password...");
-        try {
-            await apiRequest("admin-password-recovery", {
-                method: "POST",
-                body: { access_token: adminRecoveryAccessToken, password }
+    function warmPublicStartupData() {
+        const kickOff = () => {
+            const lightweightLoads = [
+                loadDailyQuotes({ fresh: true }).then(renderDailyQuoteTicker),
+                caLoadState({ render: false }),
+                loadExamCatalog(),
+                loadPEOnlineQuestionBank().then(updatePEOnlineCount)
+            ];
+            Promise.allSettled(lightweightLoads).then(() => {
+                // Load only the PE practice catalog after the small startup
+                // requests; individual topics fetch their questions on click.
+                setTimeout(() => loadDatabase({ silent: true }).catch(() => {}), 120);
             });
-            clearAdminSession();
-            closePasswordRecovery();
-            showToast("Password updated. Sign in with your new password.", "success");
-        } catch (requestError) {
-            error.textContent = requestError?.message || "Password could not be updated.";
-            error.classList.add("visible");
-        } finally {
-            showLoading(false);
+        };
+        if (typeof requestAnimationFrame === "function") {
+            requestAnimationFrame(() => setTimeout(kickOff, 0));
+        } else {
+            setTimeout(kickOff, 0);
         }
     }
-
-    document.addEventListener("pointerdown", () => {
-        touchAdminSession();
-    });
-
-    document.addEventListener("keydown", () => {
-        touchAdminSession();
-    });
-
-    document.addEventListener("click", (event) => {
-        const account = document.getElementById("admin-account");
-        if (account && !account.contains(event.target)) closeAdminAccountMenu();
-    });
-
-    document.addEventListener("visibilitychange", () => {
-        if (!document.hidden && adminSessionActive) {
-            void refreshAdminSession({ reason: "tab-active" }).catch(() => {});
-        }
-    });
-
-    document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && shouldLockAdminGateway()) {
-            event.preventDefault();
-            focusAdminGatewayPrimaryField();
-        }
-    });
 
     function applyThemeMode(mode) {
         const useDark = mode === "dark";
@@ -445,12 +235,6 @@ function closeImageZoom() {
         document.body.classList.toggle("dark-theme", useDark);
         const btn = document.getElementById("theme-toggle-btn");
         if (btn) btn.textContent = useDark ? "☀ Light" : "🌙 Dark";
-        document.querySelectorAll("[data-admin-theme]").forEach((button) => {
-            button.classList.toggle("active", button.dataset.adminTheme === (useDark ? "dark" : "light"));
-        });
-        try {
-            localStorage.setItem(ADMIN_THEME_MODE_KEY, useDark ? "dark" : "light");
-        } catch (e) {}
         void document.body.offsetWidth;
         requestAnimationFrame(() => document.documentElement.classList.remove("theme-switch-instant"));
     }
@@ -460,625 +244,15 @@ function closeImageZoom() {
         applyThemeMode(nextMode);
     }
 
-    function persistAdminSession() {
-        clearLegacyAdminTokenStorage();
-    }
 
-    async function restoreAdminSession() {
-        try {
-            clearLegacyAdminTokenStorage();
-            const restored = await refreshAdminSession({ reason: "restore", forceLogout: false });
-            adminSessionActive = Boolean(restored?.principal);
-            return true;
-        } catch (e) {
-            adminSessionActive = false;
-            return false;
-        }
-    }
-
-function clearLegacyAdminTokenStorage() {
-        try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
-        try { localStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
-    }
-
-function clearAdminSession() {
-        clearLegacyAdminTokenStorage();
-        adminSessionActive = false;
-        stopAdminSessionAutoRefresh();
-    }
-
-function startAdminSessionAutoRefresh() {
-        stopAdminSessionAutoRefresh();
-        if (!adminSessionActive) return;
-        // Renew the backend-held admin session before its cookie expires.
-        adminSessionRefreshTimer = setInterval(() => {
-            if (document.hidden) return;
-            void refreshAdminSession({ reason: "background" }).catch(() => {});
-        }, 45 * 60 * 1000);
-    }
-
-function stopAdminSessionAutoRefresh() {
-        if (adminSessionRefreshTimer) clearInterval(adminSessionRefreshTimer);
-        adminSessionRefreshTimer = null;
-        adminSessionRefreshPromise = null;
-    }
-
-async function refreshAdminSession({ reason = "manual", forceLogout = false } = {}) {
-        if (adminSessionRefreshPromise) return adminSessionRefreshPromise;
-        adminSessionRefreshPromise = (async () => {
-            const refreshed = await apiRequest("admin-session-refresh", {
-                method: "POST",
-                body: {}
-            });
-            if (!refreshed?.principal) {
-                throw new Error("Admin session refresh returned incomplete profile.");
-            }
-            adminSessionActive = true;
-            adminPrincipal = refreshed.principal;
-            adminSessionExpiryNoticeShown = false;
-            clearLegacyAdminTokenStorage();
-            startAdminSessionAutoRefresh();
-            return refreshed;
-        })().catch(async error => {
-            if (!(reason === "restore" && error?.status === 401)) {
-                console.error(`Admin session refresh failed (${reason})`, error);
-            }
-            if (forceLogout) await handleAdminSessionExpired();
-            throw error;
-        }).finally(() => {
-            adminSessionRefreshPromise = null;
-        });
-        return adminSessionRefreshPromise;
-    }
-
-async function handleAdminSessionExpired() {
-        if (adminSessionExpiryNoticeShown) return;
-        adminSessionExpiryNoticeShown = true;
-        showToast("Admin session expired. Please sign in again.", "info");
-        await closeAdminPortal();
-    }
-
-function safeParseStorage(key, fallback) {
-    try {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : fallback;
-    } catch (e) {
-        return fallback;
-    }
-}
-
-function rememberAdminLoginEmail(value) {
-    try {
-        localStorage.setItem(ADMIN_LOGIN_EMAIL_KEY, String(value || "").trim().toLowerCase());
-    } catch (e) {}
-}
-
-function restoreAdminLoginEmail() {
-    const input = document.getElementById("admin-email-input");
-    if (!input) return;
-    try {
-        input.value = localStorage.getItem(ADMIN_LOGIN_EMAIL_KEY) || "";
-    } catch (e) {
-        input.value = "";
-    }
-}
-
-function getAdminProfileState() {
-    const fallbackName = adminPrincipal?.email ? String(adminPrincipal.email).split("@")[0] : "Admin";
-    const fallbackEmail = adminPrincipal?.email || "";
-    const stored = adminProfile || {};
-    return {
-        displayName: String(stored?.display_name || fallbackName || "Admin"),
-        contactEmail: String(stored?.contact_email || fallbackEmail),
-        phone: String(stored?.phone || ""),
-        avatar: String(stored?.avatar_url || "")
-    };
-}
-
-function saveAdminProfileState(profile) {
-    adminProfile = profile || null;
-}
-
-function buildAdminRoleLabel() {
-    if (!adminPrincipal) return "Admin";
-    return adminPrincipal.is_super_admin ? "Super Admin" : "Delegated Admin";
-}
-
-function buildAdminPermissionBadges() {
-    if (!adminPrincipal) return [];
-    return [buildAdminRoleLabel(), ...getAdminRoleFeatureLabels(adminPrincipal.permissions)];
-}
-
-function getAdminRoleFeatureLabels(permissions = {}) {
-    const labels = [];
-    if (permissions?.questions_view) labels.push("Questions · View");
-    if (permissions?.questions_create) labels.push("Questions · Add");
-    if (permissions?.questions_edit) labels.push("Questions · Edit");
-    if (permissions?.questions_bulk) labels.push("Questions · Bulk");
-    if (permissions?.flashcards_view) labels.push("Flashcards · View");
-    if (permissions?.flashcards_create) labels.push("Flashcards · Add");
-    if (permissions?.flashcards_edit) labels.push("Flashcards · Edit");
-    if (permissions?.quotes_view) labels.push("Quotes · View");
-    if (permissions?.quotes_create) labels.push("Quotes · Publish");
-    if (permissions?.quotes_edit) labels.push("Quotes · Edit");
-    if (permissions?.roles) labels.push("User Role");
-    return labels;
-}
-
-function renderAdminAvatar(targetId, profile) {
-    const target = document.getElementById(targetId);
-    if (!target) return;
-    const initials = String(profile.displayName || adminPrincipal?.email || "Admin")
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map(part => part[0]?.toUpperCase() || "")
-        .join("") || "EP";
-    if (profile.avatar) {
-        target.innerHTML = `<img src="${escapeHTML(profile.avatar)}" alt="Profile">`;
-    } else {
-        target.textContent = initials;
-    }
-}
-
-function hydrateAdminProfileCard() {
-    const profile = getAdminProfileState();
-    const roleLabel = buildAdminRoleLabel();
-    renderAdminAvatar("admin-avatar-header", profile);
-    renderAdminAvatar("admin-avatar-panel", profile);
-    const accountName = document.getElementById("admin-account-name");
-    const accountRole = document.getElementById("admin-account-role");
-    const summaryName = document.getElementById("admin-profile-summary-name");
-    const summaryEmail = document.getElementById("admin-profile-summary-email");
-    const nameInput = document.getElementById("admin-profile-name");
-    const contactEmailInput = document.getElementById("admin-profile-contact-email");
-    const phoneInput = document.getElementById("admin-profile-phone");
-    const loginEmailInput = document.getElementById("admin-profile-login-email");
-    if (accountName) accountName.textContent = profile.displayName;
-    if (accountRole) accountRole.textContent = roleLabel;
-    if (summaryName) summaryName.textContent = profile.displayName;
-    if (summaryEmail) summaryEmail.textContent = adminPrincipal?.email || profile.contactEmail || "No login email";
-    if (nameInput) nameInput.value = profile.displayName;
-    if (contactEmailInput) contactEmailInput.value = profile.contactEmail;
-    if (phoneInput) phoneInput.value = profile.phone;
-    if (loginEmailInput) loginEmailInput.value = adminPrincipal?.email || "";
-    renderAdminRoleSummary();
-}
-
-function renderAdminRoleSummary() {
-    const title = document.getElementById("admin-role-summary-title");
-    const copy = document.getElementById("admin-role-summary-copy");
-    const badges = document.getElementById("admin-role-summary-badges");
-    if (title) title.textContent = buildAdminRoleLabel();
-    if (copy) copy.textContent = adminPrincipal?.email
-        ? `${adminPrincipal.email} can currently access the permissions below.`
-        : "Permission details will appear here after sign in.";
-    if (badges) {
-        badges.innerHTML = buildAdminPermissionBadges().map(label => `<span class="admin-role-summary-badge">${escapeHTML(label)}</span>`).join("");
-    }
-}
-
-function setAdminAccountPanel(panel) {
-    activeAdminAccountPanel = panel === "role" ? "role" : "profile";
-    document.querySelectorAll("[data-admin-account-panel]").forEach((button) => {
-        button.classList.toggle("active", button.dataset.adminAccountPanel === activeAdminAccountPanel);
-    });
-    document.getElementById("admin-account-panel-profile").hidden = activeAdminAccountPanel !== "profile";
-    document.getElementById("admin-account-panel-role").hidden = activeAdminAccountPanel !== "role";
-}
-
-function toggleAdminAccountMenu(event) {
-    event?.stopPropagation();
-    const account = document.getElementById("admin-account");
-    const trigger = document.getElementById("admin-account-trigger");
-    if (!account || !trigger) return;
-    const open = account.classList.toggle("open");
-    trigger.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) {
-        hydrateAdminProfileCard();
-        setAdminAccountPanel(activeAdminAccountPanel);
-    }
-}
-
-function closeAdminAccountMenu() {
-    const account = document.getElementById("admin-account");
-    const trigger = document.getElementById("admin-account-trigger");
-    if (!account || !account.classList.contains("open")) return;
-    account.classList.remove("open");
-    trigger?.setAttribute("aria-expanded", "false");
-}
-
-async function saveAdminProfileCard() {
-    const profile = {
-        display_name: document.getElementById("admin-profile-name")?.value.trim() || "Admin",
-        contact_email: document.getElementById("admin-profile-contact-email")?.value.trim() || "",
-        phone: document.getElementById("admin-profile-phone")?.value.trim() || "",
-        avatar: getAdminProfileState().avatar
-    };
-    try {
-        const result = await adminApiRequest("admin-profile", { method: "POST", body: profile });
-        saveAdminProfileState(result?.profile || null);
-        hydrateAdminProfileCard();
-        showToast("Profile saved.", "success");
-    } catch (error) {
-        showToast(`Could not save profile: ${error.message || "Unknown error"}`, "error");
-    }
-}
-
-async function handleAdminProfileAvatarUpload(event) {
-    const file = event.target?.files?.[0];
-    if (!file) return;
-    if (!String(file.type || "").toLowerCase().startsWith("image/")) {
-        showToast("Please choose an image file for the profile picture.", "error");
-        event.target.value = "";
-        return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-        showToast("Profile image should be no larger than 2 MB.", "error");
-        event.target.value = "";
-        return;
-    }
-    try {
-        const avatar = await optimizeAdminImageFile(file);
-        if (event.target?.files?.[0] !== file) return;
-        const profile = {
-            display_name: getAdminProfileState().displayName,
-            contact_email: getAdminProfileState().contactEmail,
-            phone: getAdminProfileState().phone,
-            avatar_url: avatar
-        };
-        saveAdminProfileState(profile);
-        hydrateAdminProfileCard();
-        showToast("Profile picture ready. Select Save Profile to keep it.", "info");
-    } catch (error) {
-        event.target.value = "";
-        showToast("Profile image could not be processed.", "error");
-    }
-}
-
-function captureAdminQuestionContext() {
-    return {
-        destMode: document.querySelector("[name='dest-mode']:checked")?.value || "exam",
-        peType: document.querySelector("[name='pe-type']:checked")?.value || PE_BCSC_MAIN_TYPE,
-        catMode: document.querySelector("[name='cat-mode']:checked")?.value || "exist",
-        existingCategory: document.getElementById("adm-cat-select")?.value || "",
-        newCategory: document.getElementById("adm-cat-input")?.value.trim() || "",
-        peTopic: document.getElementById("adm-pe-topic")?.value.trim() || ""
-    };
-}
-
-function rememberAdminQuestionContext(context = captureAdminQuestionContext()) {
-    try {
-        localStorage.setItem(ADMIN_QUESTION_CONTEXT_KEY, JSON.stringify(context));
-    } catch (e) {}
-}
-
-function restoreAdminQuestionContext() {
-    const context = safeParseStorage(ADMIN_QUESTION_CONTEXT_KEY, null);
-    if (!context) return;
-    const destInput = document.querySelector(`[name='dest-mode'][value='${context.destMode || "exam"}']`);
-    if (destInput) destInput.checked = true;
-    const restoredPeType = context.peType === "Mock" ? PE_BCSC_MAIN_TYPE : (context.peType || PE_BCSC_MAIN_TYPE);
-    const peTypeInput = document.querySelector(`[name='pe-type'][value='${restoredPeType}']`);
-    if (peTypeInput) peTypeInput.checked = true;
-    const catModeInput = document.querySelector(`[name='cat-mode'][value='${context.catMode || "exist"}']`);
-    if (catModeInput) catModeInput.checked = true;
-    onDestModeChange();
-    onPeTypeChange();
-    onCatModeChange();
-    if (typeof context.peTopic === "string") {
-        const peTopic = document.getElementById("adm-pe-topic");
-        if (peTopic) peTopic.value = context.peTopic;
-    }
-    const categorySelect = document.getElementById("adm-cat-select");
-    if (categorySelect && context.existingCategory && [...categorySelect.options].some(option => option.value === context.existingCategory)) {
-        categorySelect.value = context.existingCategory;
-    }
-    const newCategoryInput = document.getElementById("adm-cat-input");
-    if (newCategoryInput && typeof context.newCategory === "string") {
-        newCategoryInput.value = context.newCategory;
-    }
-    rememberAdminQuestionContext(captureAdminQuestionContext());
-}
-
-function captureAdminFlashcardContext() {
-    return {
-        scope: document.getElementById("caf-admin-scope")?.value || "Bhutan",
-        catMode: document.querySelector('[name="caf-cat-mode"]:checked')?.value || "exist",
-        existingCategory: document.getElementById("caf-admin-category")?.value || "",
-        newCategory: document.getElementById("caf-admin-category-new")?.value.trim() || ""
-    };
-}
-
-function rememberAdminFlashcardContext(context = captureAdminFlashcardContext()) {
-    try {
-        localStorage.setItem(ADMIN_FLASHCARD_CONTEXT_KEY, JSON.stringify(context));
-    } catch (e) {}
-}
-
-function restoreAdminFlashcardContext() {
-    const context = safeParseStorage(ADMIN_FLASHCARD_CONTEXT_KEY, null);
-    if (!context) return;
-    const scope = document.getElementById("caf-admin-scope");
-    if (scope) scope.value = context.scope || "Bhutan";
-    cafPopulateAdminCategories();
-    cafSetAdminCategoryMode(context.catMode || "exist");
-    const existingCategory = document.getElementById("caf-admin-category");
-    if (existingCategory && context.existingCategory && [...existingCategory.options].some(option => option.value === context.existingCategory)) {
-        existingCategory.value = context.existingCategory;
-    }
-    const newCategory = document.getElementById("caf-admin-category-new");
-    if (newCategory && typeof context.newCategory === "string") {
-        newCategory.value = context.newCategory;
-    }
-    rememberAdminFlashcardContext(captureAdminFlashcardContext());
-}
-
-function adminHasPermission(permission) {
-    return Boolean(adminPrincipal?.permissions?.[permission]);
-}
-
-function getAdminAllowedSections() {
-    const sections = [];
-    if (adminHasPermission("questions")) sections.push("questions");
-    if (adminHasPermission("flashcards")) sections.push("flashcards");
-    if (adminHasPermission("quotes")) sections.push("quotes");
-    if (adminHasPermission("questions")) sections.push("resources");
-    if (adminHasPermission("roles")) sections.push("roles");
-    return sections;
-}
-
-function setAdminSection(section) {
-    const allowedSections = getAdminAllowedSections();
-    const nextSection = allowedSections.includes(section) ? section : allowedSections[0] || "questions";
-    activeAdminSection = nextSection;
-    document.querySelectorAll("[data-admin-section-link]").forEach((button) => {
-        const isActive = button.dataset.adminSectionLink === nextSection;
-        button.classList.toggle("active", isActive);
-        button.setAttribute("aria-current", isActive ? "page" : "false");
-    });
-    document.querySelectorAll("[data-admin-section]").forEach((panel) => {
-        const isActive = panel.dataset.adminSection === nextSection;
-        panel.hidden = !isActive;
-        panel.style.display = isActive ? "" : "none";
-    });
-    const bulkStack = document.querySelector(".admin-side-stack.admin-section-panel[data-admin-section='questions']");
-    if (bulkStack) {
-        const showBulk = nextSection === "questions" && adminHasPermission("questions_bulk");
-        bulkStack.hidden = !showBulk;
-        bulkStack.style.display = showBulk ? "" : "none";
-    }
-    if (nextSection === "resources") void loadAdminPEResources();
-}
-
-function applyAdminPermissions() {
-    const roleOnly = document.querySelector('[data-admin-section-link="roles"]');
-    document.querySelectorAll("[data-admin-section-link]").forEach((button) => {
-        const section = button.dataset.adminSectionLink || "";
-        const allowed = getAdminAllowedSections().includes(section);
-        button.hidden = !allowed;
-    });
-    if (roleOnly) roleOnly.hidden = !adminHasPermission("roles");
-    const questionRegistry = document.querySelector(".admin-question-registry-inline");
-    if (questionRegistry) questionRegistry.hidden = !adminHasPermission("questions_view");
-    const bulkStack = document.querySelector(".admin-side-stack.admin-section-panel[data-admin-section='questions']");
-    if (bulkStack) bulkStack.hidden = !adminHasPermission("questions_bulk");
-    const flashcardRegistry = document.getElementById("caf-admin-registry");
-    if (flashcardRegistry) flashcardRegistry.hidden = !adminHasPermission("flashcards_view");
-    const quoteRegistry = document.getElementById("quote-admin-registry");
-    if (quoteRegistry) quoteRegistry.hidden = !adminHasPermission("quotes_view");
-    const questionSave = document.getElementById("admin-submit-btn");
-    if (questionSave) questionSave.style.display = (adminHasPermission("questions_create") || adminHasPermission("questions_edit")) ? "" : "none";
-    const flashcardSave = document.getElementById("caf-admin-save-btn");
-    if (flashcardSave) flashcardSave.style.display = (adminHasPermission("flashcards_create") || adminHasPermission("flashcards_edit")) ? "" : "none";
-    const quoteSave = document.getElementById("quote-admin-save-btn");
-    if (quoteSave) quoteSave.style.display = (adminHasPermission("quotes_create") || adminHasPermission("quotes_edit")) ? "flex" : "none";
-    const resourceSave = document.getElementById("pe-resource-save-btn");
-    if (resourceSave) resourceSave.style.display = (adminHasPermission("questions_create") || adminHasPermission("questions_edit")) ? "" : "none";
-    setAdminSection(activeAdminSection);
-}
-
-function setAdminSidebarHover(expanded) {
-    const shell = document.getElementById("admin-shell");
-    if (!shell || window.innerWidth <= 820) return;
-    shell.classList.toggle("is-hover-expanded", Boolean(expanded));
-}
-
-function queueAdminSidebarHover(expanded) {
-    if (adminSidebarHoverOpenTimer) {
-        clearTimeout(adminSidebarHoverOpenTimer);
-        adminSidebarHoverOpenTimer = null;
-    }
-    if (adminSidebarHoverCloseTimer) {
-        clearTimeout(adminSidebarHoverCloseTimer);
-        adminSidebarHoverCloseTimer = null;
-    }
-    if (expanded) {
-        adminSidebarHoverOpenTimer = setTimeout(() => {
-            setAdminSidebarHover(true);
-            adminSidebarHoverOpenTimer = null;
-        }, 18);
-        return;
-    }
-    adminSidebarHoverCloseTimer = setTimeout(() => {
-        setAdminSidebarHover(false);
-        adminSidebarHoverCloseTimer = null;
-    }, 165);
-}
-
-async function loadAdminProfile() {
-    const result = await adminApiRequest("admin-profile", { method: "GET" });
-    adminPrincipal = result?.principal || null;
-    saveAdminProfileState(result?.profile || null);
-    return adminPrincipal;
-}
-
-async function loadAdminRoles() {
-    if (!adminHasPermission("roles")) {
-        adminRoles = [];
-        renderAdminRoleRegistry();
-        return [];
-    }
-    const result = await adminApiRequest("admin-roles", { method: "GET" });
-    adminRoles = Array.isArray(result?.roles) ? result.roles : [];
-    renderAdminRoleRegistry();
-    return adminRoles;
-}
-
-function resetAdminRoleForm() {
-    const form = document.getElementById("admin-role-form");
-    if (form) form.reset();
-    const active = document.getElementById("admin-role-active");
-    if (active) active.checked = true;
-    const password = document.getElementById("admin-role-password");
-    if (password) password.value = "";
-    const saveBtn = document.getElementById("admin-role-save-btn");
-    if (saveBtn) saveBtn.textContent = "Save Role";
-}
-
-function startAdminRoleEdit(email) {
-    const role = adminRoles.find(item => String(item.email || "").toLowerCase() === String(email || "").toLowerCase());
-    if (!role || role.is_super_admin) return;
-    document.getElementById("admin-role-email").value = role.email || "";
-    document.getElementById("admin-role-password").value = "";
-    document.getElementById("admin-role-questions-view").checked = Boolean(role.can_questions_view);
-    document.getElementById("admin-role-questions-create").checked = Boolean(role.can_questions_create);
-    document.getElementById("admin-role-questions-edit").checked = Boolean(role.can_questions_edit);
-    document.getElementById("admin-role-questions-bulk").checked = Boolean(role.can_questions_bulk);
-    document.getElementById("admin-role-flashcards-view").checked = Boolean(role.can_flashcards_view);
-    document.getElementById("admin-role-flashcards-create").checked = Boolean(role.can_flashcards_create);
-    document.getElementById("admin-role-flashcards-edit").checked = Boolean(role.can_flashcards_edit);
-    document.getElementById("admin-role-quotes-view").checked = Boolean(role.can_quotes_view);
-    document.getElementById("admin-role-quotes-create").checked = Boolean(role.can_quotes_create);
-    document.getElementById("admin-role-quotes-edit").checked = Boolean(role.can_quotes_edit);
-    document.getElementById("admin-role-active").checked = Boolean(role.active);
-    const saveBtn = document.getElementById("admin-role-save-btn");
-    if (saveBtn) saveBtn.textContent = "Update Role";
-    setAdminSection("roles");
-    document.getElementById("admin-role-form")?.scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-function renderAdminRoleRegistry() {
-    const registry = document.getElementById("admin-role-registry");
-    if (!registry) return;
-    if (!adminHasPermission("roles")) {
-        registry.innerHTML = `<div class="empty-state"><p>Role management is available only to the primary super-admin.</p></div>`;
-        return;
-    }
-    if (!adminRoles.length) {
-        registry.innerHTML = `<div class="empty-state"><p>No delegated admin roles have been assigned yet.</p></div>`;
-        return;
-    }
-    registry.innerHTML = adminRoles.map((role) => {
-        const badges = [];
-        const features = [];
-        if (role.is_super_admin) badges.push(`<span class="role-badge">Super Admin</span>`);
-        badges.push(`<span class="role-badge">${role.active ? "Active" : "Inactive"}</span>`);
-        if (role.can_questions_view) features.push(`<span class="role-feature-pill">Questions · View</span>`);
-        if (role.can_questions_create) features.push(`<span class="role-feature-pill">Questions · Add</span>`);
-        if (role.can_questions_edit) features.push(`<span class="role-feature-pill">Questions · Edit</span>`);
-        if (role.can_questions_bulk) features.push(`<span class="role-feature-pill">Questions · Bulk</span>`);
-        if (role.can_flashcards_view) features.push(`<span class="role-feature-pill">Flashcards · View</span>`);
-        if (role.can_flashcards_create) features.push(`<span class="role-feature-pill">Flashcards · Add</span>`);
-        if (role.can_flashcards_edit) features.push(`<span class="role-feature-pill">Flashcards · Edit</span>`);
-        if (role.can_quotes_view) features.push(`<span class="role-feature-pill">Quotes · View</span>`);
-        if (role.can_quotes_create) features.push(`<span class="role-feature-pill">Quotes · Publish</span>`);
-        if (role.can_quotes_edit) features.push(`<span class="role-feature-pill">Quotes · Edit</span>`);
-        return `
-            <div class="role-row">
-                <div class="role-row-email">
-                    <strong>${escapeHTML(role.email || "")}</strong>
-                </div>
-                <div>
-                    <div class="role-badges">${badges.join("")}</div>
-                    <div class="role-feature-list">${features.join("") || `<span class="role-feature-pill">No active permissions</span>`}</div>
-                </div>
-                <div class="admin-question-actions">${role.is_super_admin
-                    ? `<span class="role-badge">Protected</span>`
-                    : `<button type="button" class="btn-view-sm" data-role-edit-email="${escapeHTML(role.email || "")}">Edit</button>
-                       <button type="button" class="btn-view-sm" data-role-delete-email="${escapeHTML(role.email || "")}">Delete</button>`}
-                </div>
-            </div>
-        `;
-    }).join("");
-    registry.querySelectorAll("[data-role-edit-email]").forEach((button) => {
-        button.addEventListener("click", () => startAdminRoleEdit(button.dataset.roleEditEmail || ""));
-    });
-    registry.querySelectorAll("[data-role-delete-email]").forEach((button) => {
-        button.addEventListener("click", () => { void deleteAdminRole(button.dataset.roleDeleteEmail || ""); });
-    });
-}
-
-async function deleteAdminRole(email) {
-    const normalizedEmail = String(email || "").trim().toLowerCase();
-    if (!normalizedEmail || !window.confirm(`Delete delegated admin ${normalizedEmail}? This removes both login access and its role.`)) return;
-    showLoading(true, "Deleting delegated admin...");
-    try {
-        await adminApiRequest("admin-roles", { method: "DELETE", body: { email: normalizedEmail } });
-        await loadAdminRoles();
-        resetAdminRoleForm();
-        showToast("Delegated admin deleted.", "success");
-    } catch (error) {
-        showToast(`Could not delete delegated admin: ${error.message || "Unknown error"}`, "error");
-    } finally {
-        showLoading(false);
-    }
-}
-
-async function saveAdminRole() {
-    const payload = {
-        email: document.getElementById("admin-role-email")?.value.trim().toLowerCase() || "",
-        password: document.getElementById("admin-role-password")?.value || "",
-        can_questions_view: document.getElementById("admin-role-questions-view")?.checked || false,
-        can_questions_create: document.getElementById("admin-role-questions-create")?.checked || false,
-        can_questions_edit: document.getElementById("admin-role-questions-edit")?.checked || false,
-        can_questions_bulk: document.getElementById("admin-role-questions-bulk")?.checked || false,
-        can_flashcards_view: document.getElementById("admin-role-flashcards-view")?.checked || false,
-        can_flashcards_create: document.getElementById("admin-role-flashcards-create")?.checked || false,
-        can_flashcards_edit: document.getElementById("admin-role-flashcards-edit")?.checked || false,
-        can_quotes_view: document.getElementById("admin-role-quotes-view")?.checked || false,
-        can_quotes_create: document.getElementById("admin-role-quotes-create")?.checked || false,
-        can_quotes_edit: document.getElementById("admin-role-quotes-edit")?.checked || false,
-        active: document.getElementById("admin-role-active")?.checked || false
-    };
-    if (!payload.email) {
-        showToast("Enter the delegated admin email first.", "error");
-        return;
-    }
-    if (payload.password && payload.password.trim().length < 6) {
-        showToast("Delegated admin password must be at least 6 characters.", "error");
-        return;
-    }
-    try {
-        await adminApiRequest("admin-roles", { method: "POST", body: payload });
-        await loadAdminRoles();
-        resetAdminRoleForm();
-        showToast("Admin role saved successfully.", "success");
-    } catch (error) {
-        showToast(`Could not save admin role: ${error.message || "Unknown error"}`, "error");
-    }
-}
-
-    function touchAdminSession() {
-        if (!adminSessionActive || !document.body.classList.contains("admin-mode")) return;
-        persistAdminSession();
-    }
-
-	function formatOptionText(value) {
-	    const text = String(value || "").trim();
-	    const isoDateOnly = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d{3})?Z$/;
-	    if (!isoDateOnly.test(text)) return text;
-
-	    const date = new Date(text);
-	    if (Number.isNaN(date.getTime())) return text;
-
-	    return new Intl.DateTimeFormat("en-GB", {
-	        timeZone: "Asia/Thimphu",
-	        day: "numeric",
-	        month: "long",
-	        year: "numeric"
-	    }).format(date);
-    }
+	function shuffleArray(items) {
+	    const copy = [...items];
+	    for (let i = copy.length - 1; i > 0; i--) {
+	        const j = Math.floor(Math.random() * (i + 1));
+	        [copy[i], copy[j]] = [copy[j], copy[i]];
+	    }
+	    return copy;
+	}
 
     function escapeHTML(value) {
         return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -1101,26 +275,6 @@ async function saveAdminRole() {
 
     function safeMediaSource(value, mediaType) {
         return escapeHTML(safeMediaURL(value, mediaType));
-    }
-
-function getAdminCategory() {
-	    const destMode = document.querySelector("[name='dest-mode']:checked")?.value || "exam";
-	    if (destMode === "pe" || destMode === "pe-online") {
-	        let peType = document.querySelector("[name='pe-type']:checked")?.value || PE_BCSC_MAIN_TYPE;
-            if (destMode === "pe-online" && peType === PE_BCSC_MAIN_TYPE) peType = "Past Paper";
-	        const topic = document.getElementById("adm-pe-topic").value.trim() || "General";
-	        return `__PE__::${peType}::${topic}`;
-	    }
-	    const mode = document.querySelector("[name='cat-mode']:checked").value;
-	    return mode === "exist"
-	        ? document.getElementById("adm-cat-select").value
-	        : document.getElementById("adm-cat-input").value.trim();
-	}
-
-    function getAdminTargetTable(question = null) {
-        if (question?.sourceTable === "PEOnlineExam") return "PEOnlineExam";
-        const destMode = document.querySelector("[name='dest-mode']:checked")?.value || "exam";
-        return destMode === "pe-online" ? "PEOnlineExam" : "Exam";
     }
 
 	// ─── PE CATEGORY ENCODING HELPERS ──────────────────
@@ -1151,6 +305,22 @@ function getAdminCategory() {
 	    return -1;
 	}
 
+	function randomizePEPracticeQuestionSet(questions, { shuffleQuestions = true } = {}) {
+	    const orderedQuestions = shuffleQuestions ? shuffleArray(questions) : [...questions];
+	    return orderedQuestions.map(question => {
+	        const optionItems = (Array.isArray(question.options) ? question.options : [])
+	            .slice(0, 4)
+	            .map((text, originalIndex) => ({ text, originalIndex }));
+	        const shuffledOptions = shuffleArray(optionItems);
+	        return {
+	            ...question,
+	            options: shuffledOptions.map(item => item.text),
+	            _optionOriginalIndexes: shuffledOptions.map(item => item.originalIndex),
+	            _peRandomSort: Math.random()
+	        };
+	    });
+	}
+
 // ─── LOADING ─────────────────────────────────────────
 function showLoading(on, msg = "Loading…") {
     const el = document.getElementById("loading-overlay");
@@ -1176,33 +346,27 @@ function showToast(msg, type = "info") {
 function setEntryActionButtons() {
     const contactBtn = document.getElementById("contact-btn");
     const peBtn = document.getElementById("pe-btn");
-    const adminBtn = document.getElementById("admin-btn");
     const themeBtn = document.getElementById("theme-toggle-btn");
     if (themeBtn) themeBtn.style.display = "inline-flex";
     if (contactBtn) contactBtn.style.display = "block";
-    if (adminBtn) adminBtn.style.display = "block";
     if (peBtn) peBtn.style.display = "none";
 }
 
 function setPostContinueActionButtons() {
     const contactBtn = document.getElementById("contact-btn");
     const peBtn = document.getElementById("pe-btn");
-    const adminBtn = document.getElementById("admin-btn");
     const themeBtn = document.getElementById("theme-toggle-btn");
     if (themeBtn) themeBtn.style.display = "inline-flex";
     if (contactBtn) contactBtn.style.display = "none";
-    if (adminBtn) adminBtn.style.display = "none";
     if (peBtn) peBtn.style.display = "block";
 }
 
 function hideTopActionButtons() {
     const contactBtn = document.getElementById("contact-btn");
     const peBtn = document.getElementById("pe-btn");
-    const adminBtn = document.getElementById("admin-btn");
     const themeBtn = document.getElementById("theme-toggle-btn");
     if (themeBtn) themeBtn.style.display = "none";
     if (contactBtn) contactBtn.style.display = "none";
-    if (adminBtn) adminBtn.style.display = "none";
     if (peBtn) peBtn.style.display = "none";
 }
 
@@ -1222,6 +386,12 @@ function clearDatabaseCache() {
     try { sessionStorage.removeItem(DB_CACHE_KEY); } catch (e) {}
     try { localStorage.removeItem(DB_CACHE_KEY); } catch (e) {}
     questionMediaCache = new Map();
+    categoryMediaPrefetch = { category: "", promise: null };
+    peOnlineMediaPrefetchPromise = null;
+    peTopicMediaPrefetch = new Map();
+    peDIGraphPrefetch = new Map();
+    peDIGraphFingerprintCache = new Map();
+    peTopicQuestionCache = new Map();
     clearPublicApiCache();
 }
 
@@ -1291,26 +461,10 @@ async function fetchApiJson(path, { method = "GET", body, headers = {} } = {}) {
     return data;
 }
 
-async function adminApiRequest(path, { method = "POST", body } = {}) {
-    if (!adminSessionActive) {
-        throw new Error("Admin session is missing. Please sign in again.");
-    }
-    const request = () => apiRequest(path, { method, body });
-    try {
-        return await request();
-    } catch (error) {
-        if (error?.status !== 401) {
-            if (error?.status === 403) await handleAdminSessionExpired();
-            throw error;
-        }
-        await refreshAdminSession({ reason: `retry:${path}`, forceLogout: true });
-        return request();
-    }
-}
 
 function getPublicApiCacheTTL(path) {
     if (path === "questions?view=catalog") return 5 * 60 * 1000;
-    if (path === "questions?view=pe-practice") return 5 * 60 * 1000;
+    if (path === "questions?view=pe-catalog") return 5 * 60 * 1000;
     if (path === "pe-online-questions?view=catalog") return 5 * 60 * 1000;
     if (path === "pe-online-questions?view=all-media") return 10 * 60 * 1000;
     if (path === "flashcards") return 60 * 1000;
@@ -1373,26 +527,21 @@ function mapSecureExamRows(rows) {
 }
 
 async function fetchQuestions() {
-    // Lightweight fetch — excludes image/audio columns, which can each hold
-    // multi-megabyte base64 data. This keeps initial load fast; media is
-    // fetched separately afterward without blocking first render.
-    if (adminSessionActive) {
-        const adminRows = await fetchAdminQuestions();
-        return adminRows.filter(row => row.sourceTable === "Exam");
-    }
-    const rows = await apiRequest("questions?view=pe-practice");
-    return mapExamRows(rows);
+    const rows = await apiRequest("questions?view=pe-catalog");
+    return (rows || []).map(row => ({
+        peType: String(row.peType || ""),
+        topic: String(row.topic || ""),
+        count: Number(row.count || 0)
+    })).filter(row => row.peType && row.topic && row.count > 0);
 }
 
-async function fetchAdminQuestions() {
-    const result = await adminApiRequest("admin-questions", { method: "GET" });
-    const examRows = result?.exam || [];
-    const peOnlineRows = result?.peOnline || [];
-    return [
-        ...mapExamRows(examRows, "Exam"),
-        ...mapExamRows(peOnlineRows, "PEOnlineExam")
-    ].map(row => ({ ...row, _adminMediaLoaded: false }));
+async function fetchPEPracticeTopicQuestions(peType, topic) {
+    const path = `questions?view=pe-practice&pe_type=${encodeURIComponent(peType)}&topic=${encodeURIComponent(topic)}`;
+    return randomizePEPracticeQuestionSet(mapExamRows(await apiRequest(path)), {
+        shuffleQuestions: peType !== "Data Interpretation"
+    });
 }
+
 
 async function loadExamCatalog() {
     const rows = await apiRequest("questions?view=catalog");
@@ -1401,7 +550,6 @@ async function loadExamCatalog() {
     examCatalogReady = categories.length > 0;
     updateCategorySelects();
     const total = [...examCategoryCounts.values()].reduce((sum, count) => sum + count, 0);
-    document.getElementById("q-count").textContent = total;
     const btn = document.getElementById("start-btn");
     btn.disabled = !examCatalogReady;
     btn.innerHTML = examCatalogReady
@@ -1517,8 +665,10 @@ async function fetchPEOnlineQuestionWindow(index) {
 }
 
 async function ensurePEOnlineQuestionLoaded(index) {
-    if (!peOnlineMode || activeData[index]) return activeData[index];
-    await fetchPEOnlineQuestionWindow(index);
+    if (!peOnlineMode) return activeData[index];
+    if (!activeData[index]) {
+        await fetchPEOnlineQuestionWindow(index);
+    }
     if (activeData[index]) {
         await fetchSelectedQuestionMedia([activeData[index]]);
     }
@@ -1526,10 +676,15 @@ async function ensurePEOnlineQuestionLoaded(index) {
 }
 
 async function prefetchPEOnlineQuestion(index) {
-    if (!peOnlineMode || index < 0 || index >= activeData.length || activeData[index]) return;
+    if (!peOnlineMode || index < 0 || index >= activeData.length) return;
     try {
-        const rows = await fetchPEOnlineQuestionWindow(index);
-        const warmable = rows.map(entry => entry.question).filter(Boolean);
+        let warmable = [];
+        if (activeData[index]) {
+            warmable = [activeData[index]];
+        } else {
+            const rows = await fetchPEOnlineQuestionWindow(index);
+            warmable = rows.map(entry => entry.question).filter(Boolean);
+        }
         if (warmable.length) {
             await fetchSelectedQuestionMedia(warmable);
             await warmQuestionAssets(warmable, { reportProgress: false });
@@ -1676,6 +831,53 @@ async function warmQuestionAssets(questions, { reportProgress = true } = {}) {
     }
 }
 
+async function warmMediaRows(mediaRows) {
+    const warmable = (mediaRows || []).map(row => ({
+        imageCode: typeof row.image === "string" ? row.image : "",
+        audioCode: typeof row.audio === "string" ? row.audio : ""
+    }));
+    await warmQuestionAssets(warmable, { reportProgress: false });
+}
+
+async function prefetchCategoryMedia(category, { blockForMs = 0 } = {}) {
+    const normalizedCategory = String(category || "").trim();
+    if (!normalizedCategory) return;
+
+    if (categoryMediaPrefetch.category !== normalizedCategory || !categoryMediaPrefetch.promise) {
+        categoryMediaPrefetch = {
+            category: normalizedCategory,
+            promise: (async () => {
+                const rows = await apiRequest(`questions?view=category-media&category=${encodeURIComponent(normalizedCategory)}`);
+                if (!Array.isArray(rows) || !rows.length) return;
+                cacheMediaRows(rows);
+                await warmMediaRows(rows.filter(row => row.image || row.audio));
+            })().catch(error => {
+                console.error("Category media prefetch failed:", error);
+            })
+        };
+    }
+
+    if (blockForMs > 0) {
+        await Promise.race([
+            categoryMediaPrefetch.promise,
+            new Promise(resolve => setTimeout(resolve, blockForMs))
+        ]);
+    }
+}
+
+function prefetchPEOnlineMedia() {
+    if (peOnlineMediaPrefetchPromise) return peOnlineMediaPrefetchPromise;
+    peOnlineMediaPrefetchPromise = (async () => {
+        const rows = await apiRequest("pe-online-questions?view=all-media");
+        if (!Array.isArray(rows) || !rows.length) return;
+        cacheMediaRows(rows);
+    })().catch(error => {
+        peOnlineMediaPrefetchPromise = null;
+        console.error("PE Online media prefetch failed:", error);
+    });
+    return peOnlineMediaPrefetchPromise;
+}
+
 async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam media…") {
     let mediaLoaderVisible = false;
     const mediaLoaderDelay = setTimeout(() => {
@@ -1711,10 +913,24 @@ async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam m
     }
 }
 
-async function loadDatabase() {
+async function loadDatabase(options = {}) {
+    const silent = Boolean(options.silent);
     if (databaseReady) return true;
-    if (databaseLoading) return false;
+    if (databaseLoadPromise) {
+        if (!silent) showLoading(true, "Opening PE...");
+        const loaded = await databaseLoadPromise;
+        if (!silent) showLoading(false);
+        return loaded;
+    }
     databaseLoading = true;
+    databaseLoadPromise = loadDatabaseOnce(silent).finally(() => {
+        databaseLoading = false;
+        databaseLoadPromise = null;
+    });
+    return databaseLoadPromise;
+}
+
+async function loadDatabaseOnce(silent) {
 
     // ── Cache-first: render instantly if we have data ──
     const cached = sessionStorage.getItem(DB_CACHE_KEY) || localStorage.getItem(DB_CACHE_KEY);
@@ -1722,8 +938,7 @@ async function loadDatabase() {
         try {
             processData(JSON.parse(cached));
             databaseReady = true;
-            databaseLoading = false;
-            if (!examPreparing) showLoading(false);
+            if (!examPreparing && !silent) showLoading(false);
             // Refresh in background silently (no spinner)
             fetchQuestions()
                 .then(data => {
@@ -1738,14 +953,16 @@ async function loadDatabase() {
     }
 
     // ── First-time load with timeout + animated progress ──
-    showLoading(true, "Loading question database…");
-    setLoaderProgress(10);
+    if (!silent) {
+        showLoading(true, "Loading question database…");
+        setLoaderProgress(10);
+    }
 
     // Animate progress bar while waiting
     let prog = 10;
     const progInterval = setInterval(() => {
         prog = Math.min(prog + (Math.random() * 8 + 3), 85);
-        setLoaderProgress(prog);
+        if (!silent) setLoaderProgress(prog);
     }, 400);
     // Use Promise.race for timeout — AbortController causes DataCloneError in sandboxed iframes
     const fetchPromise = fetchQuestions();
@@ -1755,66 +972,80 @@ async function loadDatabase() {
     );
 
     try {
-        document.getElementById("loading-text").textContent = "Fetching questions…";
+        if (!silent) document.getElementById("loading-text").textContent = "Fetching questions…";
         const data = await Promise.race([fetchPromise, timeoutPromise]);
         clearTimeout(timeoutId);
         clearInterval(progInterval);
-        setLoaderProgress(95);
+        if (!silent) setLoaderProgress(95);
 
         saveDatabaseCache(data);
         processData(data);
         databaseReady = true;
 
-        document.getElementById("loading-text").textContent = "Ready!";
-        setLoaderProgress(100);
-        setTimeout(() => {
-            if (!examPreparing) showLoading(false);
-        }, 300);
-        databaseLoading = false;
+        if (!silent) {
+            document.getElementById("loading-text").textContent = "Ready!";
+            setLoaderProgress(100);
+            setTimeout(() => {
+                if (!examPreparing) showLoading(false);
+            }, 300);
+        }
         return true;
 
     } catch (e) {
         clearTimeout(timeoutId);
         clearInterval(progInterval);
-        setLoaderProgress(0);
+        if (!silent) setLoaderProgress(0);
         if (e.message === "TIMEOUT") {
             const fallback = localStorage.getItem(DB_CACHE_KEY);
             if (fallback) {
                 processData(JSON.parse(fallback));
                 databaseReady = true;
-                databaseLoading = false;
-                showToast("Using saved questions. Internet is slow.", "info");
-                showLoading(false);
+                if (!silent) {
+                    showToast("Using saved questions. Internet is slow.", "info");
+                    showLoading(false);
+                }
                 return true;
             }
-            showToast("Database is taking too long. Please try again.", "error");
-            document.getElementById("loading-text").textContent = "Database is taking too long.";
+            if (!silent) {
+                showToast("Database is taking too long. Please try again.", "error");
+                document.getElementById("loading-text").textContent = "Database is taking too long.";
+            }
         } else {
-            showToast("Failed to load question database.", "error");
-            document.getElementById("loading-text").textContent = "Failed to connect.";
+            if (!silent) {
+                showToast("Failed to load question database.", "error");
+                document.getElementById("loading-text").textContent = "Failed to connect.";
+            }
         }
         console.error(e);
-        databaseLoading = false;
-        setTimeout(() => showLoading(false), 1500);
+        if (!silent) setTimeout(() => showLoading(false), 1500);
         return false;
     }
 }
 
 function processData(data) {
-    questionPool = data || [];
-    peQuestionsCache = questionPool.filter(q => isPECategory(q.category));
+    const rows = Array.isArray(data) ? data : [];
+    const isCatalogOnly = rows.every(row => row && Object.hasOwn(row, "peType") && Object.hasOwn(row, "topic") && Object.hasOwn(row, "count"));
+    questionPool = isCatalogOnly ? [] : rows;
+    peQuestionsCache = isCatalogOnly ? [] : questionPool.filter(q => isPECategory(q.category));
     peTopicBuckets = new Map();
-    peQuestionsCache.forEach(q => {
-        const info = parsePECategory(q.category);
-        if (!info) return;
+    const addPETopicBucket = (info, count = 1) => {
         const typeKey = info.peType;
         const allKey = `all::${info.topic}`;
         const typeTopicKey = `${typeKey}::${info.topic}`;
         if (!peTopicBuckets.has(allKey)) peTopicBuckets.set(allKey, { topic: info.topic, peType: typeKey, count: 0 });
         if (!peTopicBuckets.has(typeTopicKey)) peTopicBuckets.set(typeTopicKey, { topic: info.topic, peType: typeKey, count: 0 });
-        peTopicBuckets.get(allKey).count += 1;
-        peTopicBuckets.get(typeTopicKey).count += 1;
-    });
+        peTopicBuckets.get(allKey).count += count;
+        peTopicBuckets.get(typeTopicKey).count += count;
+    };
+    if (isCatalogOnly) {
+        rows.forEach(row => addPETopicBucket({ peType: row.peType, topic: row.topic }, Number(row.count || 0)));
+    } else {
+        peQuestionsCache.forEach(q => {
+            const info = parsePECategory(q.category);
+            if (!info) return;
+            addPETopicBucket(info);
+        });
+    }
     // Exam categories must exclude PE-tagged questions so the normal
     // exam flow (category select, start exam, counts) is unaffected.
     const examQuestions = questionPool.filter(q => !isPECategory(q.category));
@@ -1827,7 +1058,6 @@ function processData(data) {
         examCatalogReady = categories.length > 0;
     }
     updateCategorySelects();
-    renderAdminTable();
     const noData = categories.length === 0;
     const btn = document.getElementById("start-btn");
     btn.disabled = noData;
@@ -1838,28 +1068,22 @@ function processData(data) {
     } else {
         btn.innerHTML = "<span>Continue</span> →";
     }
-    const catalogTotal = [...examCategoryCounts.values()].reduce((sum, count) => sum + count, 0);
-    document.getElementById("q-count").textContent = examQuestions.length || catalogTotal;
     if (document.getElementById("pe-view") && document.getElementById("pe-view").style.display !== "none") {
-        renderPEHomeGrid();
-        renderPEMockGrid();
-        renderPEPastGrid();
-        renderPEDIGrid();
-        updatePEOnlineCount();
+        const activePanel = document.querySelector(".pe-content .pe-section.active")?.id;
         if (peActiveTopic) renderPEQuestionList();
-        if (peDIActiveSet) renderPEDIQuestion();
+        else if (peDIActiveSet) renderPEDIQuestion();
+        else if (activePanel) renderPEPanel(activePanel);
     }
 }
 
 function updateCategorySelects() {
-    ["category-select", "adm-cat-select"].forEach(id => {
+    ["category-select"].forEach(id => {
         const sel = document.getElementById(id);
         if (!sel) return;
         sel.innerHTML = categories.length === 0
             ? `<option>No categories available</option>`
             : categories.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join("");
     });
-    restoreAdminQuestionContext();
     updateTestSummary();
 }
 
@@ -1893,6 +1117,147 @@ function updateTestSummary() {
 
 }
 
+function queueSelectedCategoryMediaPrefetch(options = {}) {
+    if (!examCatalogReady) return;
+    const select = document.getElementById("category-select");
+    const category = String(select?.value || "").trim();
+    if (!category) return;
+    void prefetchCategoryMedia(category, options).catch(() => {});
+}
+
+function queuePEOnlineMediaPrefetch() {
+    void Promise.resolve(prefetchPEOnlineMedia()).catch(() => {});
+}
+
+function getPETopicQuestions(peType, topic) {
+    const key = getPETopicPrefetchKey(peType, topic);
+    if (peTopicQuestionCache.has(key)) return peTopicQuestionCache.get(key);
+    return getPEQuestions().filter(q => {
+        const info = parsePECategory(q.category);
+        return info.peType === peType && info.topic === topic;
+    });
+}
+
+function getPETopicPrefetchKey(peType, topic) {
+    return `${String(peType || "").trim()}::${String(topic || "").trim()}`;
+}
+
+async function prefetchPETopicMedia(peType, topic, { blockForMs = 0 } = {}) {
+    if (peType === "Data Interpretation") return;
+
+    const key = getPETopicPrefetchKey(peType, topic);
+    if (!key) return;
+
+    if (!peTopicMediaPrefetch.has(key)) {
+        const topicQuestions = getPETopicQuestions(peType, topic);
+        if (!topicQuestions.length) return;
+
+        const warmable = topicQuestions.filter(q => q.imageCode || q.audioCode).slice(0, 3);
+        const promise = (async () => {
+            await fetchSelectedQuestionMedia(topicQuestions);
+            if (warmable.length) {
+                await warmQuestionAssets(warmable, { reportProgress: false });
+            }
+        })().catch(error => {
+            peTopicMediaPrefetch.delete(key);
+            console.error("PE topic media prefetch failed:", error);
+        });
+
+        peTopicMediaPrefetch.set(key, promise);
+    }
+
+    const existingPromise = peTopicMediaPrefetch.get(key);
+    if (blockForMs > 0 && existingPromise) {
+        await Promise.race([
+            existingPromise,
+            new Promise(resolve => setTimeout(resolve, blockForMs))
+        ]);
+    }
+}
+
+async function ensurePETopicQuestions(peType, topic, { force = false } = {}) {
+    const key = getPETopicPrefetchKey(peType, topic);
+    if (!force && peTopicQuestionCache.has(key)) return peTopicQuestionCache.get(key);
+    const questions = await fetchPEPracticeTopicQuestions(peType, topic);
+    peTopicQuestionCache.set(key, questions);
+    return questions;
+}
+
+function clearPETopicQuestionsFromMemory(peType, topic) {
+    const key = getPETopicPrefetchKey(peType, topic);
+    peTopicQuestionCache.delete(key);
+    peTopicMediaPrefetch.delete(key);
+}
+
+function clearActivePEPracticeMemory() {
+    if (peGuideCarouselTimer) {
+        clearInterval(peGuideCarouselTimer);
+        peGuideCarouselTimer = null;
+    }
+    if (peActiveTopic) {
+        clearPETopicQuestionsFromMemory(peActiveTopic.peType, peActiveTopic.topic);
+    }
+    if (peDIActiveSet) {
+        clearPETopicQuestionsFromMemory("Data Interpretation", peDIActiveSet);
+        peDIGraphPrefetch.delete(String(peDIActiveSet || "").trim());
+    }
+    pePracticeQuestionsByDomId.clear();
+    const topicContainer = document.getElementById("pe-questions-container");
+    const diContainer = document.getElementById("pe-di-questions-container");
+    const diChart = document.getElementById("pe-di-chart-img");
+    if (topicContainer) topicContainer.innerHTML = "";
+    if (diContainer) diContainer.innerHTML = "";
+    if (diChart) diChart.removeAttribute("src");
+}
+
+async function prefetchPEDISetGraph(setName, { blockForMs = 0 } = {}) {
+    const normalizedSetName = String(setName || "").trim();
+    if (!normalizedSetName) return;
+
+    if (!peDIGraphPrefetch.has(normalizedSetName)) {
+        const setQuestions = getPEDISetQuestions(normalizedSetName);
+        if (!setQuestions.length) return;
+
+        const promise = (async () => {
+            // A reused set name can contain more than one chart. Fetch every
+            // question's media so each newly uploaded chart can begin its own
+            // group instead of silently inheriting the first chart forever.
+            await fetchSelectedQuestionMedia(setQuestions, { persistCache: false });
+            await preparePEDIGraphFingerprints(normalizedSetName);
+            const graphSources = [...new Set(setQuestions
+                .map(question => safeMediaURL(question.imageCode, "image"))
+                .filter(Boolean))];
+            if (graphSources[0]) await preloadImageAsset(graphSources[0]);
+            graphSources.slice(1).forEach(source => {
+                void preloadImageAsset(source);
+            });
+            const audioQuestions = setQuestions.filter(q => q.audioCode).slice(0, 2);
+            if (audioQuestions.length) {
+                await warmQuestionAssets(audioQuestions, { reportProgress: false });
+            }
+        })().catch(error => {
+            peDIGraphPrefetch.delete(normalizedSetName);
+            console.error("PE DI graph prefetch failed:", error);
+        });
+
+        peDIGraphPrefetch.set(normalizedSetName, promise);
+    }
+
+    const existingPromise = peDIGraphPrefetch.get(normalizedSetName);
+    if (blockForMs > 0 && existingPromise) {
+        await Promise.race([
+            existingPromise,
+            new Promise(resolve => setTimeout(resolve, blockForMs))
+        ]);
+    }
+}
+
+function handleCategorySelectionChange() {
+    updateTestSummary();
+    if (!setupContinued) return;
+    queueSelectedCategoryMediaPrefetch();
+}
+
 // ─── EXAM START ───────────────────────────────────────
 async function startExam() {
     if (examPreparing) return;
@@ -1921,6 +1286,7 @@ async function startExam() {
             btn.innerHTML = "<span>Begin Examination</span> →";
             btn.disabled = false;
             setPostContinueActionButtons();
+            queueSelectedCategoryMediaPrefetch();
             document.getElementById("category-select").focus();
             examPreparing = false;
             showLoading(false);
@@ -2224,10 +1590,10 @@ function syncNormalSubmitVisibility() {
     if (!activeData.length) return;
     const canSubmit = responses[activeData.length - 1] !== null;
     document.querySelectorAll(".normal-submit-btn").forEach(btn => {
-        btn.style.display = canSubmit ? "" : "none";
+        btn.classList.toggle("is-hidden", !canSubmit);
     });
     document.querySelectorAll(".normal-submit-hint").forEach(hint => {
-        hint.style.display = canSubmit ? "none" : "";
+        hint.classList.toggle("is-hidden", canSubmit);
     });
 }
 
@@ -2471,193 +1837,6 @@ async function submitExam() {
     }
 }
 
-// ─── ADMIN ────────────────────────────────────────────
-function openAdminPortal() {
-    if (adminSessionActive) {
-        restoreAdminPortal();
-        return;
-    }
-    document.body.classList.remove("admin-mode");
-    document.getElementById("admin-view")?.classList.add("is-hidden");
-    document.getElementById("admin-top-tools")?.classList.add("is-hidden");
-    document.getElementById("admin-back-btn")?.classList.add("is-hidden");
-    resetAdminGateway();
-    restoreAdminLoginEmail();
-    setAdminAuthMode("password");
-    const emailInput = document.getElementById("admin-email-input");
-    const input = document.getElementById("admin-pw-input");
-    const errMsg = document.getElementById("pw-error");
-    const passwordEye = document.getElementById("pw-eye");
-    ensureAdminModalOpen();
-    if (input) input.type = "password";
-    if (passwordEye) passwordEye.textContent = "👁";
-    errMsg?.classList.remove("visible");
-    emailInput?.classList.remove("error-shake");
-    input?.classList.remove("error-shake");
-    setTimeout(() => (emailInput?.value ? input : emailInput)?.focus(), 280);
-}
-
-function closeAdminModal() {
-    document.getElementById("admin-modal").classList.remove("open");
-}
-
-function shouldLockAdminGateway() {
-    const modal = document.getElementById("admin-modal");
-    return Boolean(modal && !adminSessionActive && document.body.classList.contains("admin-site"));
-}
-
-function ensureAdminModalOpen() {
-    const modal = document.getElementById("admin-modal");
-    if (!modal) return;
-    modal.classList.add("open");
-}
-
-function focusAdminGatewayPrimaryField() {
-    if (adminOtpState) {
-        focusAdminOtpDigit(0);
-        return;
-    }
-    const emailInput = document.getElementById("admin-email-input");
-    const passwordInput = document.getElementById("admin-pw-input");
-    const target = emailInput?.value ? passwordInput : emailInput;
-    target?.focus();
-}
-
-function keepAdminModalLocked(event) {
-    if (!shouldLockAdminGateway()) return;
-    const modal = document.getElementById("admin-modal");
-    const modalBox = document.getElementById("modal-box");
-    if (!modal || !modalBox) return;
-    ensureAdminModalOpen();
-    if (event.target === modal || !modalBox.contains(event.target)) {
-        event.preventDefault();
-        event.stopPropagation();
-        setTimeout(() => focusAdminGatewayPrimaryField(), 0);
-    }
-}
-
-function clearAdminGatewayFields() {
-    const errorMessage = document.getElementById("pw-error");
-    errorMessage?.classList.remove("visible");
-
-    if (adminOtpState) {
-        clearAdminOtpDigits();
-        document.getElementById("admin-mfa-input")?.classList.remove("error-shake");
-        focusAdminOtpDigit(0);
-        return;
-    }
-
-    const emailInput = document.getElementById("admin-email-input");
-    const passwordInput = document.getElementById("admin-pw-input");
-    if (emailInput) {
-        emailInput.value = "";
-        emailInput.classList.remove("error-shake");
-    }
-    if (passwordInput) {
-        passwordInput.value = "";
-        passwordInput.classList.remove("error-shake");
-    }
-    emailInput?.focus();
-}
-
-function resetAdminGateway() {
-    adminOtpState = null;
-    restoreAdminLoginEmail();
-    const passwordInput = document.getElementById("admin-pw-input");
-    const otpInput = document.getElementById("admin-mfa-input");
-    const errMsg = document.getElementById("pw-error");
-    const authBtn = document.getElementById("admin-modal-auth-btn");
-    if (passwordInput) {
-        passwordInput.value = "";
-        passwordInput.disabled = false;
-        passwordInput.classList.remove("error-shake");
-    }
-    if (otpInput) {
-        otpInput.value = "";
-        otpInput.disabled = false;
-        otpInput.classList.remove("error-shake");
-    }
-    clearAdminOtpDigits();
-    if (authBtn) {
-        authBtn.disabled = false;
-        authBtn.classList.remove("is-hidden");
-        authBtn.style.display = "";
-        authBtn.setAttribute("aria-hidden", "false");
-        authBtn.closest(".modal-btn-row")?.classList.remove("is-otp-mode");
-    }
-    if (errMsg) {
-        errMsg.textContent = "⚠ Incorrect password. Please try again.";
-        errMsg.classList.remove("visible");
-    }
-}
-
-function setAdminAuthMode(mode) {
-    const subtitle = document.getElementById("admin-modal-subtitle");
-    const emailWrap = document.getElementById("admin-email-wrap");
-    const emailInput = document.getElementById("admin-email-input");
-    const passwordWrap = document.getElementById("admin-pw-wrap");
-    const passwordInput = document.getElementById("admin-pw-input");
-    const passwordEye = document.getElementById("pw-eye");
-    const otpWrap = document.getElementById("admin-mfa-wrap");
-    const otpInput = document.getElementById("admin-mfa-input");
-    const authBtn = document.getElementById("admin-modal-auth-btn");
-    const actionRow = authBtn?.closest(".modal-btn-row");
-    const isOtp = mode === "otp";
-    if (subtitle) {
-        subtitle.textContent = isOtp
-            ? `Enter the 6-digit code${adminOtpState?.destination ? ` sent to ${adminOtpState.destination}` : ""}`
-            : "Enter admin email and password";
-    }
-    if (emailWrap) emailWrap.classList.toggle("is-hidden", isOtp);
-    if (emailInput) emailInput.disabled = isOtp;
-    if (passwordWrap) passwordWrap.classList.toggle("is-hidden", isOtp);
-    if (passwordInput) passwordInput.disabled = isOtp;
-    if (passwordEye) passwordEye.classList.toggle("is-hidden", isOtp);
-    if (otpWrap) otpWrap.classList.toggle("is-hidden", !isOtp);
-    if (otpInput) otpInput.disabled = !isOtp;
-    getAdminOtpDigitInputs().forEach(input => {
-        input.disabled = !isOtp;
-    });
-    if (authBtn) {
-        authBtn.classList.toggle("is-hidden", isOtp);
-        authBtn.style.display = isOtp ? "none" : "";
-        authBtn.setAttribute("aria-hidden", isOtp ? "true" : "false");
-        authBtn.disabled = isOtp;
-    }
-    actionRow?.classList.toggle("is-otp-mode", isOtp);
-}
-
-function showAdminAuthError(message) {
-    const input = adminOtpState
-        ? document.querySelector('.otp-digit-input')
-        : document.getElementById("admin-pw-input");
-    const errMsg = document.getElementById("pw-error");
-    const authBtn = document.getElementById("admin-modal-auth-btn");
-    if (input) {
-        input.disabled = false;
-        if (adminOtpState) {
-            clearAdminOtpDigits();
-            getAdminOtpDigitInputs().forEach(digitInput => {
-                digitInput.classList.remove("error-shake");
-                void digitInput.offsetWidth;
-                digitInput.classList.add("error-shake");
-                digitInput.disabled = false;
-            });
-        } else {
-            input.value = "";
-            input.classList.remove("error-shake");
-            void input.offsetWidth;
-            input.classList.add("error-shake");
-        }
-    }
-    if (authBtn) authBtn.disabled = Boolean(adminOtpState);
-    if (errMsg) {
-        errMsg.textContent = message;
-        errMsg.classList.add("visible");
-    }
-    ensureAdminModalOpen();
-    setTimeout(() => input?.focus(), 120);
-}
 
 let contactCaptchaAnswer = 0;
 
@@ -2744,404 +1923,8 @@ async function submitContactForm() {
     }
 }
 
-function togglePwVisibility() {
-    const input = document.getElementById("admin-pw-input");
-    const eye   = document.getElementById("pw-eye");
-    if (!input || !eye) return;
-    if (input.type === "password") {
-        input.type = "text";
-        eye.textContent = "🙈";
-    } else {
-        input.type = "password";
-        eye.textContent = "👁";
-    }
-    input.focus();
-}
-
-function getAdminOtpDigitInputs() {
-    return Array.from(document.querySelectorAll(".otp-digit-input"));
-}
-
-function syncAdminOtpHiddenValue() {
-    const hiddenInput = document.getElementById("admin-mfa-input");
-    if (!hiddenInput) return;
-    hiddenInput.value = getAdminOtpDigitInputs().map(input => String(input.value || "").replace(/\D/g, "").slice(0, 1)).join("");
-}
-
-function focusAdminOtpDigit(index) {
-    const inputs = getAdminOtpDigitInputs();
-    const target = inputs[index];
-    if (target) target.focus();
-}
-
-function clearAdminOtpDigits() {
-    getAdminOtpDigitInputs().forEach(input => {
-        input.value = "";
-        input.classList.remove("error-shake");
-    });
-    syncAdminOtpHiddenValue();
-}
-
-function handleAdminOtpDigitInput(event, index) {
-    const input = event.target;
-    let value = String(input.value || "").replace(/\D/g, "");
-    if (value.length > 1) {
-        const digits = value.slice(0, 6).split("");
-        const inputs = getAdminOtpDigitInputs();
-        digits.forEach((digit, offset) => {
-            if (inputs[index + offset]) inputs[index + offset].value = digit;
-        });
-        value = digits[0] || "";
-    }
-    input.value = value.slice(0, 1);
-    syncAdminOtpHiddenValue();
-    if (input.value && index < 5) focusAdminOtpDigit(index + 1);
-    if (document.getElementById("admin-mfa-input")?.value.length === 6) {
-        focusAdminOtpDigit(5);
-        authenticateAdmin();
-    }
-}
-
-function handleAdminOtpDigitKeydown(event, index) {
-    const input = event.target;
-    if (event.key === "Backspace" && !input.value && index > 0) {
-        focusAdminOtpDigit(index - 1);
-        return;
-    }
-    if (event.key === "ArrowLeft" && index > 0) {
-        event.preventDefault();
-        focusAdminOtpDigit(index - 1);
-        return;
-    }
-    if (event.key === "ArrowRight" && index < 5) {
-        event.preventDefault();
-        focusAdminOtpDigit(index + 1);
-        return;
-    }
-    if (event.key === "Enter") {
-        event.preventDefault();
-        authenticateAdmin();
-    }
-}
-
-async function requestAdminEmailOtp(password) {
-    const email = document.getElementById("admin-email-input")?.value.trim().toLowerCase() || "";
-    rememberAdminLoginEmail(email);
-    const result = await apiRequest("admin-otp-request", {
-        method: "POST",
-        body: { email, password }
-    });
-    adminOtpState = {
-        requestId: String(result.request_id || ""),
-        destination: String(result.destination || "")
-    };
-    return adminOtpState;
-}
-
-async function verifyAdminEmailOtp(code) {
-    if (!adminOtpState?.requestId) {
-        throw new Error("Verification session expired");
-    }
-    const result = await apiRequest("admin-otp-verify", {
-        method: "POST",
-        body: {
-            request_id: adminOtpState.requestId,
-            code
-        }
-    });
-    if (!result?.principal) {
-        throw new Error("Verification session expired");
-    }
-    adminSessionActive = true;
-    adminPrincipal = result.principal;
-    adminOtpState = null;
-    persistAdminSession();
-    startAdminSessionAutoRefresh();
-}
-
-async function authenticateAdmin() {
-    if (adminAuthenticationPending) return;
-    const emailInput = document.getElementById("admin-email-input");
-    const passwordInput  = document.getElementById("admin-pw-input");
-    const otpInput = document.getElementById("admin-mfa-input");
-    const otpDigitInputs = getAdminOtpDigitInputs();
-    const errMsg = document.getElementById("pw-error");
-    const authBtn = document.getElementById("admin-modal-auth-btn");
-    const activeInput = adminOtpState ? otpInput : passwordInput;
-    const credentialValue = adminOtpState ? otpInput.value.trim() : passwordInput.value;
-    if (!adminOtpState && !emailInput?.value.trim()) {
-        emailInput?.classList.remove("error-shake");
-        void emailInput?.offsetWidth;
-        emailInput?.classList.add("error-shake");
-        errMsg.textContent = "⚠ Please enter your admin email.";
-        errMsg.classList.add("visible");
-        emailInput?.focus();
-        return;
-    }
-    if (!credentialValue) {
-        activeInput.classList.remove("error-shake");
-        void activeInput.offsetWidth;
-        activeInput.classList.add("error-shake");
-        errMsg.textContent = adminOtpState
-            ? "⚠ Please enter the 6-digit verification code."
-            : "⚠ Please enter your password.";
-        errMsg.classList.add("visible");
-        activeInput.focus();
-        return;
-    }
-    adminAuthenticationPending = true;
-    errMsg.classList.remove("visible");
-    if (emailInput) emailInput.disabled = true;
-    passwordInput.disabled = true;
-    otpInput.disabled = true;
-    otpDigitInputs.forEach(input => { input.disabled = true; });
-    if (authBtn) authBtn.disabled = true;
-    closeAdminModal();
-    showLoading(true, "Connecting...");
-    if (adminOtpState) {
-        try {
-            await verifyAdminEmailOtp(credentialValue);
-            try {
-                await showAdminPortal();
-            } catch (portalError) {
-                throw new Error("Admin portal open failed");
-            }
-            showToast("Admin access granted.", "success");
-        } catch (error) {
-            adminSessionActive = false;
-            document.body.classList.remove("admin-mode");
-            const errorText = String(error?.message || "");
-            const message = /portal/i.test(errorText)
-                ? "⚠ Admin portal could not be opened. Please try again."
-                : /expired/i.test(errorText) || /session/i.test(errorText)
-                ? "⚠ Verification expired. Please enter password again."
-                : error?.status === 429 || /attempt/i.test(errorText)
-                ? "⚠ Too many incorrect codes. Please enter password again."
-                : "⚠ Incorrect verification code. Please try again.";
-            if (/expired|session|attempt/i.test(errorText) || error?.status === 429) {
-                resetAdminGateway();
-                setAdminAuthMode("password");
-            }
-            showAdminAuthError(message);
-        } finally {
-            adminAuthenticationPending = false;
-            showLoading(false);
-            if (emailInput) emailInput.disabled = false;
-            passwordInput.disabled = false;
-            otpInput.disabled = false;
-            otpDigitInputs.forEach(input => { input.disabled = false; });
-            if (authBtn) authBtn.disabled = Boolean(adminOtpState);
-        }
-        return;
-    }
-    try {
-        const pendingOtp = await requestAdminEmailOtp(credentialValue);
-        if (pendingOtp?.requestId) {
-            setAdminAuthMode("otp");
-            ensureAdminModalOpen();
-            showLoading(false);
-            passwordInput.disabled = false;
-            otpInput.disabled = false;
-            otpDigitInputs.forEach(input => { input.disabled = false; });
-            if (authBtn) authBtn.disabled = true;
-            showToast("Verification code sent to email.", "success");
-            setTimeout(() => focusAdminOtpDigit(0), 120);
-            return;
-        }
-    } catch (error) {
-        adminSessionActive = false;
-        adminOtpState = null;
-        document.body.classList.remove("admin-mode");
-        const errorText = String(error?.message || "");
-        const errorCode = String(error?.code || "");
-        const message = errorCode === "security_not_configured"
-            ? "⚠ Admin email verification is not configured yet."
-            : errorCode === "otp_sender_not_configured"
-            ? "⚠ Delegated verification email sender is not configured."
-            : error?.status === 429
-            ? "⚠ Too many attempts. Please wait 10 minutes and try again."
-            : errorCode === "otp_delivery_failed" || /delivery/i.test(errorText)
-            ? "⚠ Verification code could not be sent. Please try again."
-            : "⚠ Admin password is incorrect. Please try again.";
-        showAdminAuthError(message);
-    } finally {
-        adminAuthenticationPending = false;
-        showLoading(false);
-        if (emailInput) emailInput.disabled = false;
-        passwordInput.disabled = false;
-        otpInput.disabled = false;
-        otpDigitInputs.forEach(input => { input.disabled = false; });
-        if (authBtn) authBtn.disabled = Boolean(adminOtpState);
-    }
-}
-
-async function showAdminPortal() {
-    document.body.classList.add("admin-mode");
-    persistAdminSession();
-    startAdminSessionAutoRefresh();
-    clearPublicApiCache();
-    document.getElementById("admin-shell")?.classList.remove("is-hover-expanded");
-    document.getElementById("admin-shell")?.classList.add("is-collapsed");
-    await loadAdminProfile();
-    // The gateway is open by default in the HTML. Close it after the saved
-    // token has been verified so a page refresh reveals the restored portal.
-    closeAdminModal();
-    hydrateAdminProfileCard();
-    const topTools = document.getElementById("admin-top-tools");
-    topTools?.classList.remove("is-hidden");
-    const portalLoads = await Promise.allSettled([
-        adminHasPermission("questions_view") ? fetchAdminQuestions() : Promise.resolve([]),
-        adminHasPermission("flashcards_view") ? caLoadState({ render: false, force: true }) : Promise.resolve(),
-        adminHasPermission("quotes_view") ? loadDailyQuotes({ fresh: true }) : Promise.resolve(),
-        adminHasPermission("roles") ? loadAdminRoles() : Promise.resolve([])
-    ]);
-    const adminQuestions = portalLoads[0].status === "fulfilled" ? portalLoads[0].value : [];
-    const failedLoads = portalLoads.filter(result => result.status === "rejected");
-    if (failedLoads.length) {
-        console.error("Some admin data could not be loaded", failedLoads.map(result => result.reason));
-        showToast("Signed in. Some admin data could not be loaded; refresh to retry.", "info");
-    }
-    questionPool = [];
-    categories = [];
-    processData(adminQuestions || []);
-    if (!adminHasPermission("flashcards")) {
-        cafNotes = [];
-        cafStateLoaded = false;
-    }
-    if (!adminHasPermission("quotes")) dailyQuotes = [];
-    databaseReady = true;
-    document.getElementById("q-count").textContent = questionPool.length;
-    caHydrateAdminControls();
-    caRenderAll();
-    applyAdminPermissions();
-    document.getElementById("setup-view").style.display = "none";
-    document.getElementById("admin-view")?.classList.remove("is-hidden");
-    hideTopActionButtons();
-    document.getElementById("admin-back-btn")?.classList.remove("is-hidden");
-}
-
-async function loadAdminQuestionMedia(idx) {
-    const question = questionPool[idx];
-    if (!question || question._adminMediaLoaded || question.id === undefined || question.id === null) return question;
-    const table = question.sourceTable === "PEOnlineExam" ? "PEOnlineExam" : "Exam";
-    const rows = await adminApiRequest(
-        `admin-question-media?table=${encodeURIComponent(table)}&id=${encodeURIComponent(question.id)}`,
-        { method: "GET" }
-    );
-    const media = rows?.[0] || {};
-    question.imageCode = typeof media.image === "string" ? media.image : "";
-    question.audioCode = typeof media.audio === "string" ? media.audio : "";
-    question._adminMediaLoaded = true;
-    return question;
-}
-
-async function restoreAdminPortal() {
-    await showAdminPortal();
-}
-
-async function closeAdminPortal() {
-    const shouldLogoutBackend = adminSessionActive;
-    if (shouldLogoutBackend) {
-        await apiRequest("admin-logout", { method: "POST", body: {} }).catch(() => {});
-    }
-    document.body.classList.remove("admin-mode");
-    adminSessionActive = false;
-    adminOtpState = null;
-    adminPrincipal = null;
-    adminRoles = [];
-    document.getElementById("admin-shell")?.classList.remove("is-hover-expanded");
-    closeAdminAccountMenu();
-    clearAdminSession();
-    clearDatabaseCache();
-    questionPool = [];
-    databaseReady = false;
-    cancelQuestionEdit();
-    const topTools = document.getElementById("admin-top-tools");
-    topTools?.classList.add("is-hidden");
-    document.getElementById("admin-view")?.classList.add("is-hidden");
-    document.getElementById("admin-back-btn")?.classList.add("is-hidden");
-    resetAdminGateway();
-    setAdminAuthMode("password");
-    ensureAdminModalOpen();
-    setTimeout(() => document.getElementById("admin-email-input")?.focus(), 120);
-}
-
-function onCatModeChange() {
-    const isNew = document.querySelector("[name='cat-mode']:checked").value === "new";
-    document.getElementById("exist-wrap").style.display = isNew ? "none" : "block";
-    document.getElementById("new-wrap").style.display   = isNew ? "block" : "none";
-    document.getElementById("pill-exist").classList.toggle("active", !isNew);
-    document.getElementById("pill-new").classList.toggle("active", isNew);
-    rememberAdminQuestionContext();
-    updateBulkImportPreview();
-}
-
-function onDestModeChange() {
-    const destMode = document.querySelector("[name='dest-mode']:checked").value;
-    const isPE = destMode === "pe" || destMode === "pe-online";
-    const isPEOnline = destMode === "pe-online";
-    document.getElementById("pe-type-wrap").style.display = isPE ? "block" : "none";
-    document.getElementById("exam-cat-wrap").style.display = isPE ? "none" : "block";
-    document.getElementById("pill-exam").classList.toggle("active", !isPE);
-    document.getElementById("pill-pe").classList.toggle("active", destMode === "pe");
-    document.getElementById("pill-pe-online").classList.toggle("active", isPEOnline);
-    const bcscPill = document.getElementById("pill-pe-mock");
-    const bcscInput = bcscPill?.querySelector("input");
-    if (bcscPill) bcscPill.style.display = isPEOnline ? "none" : "";
-    if (bcscInput) {
-        bcscInput.disabled = isPEOnline;
-        if (isPEOnline && bcscInput.checked) {
-            const pastInput = document.querySelector("[name='pe-type'][value='Past Paper']");
-            if (pastInput) pastInput.checked = true;
-        }
-    }
-    // Exam category fields are required only when targeting the exam bank
-    document.getElementById("adm-cat-input").required = false;
-    onPeTypeChange();
-    updateBulkDestinationBanner();
-    rememberAdminQuestionContext();
-    updateBulkImportPreview();
-}
-
-function onPeTypeChange() {
-    const peType = document.querySelector("[name='pe-type']:checked")?.value || PE_BCSC_MAIN_TYPE;
-    const isPast = peType === "Past Paper";
-    const isDI = peType === "Data Interpretation";
-    document.getElementById("pill-pe-mock").classList.toggle("active", peType === PE_BCSC_MAIN_TYPE);
-    document.getElementById("pill-pe-past").classList.toggle("active", isPast);
-    document.getElementById("pill-pe-di").classList.toggle("active", isDI);
-    document.getElementById("pe-di-note").style.display = isDI ? "block" : "none";
-    document.getElementById("adm-pe-topic-label").textContent = isDI ? "Set Name (same name groups questions under one chart)" : "Topic / Paper Name";
-    document.getElementById("adm-pe-topic").placeholder = isDI ? "e.g., Sales Chart 2023, Bar Graph Set 1" : "e.g., Problems on Trains, RCSC 2024 Paper 1";
-    updateBulkDestinationBanner();
-    rememberAdminQuestionContext();
-    updateBulkImportPreview();
-}
-
-// Keeps the banner above the bulk-paste textarea in sync with whatever
-// the Destination/PE-type/topic controls are currently set to, so it's
-// never ambiguous which category bulk-pasted questions will land in.
-function updateBulkDestinationBanner() {
-    const label = document.getElementById("bulk-destination-label");
-    const banner = document.getElementById("bulk-destination-banner");
-    if (!label || !banner) return;
-    const destMode = document.querySelector("[name='dest-mode']:checked")?.value || "exam";
-    if (destMode === "pe" || destMode === "pe-online") {
-        const peType = document.querySelector("[name='pe-type']:checked")?.value || PE_BCSC_MAIN_TYPE;
-        label.textContent = destMode === "pe-online" ? `🧪 PE Online → ${peType}` : `📚 PE → ${peType}`;
-        banner.style.background = "#e8f5e9";
-        banner.style.borderColor = "#2f9e44";
-        banner.style.color = "#1b5e20";
-    } else {
-        label.textContent = "Exam Question Bank";
-        banner.style.background = "#fff8e1";
-        banner.style.borderColor = "#f5d76e";
-        banner.style.color = "#7a5c00";
-    }
-}
-
-// ════════════════════════════════════════════════════════
 // ─── CURRENT AFFAIR FLASHCARD WALL MODULE ──────────────
+
 const cafSubcategories = {
     Bhutan: ["Sports", "Authors & Book", "Art & Culture", "Environment", "Politics", "Technology", "Awards & Honor", "Person"],
     International: ["Person", "Authors & Books", "Awards & Honor", "Sports"]
@@ -3192,8 +1975,9 @@ async function caLoadState({ render = true, force = false } = {}) {
     }
     cafStatePromise = (async () => {
         try {
-            const rows = await adminApiRequest("admin-flashcards", { method: "GET" });
+            const rows = await apiRequest("flashcards");
             cafNotes = cafNormalizeRows(rows);
+            if (document.getElementById("pe-home-panel")?.classList.contains("active")) renderPEHomeDashboard();
         } catch (e) {
             cafNotes = cafSeedNotes.map((item, idx) => ({ ...item, id: null, _seedIndex: idx }));
         }
@@ -3208,23 +1992,10 @@ async function caLoadState({ render = true, force = false } = {}) {
     }
 }
 
-function caHydrateAdminControls() {
-    resetAdminForm();
-    cafResetAdminForm();
-    resetDailyQuoteForm();
-    resetAdminRoleForm();
-    cafUpdateDropdownOptions(cafSelectedScope);
-    cafRenderAdminRegistry();
-    renderDailyQuoteAdminRegistry();
-    renderAdminRoleRegistry();
-}
-
 function caRenderAll() {
     cafUpdateDropdownOptions(cafSelectedScope);
     cafFilterData(false);
-    cafRenderAdminRegistry();
     renderDailyQuoteTicker();
-    renderDailyQuoteAdminRegistry();
 }
 
 function cafUpdateDropdownOptions(scope) {
@@ -3248,7 +2019,7 @@ function cafSelectRegion(region) {
 
 function cafFilterData(resetPage = true) {
     const selectedCategory = document.getElementById("caf-category-dropdown")?.value || cafCategoriesForScope(cafSelectedScope)[0] || "";
-    cafFilteredItems = cafNotes.filter(note => note.scope === cafSelectedScope && note.category === selectedCategory);
+    cafFilteredItems = shuffleArray(cafNotes.filter(note => note.scope === cafSelectedScope && note.category === selectedCategory));
     cafClearAllTimers();
     cafRenderPageGrid();
     if (resetPage) document.getElementById("caf-note-wall")?.scrollTo({ left: 0, top: 0 });
@@ -3388,140 +2159,6 @@ function cafRenderPageGrid() {
     requestAnimationFrame(cafSyncScrollControls);
 }
 
-function cafPopulateAdminCategories() {
-    const scope = document.getElementById("caf-admin-scope")?.value || "Bhutan";
-    const select = document.getElementById("caf-admin-category");
-    if (!select) return;
-    const previous = select.value;
-    const categoriesForScope = cafCategoriesForScope(scope);
-    select.innerHTML = categoriesForScope.map(cat => `<option value="${escapePEHtml(cat)}">${escapePEHtml(cat)}</option>`).join("");
-    if (previous && categoriesForScope.includes(previous)) select.value = previous;
-    cafApplyAdminCategoryMode();
-    rememberAdminFlashcardContext();
-}
-
-function cafApplyAdminCategoryMode() {
-    const isNew = document.querySelector('[name="caf-cat-mode"]:checked')?.value === "new";
-    const existingWrap = document.getElementById("caf-exist-wrap");
-    const newWrap = document.getElementById("caf-new-wrap");
-    const existingPill = document.getElementById("caf-pill-exist");
-    const newPill = document.getElementById("caf-pill-new");
-    if (existingWrap) existingWrap.style.display = isNew ? "none" : "block";
-    newWrap?.classList.toggle("is-hidden", !isNew);
-    existingPill?.classList.toggle("active", !isNew);
-    newPill?.classList.toggle("active", isNew);
-    rememberAdminFlashcardContext();
-}
-
-function cafSetAdminCategoryMode(mode) {
-    const input = document.querySelector(`[name="caf-cat-mode"][value="${mode}"]`);
-    if (input) input.checked = true;
-    cafApplyAdminCategoryMode();
-}
-
-function cafGetAdminCategory() {
-    const scope = document.getElementById("caf-admin-scope")?.value || "Bhutan";
-    const isNew = document.querySelector('[name="caf-cat-mode"]:checked')?.value === "new";
-    const entered = document.getElementById("caf-admin-category-new")?.value.trim() || "";
-    if (!isNew) return document.getElementById("caf-admin-category")?.value || "";
-    const existing = cafCategoriesForScope(scope).find(category => category.toLocaleLowerCase() === entered.toLocaleLowerCase());
-    return existing || entered;
-}
-
-function cafResetAdminForm() {
-    const previous = captureAdminFlashcardContext();
-    const form = document.getElementById("caf-admin-form");
-    if (form) form.reset();
-    editingCafCardId = "";
-    cafSetAdminCategoryMode("exist");
-    const date = document.getElementById("caf-admin-date");
-    if (date && !date.value) date.value = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Thimphu" }).format(new Date());
-    cafPopulateAdminCategories();
-    if (previous.scope || previous.existingCategory || previous.newCategory) restoreAdminFlashcardContext();
-    const saveBtn = document.getElementById("caf-admin-save-btn");
-    const cancelBtn = document.getElementById("caf-admin-cancel-btn");
-    if (saveBtn) saveBtn.textContent = "Save Flashcard";
-    cancelBtn?.classList.add("is-hidden");
-}
-
-function cafStartEditCard(id) {
-    const card = cafNotes.find(item => String(item.id || "") === String(id || ""));
-    if (!card) {
-        showToast("Flashcard could not be loaded for editing.", "error");
-        return;
-    }
-    editingCafCardId = String(card.id || "");
-    document.getElementById("caf-admin-scope").value = card.scope || "Bhutan";
-    cafPopulateAdminCategories();
-    cafSetAdminCategoryMode("exist");
-    document.getElementById("caf-admin-category").value = card.category || "Sports";
-    document.getElementById("caf-admin-date").value = card.date || "";
-    document.getElementById("caf-admin-question").value = card.examFocus || "";
-    document.getElementById("caf-admin-answer").value = card.answer || "";
-    const saveBtn = document.getElementById("caf-admin-save-btn");
-    const cancelBtn = document.getElementById("caf-admin-cancel-btn");
-    if (saveBtn) saveBtn.textContent = "Update Flashcard";
-    cancelBtn?.classList.remove("is-hidden");
-    document.getElementById("caf-admin-form")?.scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-function cafCancelEdit() {
-    cafResetAdminForm();
-}
-
-async function cafSaveAdminCard() {
-    const wasEditing = Boolean(editingCafCardId);
-    const payload = {
-        id: editingCafCardId || "",
-        scope: document.getElementById("caf-admin-scope")?.value || "Bhutan",
-        category: cafGetAdminCategory(),
-        date_stamp: document.getElementById("caf-admin-date")?.value.trim(),
-        exam_focus: document.getElementById("caf-admin-question")?.value.trim(),
-        answer: document.getElementById("caf-admin-answer")?.value.trim()
-    };
-    if (!payload.category || !payload.date_stamp || !payload.exam_focus || !payload.answer) {
-        showToast("Choose or enter a category, then fill date, question, and answer.", "error");
-        return;
-    }
-    try {
-        await adminApiRequest("admin-flashcard", { body: payload });
-        clearPublicApiCache();
-        rememberAdminFlashcardContext({
-            scope: payload.scope,
-            catMode: "exist",
-            existingCategory: payload.category,
-            newCategory: ""
-        });
-        showToast(wasEditing ? "Current Affair flashcard updated." : "Current Affair flashcard saved.", "success");
-        cafResetAdminForm();
-        await caLoadState();
-    } catch (e) {
-        showToast("Could not save Current Affair flashcard. Check Supabase table/policies.", "error");
-    }
-}
-
-function cafRenderAdminRegistry() {
-    const registry = document.getElementById("caf-admin-registry");
-    if (!registry) return;
-    if (!cafNotes.length) {
-        registry.innerHTML = `<div class="empty-state"><p>No Current Affair flashcards saved yet.</p></div>`;
-        return;
-    }
-    registry.innerHTML = cafNotes.slice(0, 30).map(item => `
-        <div class="caf-admin-row">
-            <strong>${escapePEHtml(item.scope)}</strong>
-            <span>${escapePEHtml(item.category)}</span>
-            <span>${escapePEHtml(item.examFocus)}</span>
-            <button type="button" class="btn-view-sm" data-caf-edit-id="${escapeHTML(String(item.id || ""))}">Edit</button>
-        </div>
-    `).join("");
-
-    registry.querySelectorAll("[data-caf-edit-id]").forEach(button => {
-        button.addEventListener("click", () => {
-            cafStartEditCard(button.dataset.cafEditId || "");
-        });
-    });
-}
 
 function renderDailyQuoteTicker() {
     const track = document.getElementById("daily-quote-track");
@@ -3548,7 +2185,6 @@ function renderDailyQuoteTicker() {
         loadDailyQuotes({ fresh: true }).then(() => {
             dailyQuoteTickerIndex = 0;
             renderDailyQuoteTicker();
-            renderDailyQuoteAdminRegistry();
         });
     }, Math.max(0, nextExpiry - Date.now()) + 50);
     dailyQuoteTickerIndex %= queue.length;
@@ -3566,8 +2202,8 @@ function renderDailyQuoteTicker() {
 
 async function loadDailyQuotes({ fresh = false } = {}) {
     try {
-        const path = fresh ? `admin-quotes?refresh=${Date.now()}` : "admin-quotes";
-        const rows = await adminApiRequest(path, { method: "GET" });
+        const path = fresh ? `quotes?refresh=${Date.now()}` : "quotes";
+        const rows = await apiRequest(path);
         dailyQuotes = (rows || []).map(row => ({
             id: String(row.id),
             english: row.english_quote || "",
@@ -3579,222 +2215,9 @@ async function loadDailyQuotes({ fresh = false } = {}) {
     }
 }
 
-function resetDailyQuoteForm() {
-    const form = document.getElementById("quote-admin-form");
-    if (form) form.reset();
-    editingQuoteId = "";
-    const saveBtn = document.getElementById("quote-admin-save-btn");
-    const cancelBtn = document.getElementById("quote-admin-cancel-btn");
-    if (saveBtn) saveBtn.textContent = "Publish Quote";
-    cancelBtn?.classList.add("is-hidden");
-}
-
-function startDailyQuoteEdit(id) {
-    const quote = dailyQuotes.find(item => String(item.id || "") === String(id || ""));
-    if (!quote) {
-        showToast("Daily quote could not be loaded for editing.", "error");
-        return;
-    }
-    editingQuoteId = String(quote.id || "");
-    document.getElementById("quote-admin-english").value = quote.english || "";
-    document.getElementById("quote-admin-dzongkha").value = quote.dzongkha || "";
-    const saveBtn = document.getElementById("quote-admin-save-btn");
-    const cancelBtn = document.getElementById("quote-admin-cancel-btn");
-    if (saveBtn) saveBtn.textContent = "Update Quote";
-    cancelBtn?.classList.remove("is-hidden");
-    document.getElementById("quote-admin-form")?.scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-function cancelDailyQuoteEdit() {
-    resetDailyQuoteForm();
-}
-
-async function saveDailyQuote() {
-    const wasEditing = Boolean(editingQuoteId);
-    const english = document.getElementById("quote-admin-english")?.value.trim();
-    const dzongkha = document.getElementById("quote-admin-dzongkha")?.value.trim();
-    if (!english && !dzongkha) {
-        showToast("Enter an English quote, a Dzongkha quote, or both.", "error");
-        return;
-    }
-
-    try {
-        await adminApiRequest("admin-quote", {
-            body: {
-                id: editingQuoteId || "",
-                english_quote: english,
-                dzongkha_quote: dzongkha
-            }
-        });
-        clearPublicApiCache();
-        await loadDailyQuotes({ fresh: true });
-        dailyQuoteTickerIndex = 0;
-        resetDailyQuoteForm();
-        renderDailyQuoteTicker();
-        renderDailyQuoteAdminRegistry();
-        showToast(wasEditing ? "Quote updated successfully." : "Quote published for 24 hours.", "success");
-    } catch (e) {
-        const message = e?.message ? `Could not save quote: ${e.message}` : "Could not save quote.";
-        showToast(message, "error");
-    }
-}
-
-function renderDailyQuoteAdminRegistry() {
-    const registry = document.getElementById("quote-admin-registry");
-    if (!registry) return;
-    if (!dailyQuotes.length) {
-        registry.innerHTML = `<div class="empty-state"><p>No daily quotes published yet.</p></div>`;
-        return;
-    }
-    registry.innerHTML = dailyQuotes.slice(0, 20).map(item => `
-        <div class="quote-admin-row">
-            <span>${item.english ? escapePEHtml(item.english) : '<span class="form-help">No English quote</span>'}</span>
-            <span class="quote-admin-dzongkha">${item.dzongkha ? escapePEHtml(item.dzongkha) : '<span class="form-help">No Dzongkha quote</span>'}</span>
-            <button type="button" class="btn-view-sm" data-quote-edit-id="${escapeHTML(String(item.id || ""))}">Edit</button>
-        </div>
-    `).join("");
-
-    registry.querySelectorAll("[data-quote-edit-id]").forEach(button => {
-        button.addEventListener("click", () => {
-            startDailyQuoteEdit(button.dataset.quoteEditId || "");
-        });
-    });
-}
-
-function readPEResourceFile(input, targetId, maxBytes) {
-    const file = input?.files?.[0];
-    if (!file) return;
-    if (file.size > maxBytes) {
-        showToast("Resource files must be no larger than 6 MB.", "error");
-        input.value = "";
-        return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => { document.getElementById(targetId).value = String(reader.result || ""); };
-    reader.readAsDataURL(file);
-}
-
-async function readPEResourceDocumentFile(input, targetId) {
-    const file = input?.files?.[0];
-    if (!file) return;
-    const type = String(file.type || "").toLowerCase();
-    if (type === "application/pdf") {
-        readPEResourceFile(input, targetId, ADMIN_MEDIA_MAX_BYTES);
-        return;
-    }
-    if (ADMIN_IMAGE_TYPES.has(type)) {
-        await readPEResourceImageFile(input, targetId);
-        return;
-    }
-    input.value = "";
-    showToast("Please use a PDF, JPG, PNG, or WebP file.", "error");
-}
-
-async function readPEResourceImageFile(input, targetId) {
-    const file = input?.files?.[0];
-    if (!file) return;
-    if (!validateAdminMediaFile(file, "image")) {
-        input.value = "";
-        return;
-    }
-    try {
-        const imageDataUrl = await optimizeAdminImageFile(file);
-        if (input.files?.[0] !== file) return;
-        document.getElementById(targetId).value = imageDataUrl;
-    } catch (error) {
-        input.value = "";
-        showToast("This image could not be optimized. Please choose another image.", "error");
-    }
-}
-
-async function loadAdminPEResources() {
-    if (!adminHasPermission("questions_view")) return;
-    try {
-        const rows = await adminApiRequest("admin-pe-resources", { method: "GET" });
-        adminPEResources = Array.isArray(rows) ? rows : [];
-        renderAdminPEResourceRegistry();
-    } catch (error) {
-        showToast(`Could not load PE resources: ${error.message || "Unknown error"}`, "error");
-    }
-}
-
-function resetAdminPEResourceForm() {
-    document.getElementById("pe-resource-admin-form")?.reset();
-    document.getElementById("pe-resource-id").value = "";
-    document.getElementById("pe-resource-sort-order").value = "0";
-    document.getElementById("pe-resource-document").value = "";
-    document.getElementById("pe-resource-preview").value = "";
-    document.getElementById("pe-resource-document-file").value = "";
-    document.getElementById("pe-resource-preview-file").value = "";
-}
-
-function editAdminPEResource(id) {
-    const item = adminPEResources.find(resource => String(resource.id) === String(id));
-    if (!item) return;
-    document.getElementById("pe-resource-id").value = item.id || "";
-    document.getElementById("pe-resource-kind").value = item.kind || "formula";
-    document.getElementById("pe-resource-title").value = item.title || "";
-    document.getElementById("pe-resource-content").value = item.content || "";
-    document.getElementById("pe-resource-practice-prompt").value = item.practice_prompt || "";
-    document.getElementById("pe-resource-practice-answer").value = item.practice_answer || "";
-    document.getElementById("pe-resource-document").value = item.document_url || "";
-    document.getElementById("pe-resource-preview").value = item.preview_url || "";
-    document.getElementById("pe-resource-published").checked = Boolean(item.published);
-    document.getElementById("pe-resource-sort-order").value = Number(item.sort_order || 0);
-    document.getElementById("pe-resource-admin-form")?.scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-async function saveAdminPEResource() {
-    const payload = {
-        id: document.getElementById("pe-resource-id").value || "",
-        kind: document.getElementById("pe-resource-kind").value,
-        title: document.getElementById("pe-resource-title").value.trim(),
-        content: document.getElementById("pe-resource-content").value,
-        practice_prompt: document.getElementById("pe-resource-practice-prompt").value.trim(),
-        practice_answer: document.getElementById("pe-resource-practice-answer").value.trim(),
-        document_url: document.getElementById("pe-resource-document").value || "",
-        preview_url: document.getElementById("pe-resource-preview").value || "",
-        published: document.getElementById("pe-resource-published").checked,
-        sort_order: Number(document.getElementById("pe-resource-sort-order").value || 0)
-    };
-    try {
-        await adminApiRequest("admin-pe-resources", { method: "POST", body: payload });
-        resetAdminPEResourceForm();
-        await loadAdminPEResources();
-        showToast("PE resource saved.", "success");
-    } catch (error) {
-        showToast(`Could not save PE resource: ${error.message || "Unknown error"}`, "error");
-    }
-}
-
-function renderAdminPEResourceRegistry() {
-    const registry = document.getElementById("pe-resource-registry");
-    if (!registry) return;
-    if (!adminPEResources.length) {
-        registry.innerHTML = '<div class="empty-state"><p>No PE resources have been created yet.</p></div>';
-        return;
-    }
-    registry.innerHTML = adminPEResources.map(item => `
-        <div class="quote-admin-row">
-            <span>${escapeHTML(item.title || "Untitled")}</span>
-            <span class="form-help">${escapeHTML(item.kind || "")} · ${item.published ? "Published" : "Draft"}</span>
-            <button type="button" class="btn-view-sm" data-pe-resource-edit-id="${escapeHTML(String(item.id || ""))}">Edit</button>
-        </div>
-    `).join("");
-    registry.querySelectorAll("[data-pe-resource-edit-id]").forEach(button => {
-        button.addEventListener("click", () => editAdminPEResource(button.dataset.peResourceEditId || ""));
-    });
-}
-
-// PE (PRACTICE ENGINE) PAGE
-// Sidebar click-handling below mirrors the reference template's
-// own logic exactly:
-//   listItems.forEach(li => li.classList.remove('active'));
-//   item.classList.add('active');
-//   contentSections.forEach(s => s.classList.remove('active'));
-//   document.getElementById(targetPanelId).classList.add('active');
-// ════════════════════════════════════════════════════════
-let peActiveTopic = null;   // { peType, topic } while viewing questions; null while browsing
+// PE practice navigation state. These declarations are public-page logic
+// and must remain independent from the separate admin application.
+let peActiveTopic = null;
 let peSidebarWired = false;
 const pePracticeQuestionsByDomId = new Map();
 
@@ -3817,11 +2240,41 @@ function wirePESidebar() {
     const menuToggle = document.getElementById("pe-menu-toggle");
     const navigation = document.getElementById("pe-navigation");
     const spacer = document.getElementById("pe-navigation-spacer");
+    const desktopSidebarMedia = typeof window !== "undefined" && window.matchMedia
+        ? window.matchMedia("(min-width: 901px)")
+        : null;
+    const syncPESidebarState = (open) => {
+        if (!navigation) return;
+        navigation.classList.toggle("open", open);
+        if (spacer) spacer.classList.toggle("open", open);
+    };
+
     if (menuToggle && navigation) {
         menuToggle.onclick = () => {
-            navigation.classList.toggle("open");
-            if (spacer) spacer.classList.toggle("open", navigation.classList.contains("open"));
+            if (desktopSidebarMedia?.matches) return;
+            const nextOpen = !navigation.classList.contains("open");
+            syncPESidebarState(nextOpen);
         };
+    }
+
+    if (navigation) {
+        navigation.addEventListener("mouseenter", () => {
+            if (!desktopSidebarMedia?.matches) return;
+            syncPESidebarState(true);
+        });
+        navigation.addEventListener("mouseleave", () => {
+            if (!desktopSidebarMedia?.matches) return;
+            syncPESidebarState(false);
+        });
+        navigation.addEventListener("focusin", () => {
+            if (!desktopSidebarMedia?.matches) return;
+            syncPESidebarState(true);
+        });
+        navigation.addEventListener("focusout", (event) => {
+            if (!desktopSidebarMedia?.matches) return;
+            if (navigation.contains(event.relatedTarget)) return;
+            syncPESidebarState(false);
+        });
     }
 
     const listItems = document.querySelectorAll("#pe-list .pe-list-item");
@@ -3833,7 +2286,10 @@ function wirePESidebar() {
             listItems.forEach((li) => li.classList.remove("active"));
             item.classList.add("active");
 
+            clearActivePEPracticeMemory();
             peActiveTopic = null; // returning to a top-level panel exits question view
+            peDIActiveSet = null;
+            peDIActiveGraphIndex = 0;
 
             const targetPanelId = item.getAttribute("data-target");
             contentSections.forEach((section) => section.classList.remove("active"));
@@ -3853,15 +2309,18 @@ async function openPEPortal() {
     document.getElementById("setup-view").style.display = "none";
     document.getElementById("exam-view") && document.getElementById("exam-view").classList.remove("show");
     document.getElementById("results-view") && document.getElementById("results-view").classList.remove("show");
-    document.getElementById("admin-view").style.display = "none";
     document.getElementById("pe-view").style.display = "block";
     hideTopActionButtons();
     document.getElementById("pe-back-btn").style.display = "block";
 
     wirePESidebar();
 
-    // Reset to Home panel and a collapsed sidebar every time PE is opened
+    // Reset to Home panel and a collapsed sidebar every time PE is opened.
+    // On desktop the hover handlers will expand it when the cursor enters.
+    clearActivePEPracticeMemory();
+    peTopicQuestionCache = new Map();
     peActiveTopic = null;
+    peDIActiveSet = null;
     document.getElementById("pe-navigation").classList.remove("open");
     document.getElementById("pe-navigation-spacer").classList.remove("open");
     document.querySelectorAll("#pe-list .pe-list-item").forEach(li => {
@@ -3870,6 +2329,7 @@ async function openPEPortal() {
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-home-panel").classList.add("active");
 
+    const databaseWasReady = databaseReady;
     if (!databaseReady) {
         showLoading(true, "Opening PE...");
         const loaded = await loadDatabase();
@@ -3880,11 +2340,14 @@ async function openPEPortal() {
         }
     }
 
-    renderPEHomeGrid();
+    // A newly completed database load renders the active panel in processData.
+    // Only render here when the cached data was already ready before opening.
+    if (databaseWasReady) renderPEHomeGrid();
 
     loadPEOnlineQuestionBank()
         .then(() => {
             updatePEOnlineCount();
+            queuePEOnlineMediaPrefetch();
         })
         .catch(error => {
             peOnlineCatalog.total = 0;
@@ -3924,7 +2387,7 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
     const topics = buildPETopicList(peTypeFilter, searchTerm);
 
     if (topics.length === 0) {
-        grid.innerHTML = '<div class="pe-empty-msg">No PE questions here yet. Add some from the Admin panel.</div>';
+        grid.innerHTML = '<div class="pe-empty-msg">No PE questions are available here yet.</div>';
         return;
     }
 
@@ -3948,8 +2411,353 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
     });
 }
 
+const PE_NOTE_DRAFT_KEY = "examportal_pe_self_note_draft_v1";
+
+function getPEOverview(type) {
+    return peOverviewCatalog.find(item => item.type === type) || { questions: 0, graphs: 0 };
+}
+
+async function loadPEHomeDashboard() {
+    if (peHomeDashboardLoadPromise) return peHomeDashboardLoadPromise;
+    peHomeDashboardLoadPromise = Promise.all([
+        apiRequest("pe-overview"),
+        apiRequest("pe-resources")
+    ]).then(([overview, resources]) => {
+        peOverviewCatalog = Array.isArray(overview?.categories) ? overview.categories : [];
+        peResourcesCatalog = Array.isArray(resources) ? resources : [];
+        renderPEHomeDashboard();
+    }).catch(error => {
+        console.error("PE home dashboard load failed:", error);
+        renderPEHomeDashboard();
+    }).finally(() => {
+        peHomeDashboardLoadPromise = null;
+    });
+    return peHomeDashboardLoadPromise;
+}
+
+function renderPEHomeDashboard() {
+    const overview = document.getElementById("pe-overview-card");
+    if (!overview) return;
+    const bcss = getPEOverview(PE_BCSC_MAIN_TYPE);
+    const past = getPEOverview("Past Paper");
+    const di = getPEOverview("Data Interpretation");
+    const currentAffairs = Array.isArray(cafNotes) ? cafNotes.length : 0;
+    const cards = [
+        ["bi-clipboard-check", "BCSC(main)", bcss.questions, "Questions"],
+        ["bi-book", "Past Paper", past.questions, "Questions"],
+        ["bi-bar-chart-line", "Data Interpretation", di.questions, `${di.questions === 1 ? "Question" : "Questions"} · ${di.graphs} graph${di.graphs === 1 ? "" : "s"}`],
+        ["bi-newspaper", "Current Affairs", currentAffairs, "Questions"]
+    ];
+    const questionTotal = cards.reduce((total, [, , count]) => total + Number(count || 0), 0);
+    overview.innerHTML = `
+        <div class="pe-overview-circles">
+            ${cards.map(([icon, label, count, detail]) => `
+                <div class="pe-overview-item">
+                    <div class="pe-overview-circle">
+                        <i class="bi ${icon}" aria-hidden="true"></i>
+                        <strong class="pe-overview-value">${Number(count || 0)}</strong>
+                        <span class="pe-overview-label">${escapeHTML(detail)}</span>
+                    </div>
+                    <span>${escapeHTML(label)}</span>
+                </div>
+            `).join("")}
+        </div>
+        <p class="pe-overview-total">Total available: <strong>${questionTotal} questions</strong> · <strong>${di.graphs} graph${di.graphs === 1 ? "" : "s"}</strong></p>
+    `;
+    renderPEResourceTabs();
+}
+
+function renderPEResourceTabs() {
+    document.querySelectorAll("[data-pe-resource-tab]").forEach(button => {
+        const active = button.dataset.peResourceTab === peActiveResourceTab;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", String(active));
+    });
+    const panels = {
+        formula: document.getElementById("pe-resource-formula"),
+        guide: document.getElementById("pe-resource-guide"),
+        note: document.getElementById("pe-resource-note")
+    };
+    Object.entries(panels).forEach(([name, panel]) => {
+        if (panel) panel.hidden = name !== peActiveResourceTab;
+    });
+    renderPEFormulaPanel(panels.formula);
+    renderPEGuidePanel(panels.guide);
+    renderPESelfNotePanel(panels.note);
+}
+
+function renderPEFormulaPanel(panel) {
+    if (!panel) return;
+    const formula = peResourcesCatalog.find(item => item.kind === "formula");
+    if (!formula) {
+        panel.innerHTML = '<div class="pe-empty-msg">Formula sheets will appear here when published.</div>';
+        return;
+    }
+    const prompt = String(formula.practice_prompt || "").trim();
+    const documentUrl = safeResourceUrl(formula.document_url);
+    panel.innerHTML = `
+        <h3>${escapeHTML(formula.title || "Formula Sheet")}</h3>
+        <div class="pe-resource-document">${escapeHTML(formula.content || "").replace(/\n/g, "<br>") || "No formula text has been published yet."}</div>
+        ${documentUrl ? `<div class="pe-resource-actions"><a class="pe-di-graph-btn" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">Open document</a></div>` : ""}
+        ${prompt ? `
+            <div class="pe-resource-practice">
+                <h3>Practice</h3>
+                <label>${escapeHTML(prompt)}</label>
+                <div><input type="text" class="pe-resource-answer" aria-label="Formula practice answer" data-formula-answer></div>
+                <div class="pe-resource-actions">
+                    <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula" data-formula-id="${escapeHTML(String(formula.id || ""))}">Check answer</button>
+                    <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
+                </div>
+            </div>
+        ` : ""}
+    `;
+}
+
+function safeResourceUrl(value) {
+    const source = String(value || "").trim();
+    return /^https:\/\/[^\s]+$/i.test(source) ? source : "";
+}
+
+function renderPEGuidePanel(panel) {
+    if (!panel) return;
+    const guides = peResourcesCatalog.filter(item => item.kind === "guide");
+    if (peGuideCarouselTimer) {
+        clearInterval(peGuideCarouselTimer);
+        peGuideCarouselTimer = null;
+    }
+    if (!guides.length) {
+        panel.innerHTML = '<div class="pe-empty-msg">Published guides will appear here.</div>';
+        return;
+    }
+    peGuideCarouselIndex %= guides.length;
+    const guide = guides[peGuideCarouselIndex];
+    const documentUrl = safeResourceUrl(guide.document_url);
+    const preview = safeMediaURL(guide.preview_url, "image")
+        || (/\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(documentUrl) ? documentUrl : "");
+    const guideBody = `
+        <div class="pe-guide-preview">
+            ${preview ? `<img src="${escapeHTML(preview)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div>Document preview</div></div>'}
+        </div>
+        <h3>${escapeHTML(guide.title || "Guide")}</h3>
+        <p class="pe-guide-meta">${documentUrl ? "Opens in a new tab" : "Document preview"}</p>
+    `;
+    panel.innerHTML = `
+        <div class="pe-guide-carousel">
+            ${documentUrl ? `<a class="pe-guide-link" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">${guideBody}</a>` : guideBody}
+            <p class="pe-guide-meta">Guide ${peGuideCarouselIndex + 1} of ${guides.length}</p>
+        </div>
+    `;
+    if (guides.length > 1 && peActiveResourceTab === "guide" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        peGuideCarouselTimer = setInterval(() => {
+            peGuideCarouselIndex = (peGuideCarouselIndex + 1) % guides.length;
+            renderPEGuidePanel(panel);
+        }, 4000);
+    }
+}
+
+function renderPESelfNotePanel(panel) {
+    if (!panel) return;
+    let draft = "";
+    try { draft = sessionStorage.getItem(PE_NOTE_DRAFT_KEY) || ""; } catch (e) {}
+    panel.innerHTML = `
+        <h3>Self Note</h3>
+        <div class="pe-note-toolbar" aria-label="Text formatting">
+            <button type="button" class="pe-di-graph-btn" data-note-command="bold" aria-label="Bold">B</button>
+            <button type="button" class="pe-di-graph-btn" data-note-command="italic" aria-label="Italic">I</button>
+            <button type="button" class="pe-di-graph-btn" data-note-command="underline" aria-label="Underline">U</button>
+            <button type="button" class="pe-di-graph-btn" data-note-command="insertUnorderedList">List</button>
+        </div>
+        <div class="pe-note-editor" id="pe-note-editor" contenteditable="true" role="textbox" aria-multiline="true"></div>
+        <div class="pe-resource-actions">
+            <button type="button" class="pe-di-graph-btn" data-pe-resource-action="save-draft">Save draft</button>
+            <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="export-note">Export DOCX</button>
+            <span class="pe-resource-feedback" data-note-feedback aria-live="polite"></span>
+        </div>
+    `;
+    const editor = panel.querySelector("#pe-note-editor");
+    if (editor) {
+        const safeDraft = sanitizePESelfNoteHtml(draft);
+        if (safeDraft) editor.innerHTML = safeDraft;
+        else editor.textContent = "Write your notes here...";
+    }
+}
+
+function handlePEHomeDashboardClick(event) {
+    const tab = event.target.closest("[data-pe-resource-tab]");
+    if (tab) {
+        peActiveResourceTab = tab.dataset.peResourceTab || "formula";
+        renderPEResourceTabs();
+        return;
+    }
+    const noteCommand = event.target.closest("[data-note-command]");
+    if (noteCommand) {
+        document.getElementById("pe-note-editor")?.focus();
+        document.execCommand(noteCommand.dataset.noteCommand || "", false, null);
+        return;
+    }
+    const action = event.target.closest("[data-pe-resource-action]")?.dataset.peResourceAction;
+    if (action === "check-formula") {
+        void checkPEFormulaAnswer(event.target.closest("[data-formula-id]")?.dataset.formulaId || "");
+    } else if (action === "save-draft") {
+        const editor = document.getElementById("pe-note-editor");
+        try { sessionStorage.setItem(PE_NOTE_DRAFT_KEY, sanitizePESelfNoteHtml(editor?.innerHTML || "")); } catch (e) {}
+        const feedback = document.querySelector("[data-note-feedback]");
+        if (feedback) feedback.textContent = "Draft saved for this browser session";
+    } else if (action === "export-note") {
+        exportPESelfNoteDocx();
+    }
+}
+
+function sanitizePESelfNoteHtml(value) {
+    const allowedTags = new Set(["b", "strong", "i", "em", "u", "ul", "ol", "li", "p", "div", "br"]);
+    const template = document.createElement("template");
+    template.innerHTML = String(value || "");
+    const sanitizeNode = node => {
+        if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.nodeValue || "");
+        if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment();
+        const tag = node.tagName.toLowerCase();
+        const target = allowedTags.has(tag) ? document.createElement(tag) : document.createDocumentFragment();
+        [...node.childNodes].forEach(child => target.appendChild(sanitizeNode(child)));
+        return target;
+    };
+    const container = document.createElement("div");
+    [...template.content.childNodes].forEach(node => container.appendChild(sanitizeNode(node)));
+    return container.innerHTML;
+}
+
+function handlePESelfNotePaste(event) {
+    if (!event.target.closest?.("#pe-note-editor")) return;
+    event.preventDefault();
+    const text = event.clipboardData?.getData("text/plain") || "";
+    document.execCommand("insertText", false, text);
+}
+
+async function checkPEFormulaAnswer(id) {
+    const answer = document.querySelector("[data-formula-answer]")?.value.trim() || "";
+    const feedback = document.querySelector("[data-formula-feedback]");
+    if (!id || !answer) {
+        if (feedback) feedback.textContent = "Enter an answer first";
+        return;
+    }
+    if (feedback) feedback.textContent = "Checking...";
+    try {
+        const result = await apiRequest("pe-resource-answer", { method: "POST", body: { id, answer } });
+        if (feedback) feedback.textContent = result?.correct ? "Correct" : "Try again";
+    } catch (error) {
+        if (feedback) feedback.textContent = "Could not check answer";
+    }
+}
+
+function xmlEscape(value) {
+    return String(value || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]);
+}
+
+function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (const byte of bytes) {
+        crc ^= byte;
+        for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+}
+
+function buildStoredZip(files) {
+    const encoder = new TextEncoder();
+    const chunks = [];
+    const central = [];
+    let offset = 0;
+    const write16 = value => Uint8Array.of(value & 255, (value >>> 8) & 255);
+    const write32 = value => Uint8Array.of(value & 255, (value >>> 8) & 255, (value >>> 16) & 255, (value >>> 24) & 255);
+    for (const [name, body] of files) {
+        const nameBytes = encoder.encode(name);
+        const bodyBytes = encoder.encode(body);
+        const crc = crc32(bodyBytes);
+        const local = [write32(0x04034b50), write16(20), write16(0), write16(0), write16(0), write16(0), write32(crc), write32(bodyBytes.length), write32(bodyBytes.length), write16(nameBytes.length), write16(0), nameBytes, bodyBytes];
+        chunks.push(...local);
+        central.push(write32(0x02014b50), write16(20), write16(20), write16(0), write16(0), write16(0), write16(0), write32(crc), write32(bodyBytes.length), write32(bodyBytes.length), write16(nameBytes.length), write16(0), write16(0), write16(0), write16(0), write32(0), write32(offset), nameBytes);
+        offset += local.reduce((total, part) => total + part.length, 0);
+    }
+    const centralSize = central.reduce((total, part) => total + part.length, 0);
+    const end = [write32(0x06054b50), write16(0), write16(0), write16(files.length), write16(files.length), write32(centralSize), write32(offset), write16(0)];
+    return new Blob([...chunks, ...central, ...end], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+}
+
+function buildDocxParagraphs(editor) {
+    const paragraphs = [[]];
+    const current = () => paragraphs[paragraphs.length - 1];
+    const finish = () => { if (current().length) paragraphs.push([]); };
+    const addText = (value, format) => {
+        const parts = String(value || "").replace(/\r/g, "").split("\n");
+        parts.forEach((part, index) => {
+            if (part) current().push({ text: part, format });
+            if (index < parts.length - 1) finish();
+        });
+    };
+    const visit = (node, format = {}) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            addText(node.nodeValue, format);
+            return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        const tag = node.tagName.toLowerCase();
+        if (tag === "br") {
+            finish();
+            return;
+        }
+        const nextFormat = {
+            bold: format.bold || tag === "b" || tag === "strong",
+            italic: format.italic || tag === "i" || tag === "em",
+            underline: format.underline || tag === "u"
+        };
+        if (tag === "ul" || tag === "ol") {
+            [...node.children].forEach((item, index) => {
+                if (item.tagName?.toLowerCase() !== "li") return;
+                addText(tag === "ol" ? `${index + 1}. ` : "• ", nextFormat);
+                [...item.childNodes].forEach(child => visit(child, nextFormat));
+                finish();
+            });
+            return;
+        }
+        [...node.childNodes].forEach(child => visit(child, nextFormat));
+        if (tag === "p" || tag === "div") finish();
+    };
+    [...editor.childNodes].forEach(node => visit(node));
+    return paragraphs.filter(paragraph => paragraph.length).map(runs => `<w:p>${runs.map(run => {
+        const properties = run.format.bold || run.format.italic || run.format.underline
+            ? `<w:rPr>${run.format.bold ? "<w:b/>" : ""}${run.format.italic ? "<w:i/>" : ""}${run.format.underline ? '<w:u w:val="single"/>' : ""}</w:rPr>`
+            : "";
+        return `<w:r>${properties}<w:t xml:space="preserve">${xmlEscape(run.text)}</w:t></w:r>`;
+    }).join("")}</w:p>`).join("");
+}
+
+function exportPESelfNoteDocx() {
+    const editor = document.getElementById("pe-note-editor");
+    const text = String(editor?.innerText || "").trim();
+    const feedback = document.querySelector("[data-note-feedback]");
+    if (!text) {
+        if (feedback) feedback.textContent = "Write a note before exporting";
+        return;
+    }
+    const paragraphs = buildDocxParagraphs(editor);
+    const files = [
+        ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
+        ["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+        ["word/document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs}<w:sectPr/></w:body></w:document>`]
+    ];
+    const url = URL.createObjectURL(buildStoredZip(files));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "examportal-self-note.docx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    if (feedback) feedback.textContent = "DOCX exported";
+}
+
 function renderPEHomeGrid() {
-    renderPETopicGrid("pe-home-grid", "all", "pe-home-search", "#f44336");
+    renderPEHomeDashboard();
+    void loadPEHomeDashboard();
 }
 function renderPEMockGrid() {
     renderPETopicGrid("pe-mock-grid", PE_BCSC_MAIN_TYPE, "pe-mock-search", "#00bcd4");
@@ -4281,32 +3089,44 @@ function peoSubmitOnlineTest() {
 
 // ─── Opening a topic → question attempt screen ─────────────
 async function openPETopic(peType, topic) {
+    clearActivePEPracticeMemory();
     if (peType === "Data Interpretation") {
         openPEDIViewer(topic);
         return;
     }
     peActiveTopic = { peType, topic };
+    document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
+    document.getElementById("pe-question-screen").classList.add("active");
+    const container = document.getElementById("pe-questions-container");
+    if (container) container.innerHTML = '<div class="pe-empty-msg">Loading questions…</div>';
 
-    const topicQuestions = getPEQuestions().filter(q => {
-        const info = parsePECategory(q.category);
-        return info.peType === peType && info.topic === topic;
-    });
     try {
-        await fetchSelectedQuestionMedia(topicQuestions);
+        await ensurePETopicQuestions(peType, topic);
+    } catch (error) {
+        console.error("PE topic question load failed:", error);
+        if (container) container.innerHTML = '<div class="pe-empty-msg">Could not load this topic. Please try again.</div>';
+        showToast("Could not load this topic. Please try again.", "error");
+        return;
+    }
+
+    if (!peActiveTopic || peActiveTopic.peType !== peType || peActiveTopic.topic !== topic) return;
+    renderPEQuestionList();
+
+    try {
+        await prefetchPETopicMedia(peType, topic, { blockForMs: 900 });
+        if (peActiveTopic && peActiveTopic.peType === peType && peActiveTopic.topic === topic) {
+            renderPEQuestionList();
+        }
     } catch (error) {
         console.error("PE topic media load failed:", error);
         showToast("The questions loaded, but some media could not be downloaded.", "info");
     }
-
-    document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
-    document.getElementById("pe-question-screen").classList.add("active");
-
-    renderPEQuestionList();
 }
 
 function showPEFolderScreen() {
     if (!peActiveTopic) return;
     const returnType = peActiveTopic.peType;
+    clearActivePEPracticeMemory();
     peActiveTopic = null;
 
     const targetPanelId = returnType === PE_BCSC_MAIN_TYPE ? "pe-mock-panel"
@@ -4324,6 +3144,8 @@ function showPEFolderScreen() {
 // Chart pane stays fixed on the left (position: sticky) while the
 // question pane on the right shows one question at a time with // Next/Previous — same model GMAT/GRE/CAT use for chart-based sets.
 let peDIActiveSet = null; // the set/topic name currently open in the viewer
+let peDIQuestionObserver = null;
+let peDIActiveGraphIndex = 0;
 
 function renderPEDIGrid() {
     const grid = document.getElementById("pe-di-grid");
@@ -4332,29 +3154,19 @@ function renderPEDIGrid() {
     const sets = buildPETopicList("Data Interpretation", searchTerm);
 
     if (sets.length === 0) {
-        grid.innerHTML = '<div class="pe-empty-msg">No Data Interpretation sets yet. Add one from the Admin panel.</div>';
+        grid.innerHTML = '<div class="pe-empty-msg">No Data Interpretation sets are available yet.</div>';
         return;
     }
 
-    grid.innerHTML = sets.map(s => {
-        const firstQ = getPEQuestions().find(q => {
-            const info = parsePECategory(q.category);
-            return info.peType === "Data Interpretation" && info.topic === s.topic;
-        });
-        const thumbnailSource = firstQ ? safeMediaSource(firstQ.imageCode, "image") : "";
-        const thumb = thumbnailSource
-            ? `<img src="${thumbnailSource}" class="pe-card-thumb" alt="" loading="lazy" decoding="async">`
-            : `<i class="bi bi-bar-chart-line pe-card-icon"></i>`;
-        return `
+    grid.innerHTML = sets.map(s => `
             <div class="pe-card accent-purple" data-di-topic="${escapeHTML(s.topic)}">
-                ${thumb}
+                <i class="bi bi-bar-chart-line pe-card-icon"></i>
                 <div class="pe-card-info">
                     <div class="pe-card-title">${escapePEHtml(s.topic)}</div>
                     <div class="pe-card-meta"> ${s.count} question${s.count === 1 ? "" : "s"}</div>
                 </div>
             </div>
-        `;
-    }).join("");
+    `).join("");
 
     grid.querySelectorAll(".pe-card[data-di-topic]").forEach(card => {
         card.addEventListener("click", () => {
@@ -4364,30 +3176,49 @@ function renderPEDIGrid() {
 }
 
 async function openPEDIViewer(setName) {
+    clearActivePEPracticeMemory();
     peDIActiveSet = setName;
+    peDIActiveGraphIndex = 0;
 
-    const setQuestions = getPEDISetQuestions(setName);
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-di-viewer-screen").classList.add("active");
 
     const chartImg = document.getElementById("pe-di-chart-img");
     document.getElementById("pe-di-set-title").textContent = setName;
+    document.getElementById("pe-di-questions-container").innerHTML = '<div class="pe-empty-msg">Loading questions…</div>';
+
+    let setQuestions = [];
+    try {
+        setQuestions = await ensurePETopicQuestions("Data Interpretation", setName);
+    } catch (error) {
+        console.error("Data Interpretation question load failed:", error);
+        if (peDIActiveSet === setName) {
+            document.getElementById("pe-di-questions-container").innerHTML = '<div class="pe-empty-msg">Could not load this set. Please try again.</div>';
+            showPEDIChart("");
+            renderPEDIGraphControls(0);
+            showToast("Could not load this Data Interpretation set. Please try again.", "error");
+        }
+        return;
+    }
+    if (peDIActiveSet !== setName) return;
     renderPEDIQuestion();
 
-    const sharedGraphQuestion = setQuestions[0];
-    const cachedGraph = sharedGraphQuestion ? safeMediaURL(sharedGraphQuestion.imageCode, "image") : "";
-    if (cachedGraph) chartImg.src = cachedGraph;
+    const firstCachedGraph = setQuestions
+        .map(question => safeMediaURL(question.imageCode, "image"))
+        .find(Boolean) || "";
+    if (firstCachedGraph) chartImg.src = firstCachedGraph;
     else chartImg.removeAttribute("src");
-
-    if (!sharedGraphQuestion || cachedGraph) return;
+    if (!setQuestions.length) return;
     try {
-        // A DI set uses one shared graph. Fetching every row would download
-        // duplicate Base64 images and block the viewer unnecessarily.
-        await fetchSelectedQuestionMedia([sharedGraphQuestion], { persistCache: false });
+        await prefetchPEDISetGraph(setName, { blockForMs: 1200 });
+        // The short wait keeps opening responsive; then finish the queued
+        // media request so a slower second/third chart is never skipped.
+        const mediaPromise = peDIGraphPrefetch.get(String(setName || "").trim());
+        if (mediaPromise) await mediaPromise;
         if (peDIActiveSet !== setName) return;
-        const graphSource = safeMediaURL(sharedGraphQuestion.imageCode, "image");
-        if (graphSource) chartImg.src = graphSource;
-        else chartImg.removeAttribute("src");
+        // Re-render after media arrives. This assigns every question to the
+        // correct sequential chart group and resets numbering for that group.
+        renderPEDIQuestion();
     } catch (error) {
         console.error("Data Interpretation graph load failed:", error);
         if (peDIActiveSet === setName) {
@@ -4397,7 +3228,11 @@ async function openPEDIViewer(setName) {
 }
 
 function closePEDIViewer() {
+    peDIQuestionObserver?.disconnect();
+    peDIQuestionObserver = null;
+    clearActivePEPracticeMemory();
     peDIActiveSet = null;
+    peDIActiveGraphIndex = 0;
     document.querySelectorAll("#pe-list .pe-list-item").forEach(li => {
         li.classList.toggle("active", li.dataset.target === "pe-di-panel");
     });
@@ -4407,26 +3242,182 @@ function closePEDIViewer() {
 }
 
 function getPEDISetQuestions(setName) {
-    return getPEQuestions().filter(q => {
-        const info = parsePECategory(q.category);
-        return info.peType === "Data Interpretation" && info.topic === setName;
+    return getPETopicQuestions("Data Interpretation", setName);
+}
+
+function hammingDistance(a, b) {
+    if (!a || !b || a.length !== b.length) return Number.POSITIVE_INFINITY;
+    let distance = 0;
+    for (let i = 0; i < a.length; i += 1) {
+        if (a[i] !== b[i]) distance += 1;
+    }
+    return distance;
+}
+
+function isSamePEDIGraphKey(nextKey, activeKey) {
+    if (!nextKey || !activeKey) return false;
+    if (nextKey === activeKey) return true;
+    if (nextKey.startsWith("hash:") && activeKey.startsWith("hash:")) {
+        // 16x16 average hash = 256 bits. Re-uploaded copies of the same chart
+        // can differ a little after compression/cropping, so allow a small gap.
+        return hammingDistance(nextKey.slice(5), activeKey.slice(5)) <= 18;
+    }
+    return false;
+}
+
+async function getPEDIGraphFingerprint(source) {
+    source = String(source || "").trim();
+    if (!source) return "";
+    if (peDIGraphFingerprintCache.has(source)) return peDIGraphFingerprintCache.get(source);
+
+    const promise = new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            try {
+                const size = 16;
+                const canvas = document.createElement("canvas");
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext("2d", { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0, size, size);
+                const data = ctx.getImageData(0, 0, size, size).data;
+                const grayscale = [];
+                for (let i = 0; i < data.length; i += 4) {
+                    grayscale.push((data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114));
+                }
+                const average = grayscale.reduce((sum, value) => sum + value, 0) / grayscale.length;
+                resolve(`hash:${grayscale.map(value => value >= average ? "1" : "0").join("")}`);
+            } catch (error) {
+                // If the browser blocks canvas reads for a remote image, fall
+                // back to the exact source string. Data/blob images still hash.
+                resolve(`src:${source}`);
+            }
+        };
+        img.onerror = () => resolve(`src:${source}`);
+        img.src = source;
     });
+
+    peDIGraphFingerprintCache.set(source, promise);
+    const key = await promise;
+    peDIGraphFingerprintCache.set(source, key);
+    return key;
+}
+
+async function preparePEDIGraphFingerprints(setName) {
+    const setQuestions = getPEDISetQuestions(setName);
+    await Promise.all(setQuestions.map(async question => {
+        const source = safeMediaURL(question.imageCode, "image");
+        question._diGraphSource = source;
+        question._diGraphKey = source ? await getPEDIGraphFingerprint(source) : "";
+    }));
+}
+
+function buildPEDIQuestionGroups(setQuestions) {
+    let activeGraph = "";
+    let activeGraphKey = "";
+    const groups = [];
+
+    (setQuestions || []).forEach(question => {
+        const uploadedGraph = safeMediaURL(question.imageCode, "image");
+        const uploadedGraphKey = question._diGraphKey || uploadedGraph;
+        if (!groups.length || (uploadedGraph && !isSamePEDIGraphKey(uploadedGraphKey, activeGraphKey))) {
+            activeGraph = uploadedGraph;
+            activeGraphKey = uploadedGraphKey;
+            groups.push({ graphSource: activeGraph, questions: [] });
+        }
+        groups[groups.length - 1].questions.push(question);
+    });
+
+    return groups.map(group => ({
+        ...group,
+        questions: [...group.questions].sort((a, b) => (a._peRandomSort || 0) - (b._peRandomSort || 0))
+    }));
+}
+
+function showPEDIChart(graphSource) {
+    const chartImg = document.getElementById("pe-di-chart-img");
+    if (!chartImg) return;
+    graphSource = String(graphSource || "").trim();
+    if (graphSource && chartImg.src !== graphSource) chartImg.src = graphSource;
+    else if (!graphSource) chartImg.removeAttribute("src");
+}
+
+function ensurePEDIGraphControls() {
+    const title = document.getElementById("pe-di-set-title");
+    if (!title || !title.parentElement) return null;
+    let controls = document.getElementById("pe-di-graph-controls");
+    if (!controls) {
+        controls = document.createElement("div");
+        controls.id = "pe-di-graph-controls";
+        controls.className = "pe-di-graph-controls";
+        title.insertAdjacentElement("afterend", controls);
+    }
+    return controls;
+}
+
+function renderPEDIGraphControls(groupCount) {
+    const controls = ensurePEDIGraphControls();
+    if (!controls) return;
+    if (groupCount <= 1) {
+        controls.innerHTML = "";
+        return;
+    }
+
+    controls.innerHTML = `
+        <div class="pe-di-graph-count">Graph ${peDIActiveGraphIndex + 1} of ${groupCount}</div>
+        <div class="pe-di-graph-buttons">
+            <button type="button" class="pe-di-graph-btn" data-di-graph-nav="prev" ${peDIActiveGraphIndex <= 0 ? "disabled" : ""}>Previous graph</button>
+            <button type="button" class="pe-di-graph-btn primary" data-di-graph-nav="next" ${peDIActiveGraphIndex >= groupCount - 1 ? "disabled" : ""}>Next graph</button>
+        </div>
+    `;
+
+    controls.querySelectorAll("[data-di-graph-nav]").forEach(button => {
+        button.addEventListener("click", () => {
+            const direction = button.dataset.diGraphNav === "next" ? 1 : -1;
+            peDIActiveGraphIndex = Math.min(groupCount - 1, Math.max(0, peDIActiveGraphIndex + direction));
+            renderPEDIQuestion();
+            document.querySelector(".pe-di-split-right")?.scrollTo({ top: 0, behavior: "smooth" });
+        });
+    });
+}
+
+function observePEDIChartGroups(container) {
+    peDIQuestionObserver?.disconnect();
+    peDIQuestionObserver = null;
+    const cards = [...container.querySelectorAll("[data-di-graph-src]")];
+    if (!cards.length) return;
+
+    showPEDIChart(cards[0].dataset.diGraphSrc || "");
 }
 
 function renderPEDIQuestion() {
     const container = document.getElementById("pe-di-questions-container");
-    if (!peDIActiveSet) { container.innerHTML = ""; return; }
+    if (!peDIActiveSet) {
+        container.innerHTML = "";
+        renderPEDIGraphControls(0);
+        showPEDIChart("");
+        return;
+    }
 
     const setQuestions = getPEDISetQuestions(peDIActiveSet);
     if (setQuestions.length === 0) {
         container.innerHTML = '<div class="pe-empty-msg">No questions in this set.</div>';
+        renderPEDIGraphControls(0);
+        showPEDIChart("");
         return;
     }
 
     pePracticeQuestionsByDomId.clear();
-    container.innerHTML = setQuestions.map((q, questionIndex) => {
+    const groupedQuestions = buildPEDIQuestionGroups(setQuestions);
+    peDIActiveGraphIndex = Math.min(groupedQuestions.length - 1, Math.max(0, peDIActiveGraphIndex));
+    const activeGroup = groupedQuestions[peDIActiveGraphIndex] || { graphSource: "", questions: [] };
+    renderPEDIGraphControls(groupedQuestions.length);
+    showPEDIChart(activeGroup.graphSource);
+
+    container.innerHTML = activeGroup.questions.map((q, questionIndex) => {
         const options = Array.isArray(q.options) ? q.options : [];
-        const qId = `pe-di-q-${questionIndex}`;
+        const qId = `pe-di-g-${peDIActiveGraphIndex}-q-${questionIndex}`;
         pePracticeQuestionsByDomId.set(qId, q);
         const optionsHtml = options.slice(0, 4).map((opt, optionIndex) => `
             <button type="button" class="pe-option" id="${qId}-opt-${optionIndex}"
@@ -4435,7 +3426,9 @@ function renderPEDIQuestion() {
             </button>
         `).join("");
         return `
-            <div class="pe-question-card accent-purple">
+            <div class="pe-question-card accent-purple"
+                 data-di-graph-src="${escapeHTML(activeGroup.graphSource)}"
+                 data-di-graph-group="${peDIActiveGraphIndex}">
                 <div class="pe-question-meta">
                     <div class="pe-question-num">${questionIndex + 1}</div>
                     <span class="pe-question-tag">Data Interpretation</span>
@@ -4445,11 +3438,12 @@ function renderPEDIQuestion() {
                 ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
                 <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
                 <div class="pe-question-actions">
+                    <button type="button" class="pe-answer-toggle" data-pe-solution-toggle="${qId}" aria-expanded="false">Show answer</button>
                     <div class="pe-feedback-msg" id="${qId}-feedback"></div>
                 </div>
                 <div class="pe-solution-box accent-purple" id="${qId}-solution">
                     <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
-                    <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
+                    <div class="pe-solution-text">${escapePEHtml(q.explanation || "No explanation has been added yet.")}</div>
                 </div>
             </div>
         `;
@@ -4458,6 +3452,8 @@ function renderPEDIQuestion() {
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
     });
+    bindPESolutionToggles(container);
+    observePEDIChartGroups(container);
 }
 
 // ─── Question attempt flow (attempt first, then reveal) ────
@@ -4465,10 +3461,7 @@ function renderPEQuestionList() {
     const container = document.getElementById("pe-questions-container");
     if (!peActiveTopic) { container.innerHTML = ""; return; }
 
-    const list = getPEQuestions().filter(q => {
-        const info = parsePECategory(q.category);
-        return info.peType === peActiveTopic.peType && info.topic === peActiveTopic.topic;
-    });
+    const list = getPETopicQuestions(peActiveTopic.peType, peActiveTopic.topic);
 
     if (list.length === 0) {
         container.innerHTML = '<div class="pe-empty-msg">No questions in this topic yet.</div>';
@@ -4496,7 +3489,7 @@ function renderPEQuestionList() {
         const explanationHtml = `
             <div class="pe-solution-box ${accentClass}" id="${qId}-solution">
                 <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
-                <div class="pe-solution-text">${escapePEHtml(q.explanation)}</div>
+                <div class="pe-solution-text">${escapePEHtml(q.explanation || "No explanation has been added yet.")}</div>
             </div>
         `;
 
@@ -4512,6 +3505,7 @@ function renderPEQuestionList() {
                 ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
                 <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
                 <div class="pe-question-actions">
+                    <button type="button" class="pe-answer-toggle" data-pe-solution-toggle="${qId}" aria-expanded="false">Show answer</button>
                     <div class="pe-feedback-msg" id="${qId}-feedback"></div>
                 </div>
                 ${explanationHtml}
@@ -4521,6 +3515,26 @@ function renderPEQuestionList() {
 
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
+    });
+    bindPESolutionToggles(container);
+}
+
+function togglePESolution(qId, forceOpen = null) {
+    const solution = document.getElementById(`${qId}-solution`);
+    const toggle = [...document.querySelectorAll("[data-pe-solution-toggle]")]
+        .find(button => button.dataset.peSolutionToggle === qId);
+    if (!solution) return;
+    const shouldOpen = forceOpen === null ? !solution.classList.contains("open") : Boolean(forceOpen);
+    solution.classList.toggle("open", shouldOpen);
+    if (toggle) {
+        toggle.textContent = shouldOpen ? "Hide answer" : "Show answer";
+        toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    }
+}
+
+function bindPESolutionToggles(container) {
+    container.querySelectorAll("[data-pe-solution-toggle]").forEach(button => {
+        button.addEventListener("click", () => togglePESolution(button.dataset.peSolutionToggle || ""));
     });
 }
 
@@ -4543,9 +3557,13 @@ async function answerPEQuestion(qId, chosenIndex) {
     try {
         const question = pePracticeQuestionsByDomId.get(qId);
         if (!question) throw new Error("Question is no longer available.");
+        const originalOptionIndexes = Array.isArray(question._optionOriginalIndexes) ? question._optionOriginalIndexes : [];
+        const originalSelectedIndex = Number.isInteger(originalOptionIndexes[chosenIndex])
+            ? originalOptionIndexes[chosenIndex]
+            : chosenIndex;
         result = await apiRequest("question-solution", {
             method: "POST",
-            body: { id: String(question.id), selected_index: chosenIndex }
+            body: { id: String(question.id), selected_index: originalSelectedIndex }
         });
     } catch (error) {
         setPEQuestionLoading(qId, false);
@@ -4555,12 +3573,18 @@ async function answerPEQuestion(qId, chosenIndex) {
     lockPEOptions(qId);
     const chosenBtn = document.getElementById(`${qId}-opt-${chosenIndex}`);
     const feedback = document.getElementById(`${qId}-feedback`);
+    const solutionText = document.getElementById(`${qId}-solution`)?.querySelector(".pe-solution-text");
+    const serverExplanation = typeof result.explanation === "string" ? result.explanation.trim() : "";
+    if (serverExplanation && solutionText) {
+        solutionText.textContent = serverExplanation;
+    }
+    togglePESolution(qId, true);
 
     if (result.correct === true) {
-        chosenBtn.classList.add("pe-correct");
+        chosenBtn?.classList.add("pe-correct");
         if (feedback) { feedback.textContent = "✓ Correct!"; feedback.className = "pe-feedback-msg correct"; }
     } else {
-        chosenBtn.classList.add("pe-incorrect");
+        chosenBtn?.classList.add("pe-incorrect");
         if (feedback) { feedback.textContent = "✕ Not quite."; feedback.className = "pe-feedback-msg incorrect"; }
     }
 }
@@ -4580,589 +3604,3 @@ function accentClassFromColor(color) {
         default: return "";
     }
 }
-
-const ADMIN_MEDIA_MAX_BYTES = 6 * 1024 * 1024;
-const ADMIN_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const ADMIN_AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp4", "audio/wav"]);
-const ADMIN_IMAGE_MAX_DIMENSION = 1600;
-const ADMIN_IMAGE_WEBP_QUALITY = 0.92;
-
-function validateAdminMediaFile(file, mediaType) {
-    const allowedTypes = mediaType === "image" ? ADMIN_IMAGE_TYPES : ADMIN_AUDIO_TYPES;
-    if (!allowedTypes.has(String(file?.type || "").toLowerCase())) {
-        showToast(
-            mediaType === "image"
-                ? "Please use a JPG, PNG, or WebP image."
-                : "Please use an MP3, M4A/MP4, or WAV audio file.",
-            "error"
-        );
-        return false;
-    }
-    if (!Number.isFinite(file.size) || file.size <= 0 || file.size > ADMIN_MEDIA_MAX_BYTES) {
-        showToast("Media files must be no larger than 6 MB.", "error");
-        return false;
-    }
-    return true;
-}
-
-function readFileAsDataURL(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(reader.error || new Error("File could not be read."));
-        reader.readAsDataURL(file);
-    });
-}
-
-function loadAdminImage(file) {
-    return new Promise((resolve, reject) => {
-        const objectUrl = URL.createObjectURL(file);
-        const image = new Image();
-        image.onload = () => {
-            URL.revokeObjectURL(objectUrl);
-            resolve(image);
-        };
-        image.onerror = () => {
-            URL.revokeObjectURL(objectUrl);
-            reject(new Error("Image could not be decoded."));
-        };
-        image.src = objectUrl;
-    });
-}
-
-function dataUrlByteLength(value) {
-    const data = String(value || "").split(",")[1] || "";
-    const padding = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0;
-    return Math.max(0, Math.floor((data.length * 3) / 4) - padding);
-}
-
-async function optimizeAdminImageFile(file) {
-    const image = await loadAdminImage(file);
-    const sourceWidth = Number(image.naturalWidth || image.width || 0);
-    const sourceHeight = Number(image.naturalHeight || image.height || 0);
-    if (!sourceWidth || !sourceHeight || sourceWidth * sourceHeight > 40000000) {
-        throw new Error("Image dimensions are unsupported.");
-    }
-
-    const scale = Math.min(1, ADMIN_IMAGE_MAX_DIMENSION / Math.max(sourceWidth, sourceHeight));
-    const width = Math.max(1, Math.round(sourceWidth * scale));
-    const height = Math.max(1, Math.round(sourceHeight * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) return readFileAsDataURL(file);
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, width, height);
-    context.drawImage(image, 0, 0, width, height);
-
-    const optimized = canvas.toDataURL("image/webp", ADMIN_IMAGE_WEBP_QUALITY);
-    if (!optimized.startsWith("data:image/webp;")) return readFileAsDataURL(file);
-    return dataUrlByteLength(optimized) < file.size ? optimized : readFileAsDataURL(file);
-}
-
-async function handleImageUpload(input) {
-    const file = input.files[0];
-    const preview = document.getElementById("adm-img-preview");
-    const b64     = document.getElementById("adm-img-b64");
-    if (!file) { b64.value = ""; preview.classList.remove("has-preview"); return; }
-    if (!validateAdminMediaFile(file, "image")) {
-        input.value = "";
-        b64.value = "";
-        preview.removeAttribute("src");
-        preview.classList.remove("has-preview");
-        return;
-    }
-    try {
-        const imageDataUrl = await optimizeAdminImageFile(file);
-        if (input.files?.[0] !== file) return;
-        b64.value = imageDataUrl;
-        preview.src = imageDataUrl;
-        preview.classList.add("has-preview");
-    } catch (error) {
-        input.value = "";
-        b64.value = "";
-        preview.removeAttribute("src");
-        preview.classList.remove("has-preview");
-        showToast("This image could not be optimized. Please choose another image.", "error");
-    }
-}
-
-function handleAudioUpload(input) {
-    const file = input.files[0];
-    const preview = document.getElementById("adm-audio-preview");
-    const b64 = document.getElementById("adm-audio-b64");
-    if (!file) { b64.value = ""; preview.classList.add("is-hidden"); return; }
-    if (!validateAdminMediaFile(file, "audio")) {
-        input.value = "";
-        b64.value = "";
-        preview.removeAttribute("src");
-        preview.classList.add("is-hidden");
-        return;
-    }
-    const reader = new FileReader();
-    reader.onload = e => {
-        b64.value = e.target.result;
-        preview.src = e.target.result;
-        preview.classList.remove("is-hidden");
-    };
-    reader.readAsDataURL(file);
-}
-
-function setAdminFormMode(mode) {
-    const isEdit = mode === "edit";
-    document.getElementById("admin-form-title").textContent = isEdit ? "Edit Question" : "Add Question";
-    document.getElementById("admin-submit-btn").textContent = isEdit ? "Save Changes" : "+ Save to Database";
-    document.getElementById("cancel-edit-btn")?.classList.toggle("is-hidden", !isEdit);
-}
-
-function resetAdminForm() {
-    const previous = captureAdminQuestionContext();
-    document.getElementById("admin-form").reset();
-    document.getElementById("adm-img-preview")?.classList.remove("has-preview");
-    document.getElementById("adm-img-b64").value = "";
-    document.getElementById("adm-audio-preview")?.classList.add("is-hidden");
-    document.getElementById("adm-audio-preview").removeAttribute("src");
-    document.getElementById("adm-audio-b64").value = "";
-    document.getElementById("adm-explanation").value = "";
-    document.querySelectorAll("[name='cat-mode']")[0].checked = true;
-    document.querySelectorAll("[name='dest-mode']")[0].checked = true;
-    document.querySelectorAll("[name='pe-type']")[0].checked = true;
-    editingQuestionIndex = null;
-    onDestModeChange();
-    onPeTypeChange();
-    onCatModeChange();
-    if (previous.destMode || previous.existingCategory || previous.newCategory || previous.peTopic) restoreAdminQuestionContext();
-    setAdminFormMode("add");
-}
-
-function cancelQuestionEdit() {
-    resetAdminForm();
-}
-
-async function editQuestion(idx) {
-    const q = questionPool[idx];
-    if (!q) return;
-
-    if (!q._adminMediaLoaded) {
-        showLoading(true, "Loading question media...");
-        try {
-            await loadAdminQuestionMedia(idx);
-        } catch (error) {
-            showToast("Question opened without media preview. Media can be re-uploaded if needed.", "info");
-        } finally {
-            showLoading(false);
-        }
-    }
-
-    editingQuestionIndex = idx;
-    const peInfo = parsePECategory(q.category);
-
-    if (peInfo) {
-        const peDestination = q.sourceTable === "PEOnlineExam" ? "pe-online" : "pe";
-        document.querySelector(`[name='dest-mode'][value='${peDestination}']`).checked = true;
-        onDestModeChange();
-        const editablePeType = peDestination === "pe-online" && peInfo.peType === PE_BCSC_MAIN_TYPE
-            ? "Past Paper"
-            : peInfo.peType;
-        document.querySelector(`[name='pe-type'][value='${editablePeType}']`).checked = true;
-        onPeTypeChange();
-        document.getElementById("adm-pe-topic").value = peInfo.topic || "";
-    } else {
-        // Editing a normal exam question
-        document.querySelector("[name='dest-mode'][value='exam']").checked = true;
-        onDestModeChange();
-        const existingCategory = categories.includes(q.category);
-        document.querySelector("[name='cat-mode'][value='exist']").checked = existingCategory;
-        document.querySelector("[name='cat-mode'][value='new']").checked = !existingCategory;
-        onCatModeChange();
-        if (existingCategory) document.getElementById("adm-cat-select").value = q.category;
-        else document.getElementById("adm-cat-input").value = q.category || "";
-    }
-
-    document.getElementById("adm-question").value = q.question || "";
-    document.getElementById("adm-explanation").value = q.explanation || "";
-    ["A","B","C","D"].forEach((label, index) => {
-        document.getElementById(`adm-${label}`).value = (q.options || [])[index] || "";
-    });
-    document.getElementById("adm-correct").value = Number.isInteger(q.answer) && q.answer >= 0 ? q.answer : 0;
-    document.getElementById("adm-img-b64").value = q.imageCode || "";
-    const preview = document.getElementById("adm-img-preview");
-    preview.src = q.imageCode || "";
-    preview.classList.toggle("has-preview", Boolean(q.imageCode));
-    document.getElementById("adm-audio-b64").value = q.audioCode || "";
-    const audioPreview = document.getElementById("adm-audio-preview");
-    audioPreview.src = q.audioCode || "";
-    audioPreview.classList.toggle("is-hidden", !q.audioCode);
-    setAdminFormMode("edit");
-    document.getElementById("admin-form").scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-	async function saveQuestion() {
-	    let cat = getAdminCategory();
-
-	    if (!cat || cat === "No categories available") {
-	        showToast("Please specify a valid category.", "error"); return;
-	    }
-
-	    const question = document.getElementById("adm-question").value.trim();
-	    const options = ["A","B","C","D"].map(l => document.getElementById(`adm-${l}`).value.trim());
-	    if (!question || options.some(o => !o)) {
-	        showToast("Please complete the question and all four options.", "error"); return;
-	    }
-
-	    showLoading(true, "Saving question to database…");
-	    const payload = {
-            id: "",
-            table: "",
-	        category: cat,
-	        question,
-	        explanation: document.getElementById("adm-explanation").value.trim(),
-	        options,
-	        answer: parseInt(document.getElementById("adm-correct").value),
-	        imageCode: document.getElementById("adm-img-b64").value,
-	        audioCode: document.getElementById("adm-audio-b64").value
-	    };
-
-    const wasEditing = editingQuestionIndex !== null;
-    try {
-        if (wasEditing) {
-            const existing = questionPool[editingQuestionIndex];
-            if (!existing || existing.id === undefined || existing.id === null) {
-                showToast("Question ID is missing. Refresh and try again.", "error");
-                return;
-            }
-            payload.id = String(existing.id);
-            payload.table = getAdminTargetTable(existing);
-        } else {
-            payload.table = getAdminTargetTable();
-        }
-        await adminApiRequest("admin-question", { body: payload });
-        rememberAdminQuestionContext({
-            destMode: payload.table === "PEOnlineExam"
-                ? "pe-online"
-                : isPECategory(payload.category)
-                ? "pe"
-                : "exam",
-            peType: parsePECategory(payload.category)?.peType || PE_BCSC_MAIN_TYPE,
-            catMode: "exist",
-            existingCategory: isPECategory(payload.category) ? "" : payload.category,
-            newCategory: "",
-            peTopic: parsePECategory(payload.category)?.topic || ""
-        });
-        resetAdminForm();
-        clearDatabaseCache();
-        databaseReady = false;
-        await showAdminPortal();
-        showToast(wasEditing ? "Question updated successfully!" : "Question saved successfully!", "success");
-    } catch (e) {
-        console.error("Save question error:", e);
-        showToast(`Failed to save question: ${e.message || "Unknown error"}`, "error");
-    } finally {
-        showLoading(false);
-    }
-	}
-
-	function stripQuestionPrefix(text) {
-	    return String(text || "").trim().replace(/^\d+[\).:-]\s*/, "").replace(/^Question\s*[:.-]\s*/i, "").trim();
-	}
-
-	function stripOptionPrefix(text) {
-	    return String(text || "").trim()
-	        .replace(/^Option\s*[A-D]\s*[:).-]\s*/i, "")
-	        .replace(/^[A-D]\s*[:).-]\s*/i, "")
-	        .replace(/^[1-4]\s*[:).-]\s*/i, "")
-	        .trim();
-	}
-
-	function stripAnswerPrefix(text) {
-	    return String(text || "").trim()
-	        .replace(/^(Correct\s*)?Answer\s*[:.-]\s*/i, "")
-	        .replace(/^Correct\s*[:.-]\s*/i, "")
-	        .trim();
-	}
-
-	function buildBulkQuestion(category, question, options, correctRaw, label) {
-	    const answer = parseCorrectAnswer(stripAnswerPrefix(correctRaw));
-	    const cleanedQuestion = stripQuestionPrefix(question);
-	    const cleanedOptions = options.map(stripOptionPrefix);
-
-	    if (!cleanedQuestion || cleanedOptions.some(option => !option)) {
-	        return { error: `${label}: question and all four options are required` };
-	    }
-
-	    if (answer === -1) {
-	        return { error: `${label}: answer must be A, B, C, D, or 1-4` };
-	    }
-
-	    return {
-	        question: {
-	            category,
-	            question: cleanedQuestion,
-	            options: cleanedOptions,
-	            answer,
-	            imageCode: "",
-	            audioCode: ""
-	        }
-	    };
-	}
-
-	function parsePipeBulkQuestions(rawText, category) {
-	    const questions = [];
-	    const errors = [];
-	    const lines = rawText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-
-	    lines.forEach((line, index) => {
-	        const parts = line.split("|").map(part => part.trim());
-	        if (parts.length !== 6) {
-	            errors.push(`Line ${index + 1}: use Question | A | B | C | D | Answer`);
-	            return;
-	        }
-
-	        const result = buildBulkQuestion(
-	            category,
-	            parts[0],
-	            parts.slice(1, 5),
-	            parts[5],
-	            `Line ${index + 1}`
-	        );
-
-	        if (result.error) errors.push(result.error);
-	        else questions.push(result.question);
-	    });
-
-	    return { questions, errors };
-	}
-
-	function parseBlockBulkQuestions(rawText, category) {
-	    const questions = [];
-	    const errors = [];
-	    const lines = rawText.split(/\r?\n/);
-	    let current = { questionLines: [], options: [], answer: "", startLine: 1 };
-
-	    const finish = (lineNumber) => {
-	        if (!current.questionLines.length && !current.options.length && !current.answer) return;
-	        const label = `Question ${questions.length + 1} (lines ${current.startLine}-${lineNumber})`;
-	        if (current.options.length !== 4 || !current.answer) {
-	            errors.push(`${label}: include A, B, C, D, and Answer`);
-	        } else {
-	            const result = buildBulkQuestion(category, current.questionLines.join("\n"), current.options, current.answer, label);
-	            if (result.error) errors.push(result.error);
-	            else questions.push(result.question);
-	        }
-	        current = { questionLines: [], options: [], answer: "", startLine: lineNumber + 1 };
-	    };
-
-	    lines.forEach((rawLine, index) => {
-	        const line = rawLine.trim();
-	        const lineNumber = index + 1;
-	        if (!line) return;
-	        const answerMatch = line.match(/^(?:(?:correct\s*)?answer|correct)\s*[:.\-)]+\s*(.+)$/i);
-	        const optionMatch = line.match(/^(?:option\s*)?([A-D])\s*[:.\-)]+\s*(.+)$/i);
-
-	        if (answerMatch) {
-	            current.answer = answerMatch[1];
-	            finish(lineNumber);
-	        } else if (optionMatch) {
-	            const expected = ALPHA[current.options.length];
-	            if (optionMatch[1].toUpperCase() !== expected) {
-	                errors.push(`Line ${lineNumber}: expected option ${expected || "Answer"}`);
-	            }
-	            current.options.push(optionMatch[2]);
-	        } else if (current.options.length) {
-	            errors.push(`Line ${lineNumber}: option/answer lines need an A-D or Answer prefix`);
-	        } else {
-	            if (!current.questionLines.length) current.startLine = lineNumber;
-	            current.questionLines.push(line);
-	        }
-	    });
-	    finish(lines.length);
-
-	    return { questions, errors };
-	}
-
-	function parseBulkQuestions(rawText, category) {
-	    const contentLines = rawText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-	    const hasPipeFormat = contentLines.length > 0 && contentLines.every(line => line.split("|").length === 6);
-	    return hasPipeFormat
-	        ? parsePipeBulkQuestions(rawText, category)
-	        : parseBlockBulkQuestions(rawText, category);
-	}
-
-	function updateBulkImportPreview() {
-	    const preview = document.getElementById("bulk-import-preview");
-	    const submit = document.getElementById("bulk-submit-btn");
-	    const input = document.getElementById("bulk-questions");
-	    if (!preview || !submit || !input) return;
-	    const rawText = input.value.trim();
-	    preview.classList.remove("is-ready", "has-error");
-	    if (!rawText) {
-	        preview.textContent = "Paste questions to preview the import.";
-	        submit.disabled = true;
-	        return;
-	    }
-	    const category = getAdminCategory();
-	    if (!category || category === "No categories available") {
-	        preview.textContent = "Choose or enter a destination category first.";
-	        preview.classList.add("has-error");
-	        submit.disabled = true;
-	        return;
-	    }
-	    const { questions, errors } = parseBulkQuestions(rawText, category);
-	    if (errors.length) {
-	        preview.textContent = `${questions.length} valid · ${errors.length} issue${errors.length === 1 ? "" : "s"}. ${errors[0]}`;
-	        preview.classList.add("has-error");
-	        submit.disabled = true;
-	        return;
-	    }
-	    if (questions.length > 200) {
-	        preview.textContent = `${questions.length} questions found. Import at most 200 at a time.`;
-	        preview.classList.add("has-error");
-	        submit.disabled = true;
-	        return;
-	    }
-	    preview.textContent = `${questions.length} question${questions.length === 1 ? "" : "s"} ready for ${category}.`;
-	    preview.classList.add("is-ready");
-	    submit.disabled = questions.length === 0;
-	}
-
-	async function saveBulkQuestions() {
-	    const cat = getAdminCategory();
-	    if (!cat || cat === "No categories available") {
-	        showToast("Please specify a valid category.", "error"); return;
-	    }
-
-	    const rawText = document.getElementById("bulk-questions").value.trim();
-	    if (!rawText) {
-	        showToast("Please paste at least one bulk question line.", "error"); return;
-	    }
-
-	    const { questions, errors } = parseBulkQuestions(rawText, cat);
-	    if (errors.length) {
-	        showToast(errors[0], "error"); return;
-	    }
-	    if (!questions.length) {
-	        showToast("No valid questions found.", "error"); return;
-	    }
-	    if (questions.length > 200) {
-	        showToast("Import at most 200 questions at a time.", "error"); return;
-	    }
-
-	    showLoading(true, `Saving ${questions.length} questions…`);
-	    try {
-	        const table = getAdminTargetTable();
-	        await adminApiRequest("admin-bulk-questions", {
-                body: {
-                    table,
-                    questions: questions.map(question => ({
-                        category: question.category,
-                        question: question.question,
-                        explanation: question.explanation || "",
-                        options: question.options,
-                        answer: question.answer,
-                        imageCode: question.imageCode || "",
-                        audioCode: question.audioCode || ""
-                    }))
-                }
-            });
-
-	        document.getElementById("bulk-form").reset();
-	        updateBulkImportPreview();
-	        clearDatabaseCache();
-            databaseReady = false;
-            await showAdminPortal();
-	        const peInfo = parsePECategory(cat);
-	        const destinationLabel = table === "PEOnlineExam"
-                ? `🧪 PE Online → ${peInfo?.peType || "General"} → ${peInfo?.topic || "General"}`
-                : peInfo
-                ? `📚 PE → ${peInfo.peType} → ${peInfo.topic}`
-                : `Exam category "${cat}"`;
-	        showToast(`${questions.length} questions appended to: ${destinationLabel}`, "success");
-	        if (document.getElementById("pe-view") && document.getElementById("pe-view").style.display !== "none") {
-	            renderPEHomeGrid();
-	            renderPEMockGrid();
-	            renderPEPastGrid();
-	            updatePEOnlineCount();
-	        }
-	    } catch (e) {
-	        console.error("Bulk save error:", e);
-	        showToast(`Bulk append failed: ${e.message || "Please try again."}`, "error");
-	    } finally {
-	        showLoading(false);
-	    }
-	}
-
-	async function viewQuestion(idx) {
-	    const q = questionPool[idx];
-	    if (!q) return;
-	    const body = document.getElementById("question-view-body");
-	    const modal = document.getElementById("question-view-modal");
-	    body.innerHTML = '<div class="empty-state"><p>Loading question details…</p></div>';
-	    modal.classList.add("open");
-	    if (!q._adminMediaLoaded) {
-	        try { await loadAdminQuestionMedia(idx); }
-	        catch (error) { console.warn("Question media preview unavailable:", error); }
-	    }
-
-	    const options = Array.isArray(q.options) ? q.options : [];
-	    const answerIndex = Number.isInteger(q.answer) ? q.answer : parseInt(q.answer, 10);
-	    const optionsHtml = options.slice(0, 4).map((option, oi) => `
-	        <div class="question-view-option ${oi === answerIndex ? 'correct' : ''}">
-	            <span class="question-view-alpha">${ALPHA[oi] || oi + 1}</span>
-	            <span>${escapeHTML(formatOptionText(option))}${oi === answerIndex ? ' ✓' : ''}</span>
-	        </div>
-	    `).join("");
-
-	    const imageSource = safeMediaSource(q.imageCode, "image");
-	    const audioSource = safeMediaSource(q.audioCode, "audio");
-	    body.innerHTML = `
-	        <div class="question-view-category">${escapeHTML(q.category || "Uncategorized")}</div>
-	        <div class="question-view-text">${escapeHTML(q.question || "")}</div>
-	        ${imageSource ? `<img class="question-view-image" src="${imageSource}" alt="Question reference">` : ""}
-	        ${audioSource ? `<audio class="question-view-audio" src="${audioSource}" controls preload="metadata"></audio>` : ""}
-	        <div class="question-view-options">${optionsHtml || '<div class="empty-state"><p>No options found.</p></div>'}</div>
-	        ${q.explanation ? `<div class="question-view-explanation"><strong>Explanation</strong><span>${escapeHTML(q.explanation)}</span></div>` : ""}
-	    `;
-	}
-
-	function closeQuestionView() {
-	    document.getElementById("question-view-modal").classList.remove("open");
-	}
-
-	function handleQuestionViewBackdropClick(e) {
-	    if (e.target === document.getElementById("question-view-modal")) closeQuestionView();
-	}
-
-	function renderAdminTable() {
-	    const tbody = document.getElementById("admin-tbody");
-	    if (!tbody) return;
-    if (questionPool.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><p>No questions in the database yet.</p></div></td></tr>`;
-        return;
-    }
-    const canEdit = adminHasPermission("questions_edit");
-    tbody.innerHTML = questionPool.map((q, i) => {
-        const peInfo = parsePECategory(q.category);
-        const isPEOnline = q.sourceTable === "PEOnlineExam";
-        const badge = peInfo
-            ? `<span class="registry-badge ${isPEOnline ? "pe-online" : "pe"}">${isPEOnline ? "🧪 PE Online" : "📚 PE"} · ${escapeHTML(peInfo.peType)} · ${escapeHTML(peInfo.topic)}</span>`
-            : `<span class="registry-badge exam">${escapeHTML(q.category)}</span>`;
-        return `
-	        <tr>
-	            <td class="registry-index-cell">${i+1}</td>
-	            <td>${badge}</td>
-	            <td class="admin-question-cell" title="${escapeHTML(q.question)}">${escapeHTML(q.question)}</td>
-	            <td><div class="admin-question-actions">
-	                <button type="button" class="btn-view-sm" data-view-question-index="${i}">View</button>
-	                ${canEdit ? `<button type="button" class="btn-view-sm" data-edit-question-index="${i}">Edit</button>` : ""}
-	            </div></td>
-	        </tr>`;
-    }).join("");
-
-    tbody.querySelectorAll("[data-view-question-index]").forEach((button) => {
-        button.addEventListener("click", () => { void viewQuestion(Number(button.dataset.viewQuestionIndex)); });
-    });
-    tbody.querySelectorAll("[data-edit-question-index]").forEach((button) => {
-        button.addEventListener("click", () => editQuestion(Number(button.dataset.editQuestionIndex)));
-    });
-	}
