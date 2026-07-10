@@ -209,9 +209,53 @@ export function validateMediaIds(rawIds) {
 }
 
 export function validateAdminOtpRequestPayload(input) {
-    const value = exactObject(input, ["password"], "Admin OTP request");
+    const value = exactObject(input, ["email", "password"], "Admin OTP request");
     return {
+        email: optionalEmail(value.email).toLowerCase(),
         password: cleanText(value.password, "Password", { min: 1, max: 200 })
+    };
+}
+
+export function validateAdminRolePayload(input) {
+    const value = exactObject(
+        input,
+        [
+            "email",
+            "password",
+            "can_questions_view",
+            "can_questions_create",
+            "can_questions_edit",
+            "can_questions_bulk",
+            "can_flashcards_view",
+            "can_flashcards_create",
+            "can_flashcards_edit",
+            "can_quotes_view",
+            "can_quotes_create",
+            "can_quotes_edit",
+            "active"
+        ],
+        "Admin role"
+    );
+    const booleanField = (field, label) => {
+        if (typeof field !== "boolean") throw validationError("invalid_type", `${label} must be true or false.`);
+        return field;
+    };
+    return {
+        email: optionalEmail(value.email).toLowerCase(),
+        password: value.password === undefined || value.password === null || value.password === ""
+            ? ""
+            : cleanText(value.password, "Delegated admin password", { min: 6, max: 200 }),
+        can_questions_view: booleanField(value.can_questions_view, "Question view permission"),
+        can_questions_create: booleanField(value.can_questions_create, "Question create permission"),
+        can_questions_edit: booleanField(value.can_questions_edit, "Question edit permission"),
+        can_questions_bulk: booleanField(value.can_questions_bulk, "Question bulk permission"),
+        can_flashcards_view: booleanField(value.can_flashcards_view, "Current Affair view permission"),
+        can_flashcards_create: booleanField(value.can_flashcards_create, "Current Affair create permission"),
+        can_flashcards_edit: booleanField(value.can_flashcards_edit, "Current Affair edit permission"),
+        can_quotes_view: booleanField(value.can_quotes_view, "Quote view permission"),
+        can_quotes_create: booleanField(value.can_quotes_create, "Quote create permission"),
+        can_quotes_edit: booleanField(value.can_quotes_edit, "Quote edit permission"),
+        active: booleanField(value.active, "Active status")
     };
 }
 
@@ -229,6 +273,32 @@ export function validateAdminOtpVerifyPayload(input) {
             pattern: /^\d{6}$/
         })
     };
+}
+
+export function validateAdminPasswordRecoveryPayload(input) {
+    const value = exactObject(input, ["access_token", "password"], "Admin password recovery");
+    return {
+        access_token: cleanText(value.access_token, "Recovery token", { min: 40, max: 8192 }),
+        password: cleanText(value.password, "New password", { min: 8, max: 200 })
+    };
+}
+
+export function validateAdminProfilePayload(input) {
+    const value = exactObject(input, ["display_name", "contact_email", "phone", "avatar"], "Admin profile");
+    const phone = value.phone === undefined || value.phone === null || value.phone === ""
+        ? ""
+        : cleanText(String(value.phone), "Phone", { min: 1, max: 30 });
+    return {
+        display_name: cleanText(value.display_name, "Display name", { min: 1, max: 100 }),
+        contact_email: optionalEmail(value.contact_email),
+        phone,
+        avatar: validateMediaReference(value.avatar, "Profile image", "image")
+    };
+}
+
+export function validateAdminRoleDeletePayload(input) {
+    const value = exactObject(input, ["email"], "Admin role deletion");
+    return { email: optionalEmail(value.email).toLowerCase() };
 }
 
 function optionalEntityId(value, label = "ID") {
@@ -321,9 +391,50 @@ export function validateAdminFlashcardPayload(input) {
 
 export function validateAdminQuotePayload(input) {
     const value = exactObject(input, ["id", "english_quote", "dzongkha_quote"], "Admin quote mutation");
+    const englishQuote = cleanText(value.english_quote, "English quote", { min: 0, max: 4000 });
+    const dzongkhaQuote = cleanText(value.dzongkha_quote, "Dzongkha quote", { min: 0, max: 4000 });
+    if (!englishQuote && !dzongkhaQuote) {
+        throw validationError("empty_quote", "Enter an English quote, a Dzongkha quote, or both.");
+    }
     return {
         id: optionalSupabaseRowId(value.id, "Quote ID"),
-        english_quote: cleanText(value.english_quote, "English quote", { min: 1, max: 4000 }),
-        dzongkha_quote: cleanText(value.dzongkha_quote, "Dzongkha quote", { min: 1, max: 4000 })
+        english_quote: englishQuote,
+        dzongkha_quote: dzongkhaQuote
+    };
+}
+
+export function validateAdminPEResourcePayload(input) {
+    const value = exactObject(
+        input,
+        ["id", "kind", "title", "content", "practice_prompt", "practice_answer", "document_url", "preview_url", "published", "sort_order"],
+        "PE resource mutation"
+    );
+    const documentUrl = value.document_url === undefined || value.document_url === null || value.document_url === ""
+        ? ""
+        : cleanText(String(value.document_url), "Document", { min: 5, max: 9 * 1024 * 1024 });
+    const previewUrl = value.preview_url === undefined || value.preview_url === null || value.preview_url === ""
+        ? ""
+        : validateMediaReference(value.preview_url, "Preview image", "image");
+    if (documentUrl
+        && !/^data:application\/pdf;base64,/i.test(documentUrl)
+        && !/^data:image\/(?:jpeg|png|webp);base64,/i.test(documentUrl)
+        && !/^https:\/\/[^\s]+$/i.test(documentUrl)) {
+        throw validationError("invalid_document", "Document must be a PDF or image upload, or a trusted Storage URL.");
+    }
+    const sortOrder = Number(value.sort_order ?? 0);
+    if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 100000) {
+        throw validationError("invalid_sort_order", "Sort order must be a whole number between 0 and 100000.");
+    }
+    return {
+        id: optionalSupabaseRowId(value.id, "PE resource ID"),
+        kind: requiredEnum(value.kind, ["formula", "guide"], "Resource type"),
+        title: cleanText(value.title, "Title", { min: 1, max: 160 }),
+        content: cleanText(String(value.content ?? ""), "Content", { min: 0, max: 30000 }),
+        practice_prompt: cleanText(String(value.practice_prompt ?? ""), "Practice prompt", { min: 0, max: 1000 }),
+        practice_answer: cleanText(String(value.practice_answer ?? ""), "Practice answer", { min: 0, max: 500 }),
+        document_url: documentUrl,
+        preview_url: previewUrl,
+        published: Boolean(value.published),
+        sort_order: sortOrder
     };
 }
