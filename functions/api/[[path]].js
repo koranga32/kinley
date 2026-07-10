@@ -146,7 +146,7 @@ async function handlePEOverview(context) {
 
 async function handlePEResources(context) {
     if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const fields = "id,kind,title,content,practice_prompt,document_url,preview_url,updated_at";
+    const fields = "id,kind,title,content,practice_prompt,document_url,preview_url,website_url,updated_at";
     const rows = await supabaseServerRequest(
         context.env,
         `PEResources?select=${fields}&published=eq.true&order=sort_order.asc,id.asc`

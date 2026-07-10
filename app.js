@@ -2544,18 +2544,23 @@ function renderPEGuidePanel(panel) {
     peGuideCarouselIndex %= guides.length;
     const guide = guides[peGuideCarouselIndex];
     const documentUrl = safeResourceUrl(guide.document_url);
+    const websiteUrl = safeResourceUrl(guide.website_url);
+    const guideLinkUrl = documentUrl || websiteUrl;
     const preview = safeMediaURL(guide.preview_url, "image")
         || (/\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(documentUrl) ? documentUrl : "");
-    const guideBody = `
+    const previewBody = `
         <div class="pe-guide-preview">
             ${preview ? `<img src="${escapeHTML(preview)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div>Document preview</div></div>'}
         </div>
+    `;
+    const guideBody = `
+        ${guideLinkUrl ? `<a class="pe-guide-link" href="${escapeHTML(guideLinkUrl)}" target="_blank" rel="noopener noreferrer">${previewBody}</a>` : previewBody}
         <h3>${escapeHTML(guide.title || "Guide")}</h3>
-        <p class="pe-guide-meta">${documentUrl ? "Opens in a new tab" : "Document preview"}</p>
+        <p class="pe-guide-meta">${documentUrl ? "Opens supporting document" : websiteUrl ? "Opens external website" : "Document preview"}</p>
     `;
     panel.innerHTML = `
         <div class="pe-guide-carousel">
-            ${documentUrl ? `<a class="pe-guide-link" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">${guideBody}</a>` : guideBody}
+            ${guideBody}
             <p class="pe-guide-meta">Guide ${peGuideCarouselIndex + 1} of ${guides.length}</p>
         </div>
     `;
