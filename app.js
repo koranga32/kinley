@@ -49,9 +49,11 @@ let peTopicQuestionCache = new Map();
 let peOverviewCatalog = [];
 let peResourcesCatalog = [];
 let peHomeDashboardLoadPromise = null;
-let peActiveResourceTab = "formula";
+let peActiveResourceTab = "guide";
 let peGuideCarouselIndex = 0;
 let peGuideCarouselTimer = null;
+let peFormulaTopic = "";
+let peFormulaQuestionIndex = 0;
 let cafStateLoaded = false;
 let cafStatePromise = null;
 let submitInProgress = false;
@@ -84,6 +86,7 @@ function bindStaticUiEvents() {
 
     document.getElementById("pe-home-search")?.addEventListener("input", renderPEHomeGrid);
     document.getElementById("pe-home-panel")?.addEventListener("click", handlePEHomeDashboardClick);
+    document.getElementById("pe-home-panel")?.addEventListener("change", handlePENoteToolbarChange);
     document.getElementById("pe-home-panel")?.addEventListener("paste", handlePESelfNotePaste);
     document.getElementById("caf-bhutan-box")?.addEventListener("click", () => cafSelectRegion("Bhutan"));
     document.getElementById("caf-intl-box")?.addEventListener("click", () => cafSelectRegion("International"));
@@ -2455,18 +2458,17 @@ function renderPEHomeDashboard() {
     const di = getPEOverview("Data Interpretation");
     const currentAffairs = Array.isArray(cafNotes) ? cafNotes.length : 0;
     const cards = [
-        ["bi-clipboard-check", "BCSC(main)", bcss.questions, "Questions"],
-        ["bi-book", "Past Paper", past.questions, "Questions"],
-        ["bi-bar-chart-line", "Data Interpretation", di.questions, `${di.questions === 1 ? "Question" : "Questions"} · ${di.graphs} graph${di.graphs === 1 ? "" : "s"}`],
-        ["bi-newspaper", "Current Affairs", currentAffairs, "Questions"]
+        ["BCSC", bcss.questions, "Q"],
+        ["PP", past.questions, "Q"],
+        ["DI", di.questions, `Q · ${di.graphs} G`],
+        ["CA", currentAffairs, "Q"]
     ];
-    const questionTotal = cards.reduce((total, [, , count]) => total + Number(count || 0), 0);
+    const questionTotal = cards.reduce((total, [, count]) => total + Number(count || 0), 0);
     overview.innerHTML = `
         <div class="pe-overview-circles">
-            ${cards.map(([icon, label, count, detail]) => `
+            ${cards.map(([label, count, detail]) => `
                 <div class="pe-overview-item">
                     <div class="pe-overview-circle">
-                        <i class="bi ${icon}" aria-hidden="true"></i>
                         <strong class="pe-overview-value">${Number(count || 0)}</strong>
                         <span class="pe-overview-label">${escapeHTML(detail)}</span>
                     </div>
@@ -2498,30 +2500,59 @@ function renderPEResourceTabs() {
     renderPESelfNotePanel(panels.note);
 }
 
+function getPEFormulaTopics() {
+    const topics = new Map();
+    peResourcesCatalog.filter(item => item.kind === "formula").forEach(item => {
+        const topic = String(item.title || "General").trim() || "General";
+        if (!topics.has(topic)) topics.set(topic, []);
+        topics.get(topic).push(item);
+    });
+    return topics;
+}
+
 function renderPEFormulaPanel(panel) {
     if (!panel) return;
-    const formula = peResourcesCatalog.find(item => item.kind === "formula");
-    if (!formula) {
-        panel.innerHTML = '<div class="pe-empty-msg">Formula sheets will appear here when published.</div>';
+    const topics = getPEFormulaTopics();
+    const topicNames = [...topics.keys()];
+    if (!topicNames.length) {
+        panel.innerHTML = '<div class="pe-empty-msg">Formula practice questions will appear here when published.</div>';
         return;
     }
-    const prompt = String(formula.practice_prompt || "").trim();
-    const documentUrl = safeResourceUrl(formula.document_url);
+    if (!topics.has(peFormulaTopic)) peFormulaTopic = topicNames[0];
+    const questions = topics.get(peFormulaTopic) || [];
+    peFormulaQuestionIndex = Math.max(0, Math.min(peFormulaQuestionIndex, questions.length - 1));
+    const formula = questions[peFormulaQuestionIndex];
+    const prompt = String(formula?.practice_prompt || "").trim();
+    const notes = String(formula?.content || "").trim();
+    const documentUrl = safeResourceUrl(formula?.document_url);
     panel.innerHTML = `
-        <h3>${escapeHTML(formula.title || "Formula Sheet")}</h3>
-        <div class="pe-resource-document">${escapeHTML(formula.content || "").replace(/\n/g, "<br>") || "No formula text has been published yet."}</div>
-        ${documentUrl ? `<div class="pe-resource-actions"><a class="pe-di-graph-btn" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">Open document</a></div>` : ""}
-        ${prompt ? `
-            <div class="pe-resource-practice">
-                <h3>Practice</h3>
-                <div class="pe-formula-answer-row">
-                    <label>${escapeHTML(prompt)}</label>
-                    <input type="text" class="pe-resource-answer" aria-label="Formula practice answer" data-formula-answer>
-                    <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula" data-formula-id="${escapeHTML(String(formula.id || ""))}">Check answer</button>
-                    <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
+        <div class="pe-formula-library">
+            <div class="pe-formula-current">
+                <span class="pe-resource-count">Question ${peFormulaQuestionIndex + 1} of ${questions.length}</span>
+                <h3>${escapeHTML(peFormulaTopic)}</h3>
+                ${notes ? `<div class="pe-resource-document">${escapeHTML(notes).replace(/\n/g, "<br>")}</div>` : ""}
+                <p class="pe-formula-question">${escapeHTML(prompt || "No question text has been published yet.")}</p>
+                <label class="pe-formula-answer-label" for="pe-formula-answer">Write your answer</label>
+                <input id="pe-formula-answer" type="text" class="pe-resource-answer" aria-label="Formula practice answer" data-formula-answer>
+                <div class="pe-formula-nav">
+                    <button type="button" class="pe-di-graph-btn" data-pe-resource-action="formula-prev" ${peFormulaQuestionIndex === 0 ? "disabled" : ""}>Previous</button>
+                    <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula" data-formula-id="${escapeHTML(String(formula?.id || ""))}" ${prompt ? "" : "disabled"}>Check</button>
+                    <button type="button" class="pe-di-graph-btn" data-pe-resource-action="formula-next" ${peFormulaQuestionIndex >= questions.length - 1 ? "disabled" : ""}>Next</button>
                 </div>
+                <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
+                ${documentUrl ? `<div class="pe-resource-actions"><a class="pe-di-graph-btn" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">Open supporting document</a></div>` : ""}
             </div>
-        ` : ""}
+            <aside class="pe-formula-topics" aria-label="Formula topics">
+                <h3>Formula Topics</h3>
+                <div class="pe-formula-topic-list">
+                    ${topicNames.map(topic => `
+                        <button type="button" class="pe-formula-topic-item${topic === peFormulaTopic ? " active" : ""}" data-pe-resource-action="select-formula-topic" data-formula-topic="${escapeHTML(topic)}" aria-pressed="${topic === peFormulaTopic}">
+                            <strong>${escapeHTML(topic)}</strong><small>${topics.get(topic)?.length || 0} question${topics.get(topic)?.length === 1 ? "" : "s"}</small>
+                        </button>
+                    `).join("")}
+                </div>
+            </aside>
+        </div>
     `;
 }
 
@@ -2547,22 +2578,23 @@ function renderPEGuidePanel(panel) {
     const websiteUrl = safeResourceUrl(guide.website_url);
     const guideLinkUrl = documentUrl || websiteUrl;
     const guideLinkLabel = documentUrl ? "Open supporting document" : "Open external website";
-    const preview = safeMediaURL(guide.preview_url, "image")
-        || (/\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(documentUrl) ? documentUrl : "");
-    const previewBody = `
-        <div class="pe-guide-preview">
-            ${preview ? `<img src="${escapeHTML(preview)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div>Document preview</div></div>'}
-        </div>
-    `;
-    const guideBody = `
-        ${guideLinkUrl ? `<button type="button" class="pe-guide-link pe-guide-link-button" data-pe-resource-action="open-guide" data-guide-id="${escapeHTML(String(guide.id || ""))}" title="${guideLinkLabel}" aria-label="${guideLinkLabel}">${previewBody}</button>` : previewBody}
-        <h3>${escapeHTML(guide.title || "Guide")}</h3>
-        <p class="pe-guide-meta">${documentUrl ? "Opens supporting document" : websiteUrl ? "Opens external website" : "Document preview"}</p>
-    `;
+    const preview = safeMediaURL(guide.preview_url, "image");
+    const documentIsImage = /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(documentUrl);
+    const embeddedUrl = documentUrl || websiteUrl;
+    const embeddedType = documentUrl ? "Document" : websiteUrl ? "Website" : "Preview";
+    const guideMaterial = documentIsImage
+        ? `<img src="${escapeHTML(documentUrl)}" alt="${escapeHTML(guide.title || "Guide document")}" loading="lazy">`
+        : embeddedUrl
+            ? `<iframe src="${escapeHTML(embeddedUrl)}" title="${escapeHTML(guide.title || embeddedType)}" loading="lazy" referrerpolicy="no-referrer"${websiteUrl && !documentUrl ? ' sandbox="allow-forms allow-popups allow-same-origin allow-scripts"' : ""}></iframe>`
+            : preview
+                ? `<img src="${escapeHTML(preview)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">`
+                : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div>No preview available</div></div>';
     panel.innerHTML = `
         <div class="pe-guide-library">
             <div class="pe-guide-current">
-                ${guideBody}
+                ${guideLinkUrl ? `<button type="button" class="pe-guide-heading" data-pe-resource-action="open-guide" data-guide-id="${escapeHTML(String(guide.id || ""))}" title="${guideLinkLabel}">${escapeHTML(guide.title || "Guide")} <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></button>` : `<h3 class="pe-guide-heading-static">${escapeHTML(guide.title || "Guide")}</h3>`}
+                <div class="pe-guide-material">${guideMaterial}</div>
+                <p class="pe-guide-meta">${guideLinkUrl ? `${embeddedType} preview · click the heading to open in a new tab` : "Preview only"}</p>
             </div>
             <aside class="pe-guide-reading" aria-label="Reading materials">
                 <h3>Reading Materials</h3>
@@ -2590,12 +2622,14 @@ function renderPESelfNotePanel(panel) {
     let draft = "";
     try { draft = sessionStorage.getItem(PE_NOTE_DRAFT_KEY) || ""; } catch (e) {}
     panel.innerHTML = `
-        <h3>Self Note</h3>
+        <h3>NoteDown</h3>
         <div class="pe-note-toolbar" aria-label="Text formatting">
-            <button type="button" class="pe-di-graph-btn" data-note-command="bold" aria-label="Bold">B</button>
-            <button type="button" class="pe-di-graph-btn" data-note-command="italic" aria-label="Italic">I</button>
-            <button type="button" class="pe-di-graph-btn" data-note-command="underline" aria-label="Underline">U</button>
-            <button type="button" class="pe-di-graph-btn" data-note-command="insertUnorderedList">List</button>
+            <button type="button" class="pe-note-tool" data-note-command="bold" aria-label="Bold"><strong>B</strong></button>
+            <button type="button" class="pe-note-tool" data-note-command="italic" aria-label="Italic"><em>I</em></button>
+            <button type="button" class="pe-note-tool" data-note-command="underline" aria-label="Underline"><u>U</u></button>
+            <select class="pe-note-select pe-note-size" data-note-size aria-label="Font size"><option value="2">Small</option><option value="3" selected>Normal</option><option value="5">Large</option></select>
+            <select class="pe-note-select" data-note-alignment aria-label="Paragraph alignment"><option value="">Paragraph alignment</option><option value="justifyLeft">Align left</option><option value="justifyCenter">Align center</option><option value="justifyRight">Align right</option><option value="justifyFull">Justify</option></select>
+            <button type="button" class="pe-note-tool" data-note-command="insertUnorderedList" aria-label="Bulleted list"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
         </div>
         <div class="pe-note-editor" id="pe-note-editor" contenteditable="true" role="textbox" aria-multiline="true"></div>
         <div class="pe-resource-actions">
@@ -2615,7 +2649,7 @@ function renderPESelfNotePanel(panel) {
 function handlePEHomeDashboardClick(event) {
     const tab = event.target.closest("[data-pe-resource-tab]");
     if (tab) {
-        peActiveResourceTab = tab.dataset.peResourceTab || "formula";
+        peActiveResourceTab = tab.dataset.peResourceTab || "guide";
         renderPEResourceTabs();
         return;
     }
@@ -2626,7 +2660,18 @@ function handlePEHomeDashboardClick(event) {
         return;
     }
     const action = event.target.closest("[data-pe-resource-action]")?.dataset.peResourceAction;
-    if (action === "select-guide") {
+    if (action === "select-formula-topic") {
+        peFormulaTopic = event.target.closest("[data-formula-topic]")?.dataset.formulaTopic || "";
+        peFormulaQuestionIndex = 0;
+        renderPEFormulaPanel(document.getElementById("pe-resource-formula"));
+    } else if (action === "formula-prev") {
+        if (peFormulaQuestionIndex > 0) peFormulaQuestionIndex -= 1;
+        renderPEFormulaPanel(document.getElementById("pe-resource-formula"));
+    } else if (action === "formula-next") {
+        const questions = getPEFormulaTopics().get(peFormulaTopic) || [];
+        if (peFormulaQuestionIndex < questions.length - 1) peFormulaQuestionIndex += 1;
+        renderPEFormulaPanel(document.getElementById("pe-resource-formula"));
+    } else if (action === "select-guide") {
         const index = Number(event.target.closest("[data-guide-index]")?.dataset.guideIndex);
         const guideCount = peResourcesCatalog.filter(item => item.kind === "guide").length;
         if (Number.isInteger(index) && index >= 0 && index < guideCount) {
@@ -2650,8 +2695,23 @@ function handlePEHomeDashboardClick(event) {
     }
 }
 
+function handlePENoteToolbarChange(event) {
+    const editor = document.getElementById("pe-note-editor");
+    if (!editor) return;
+    if (event.target.matches("[data-note-size]")) {
+        editor.focus();
+        document.execCommand("fontSize", false, event.target.value);
+    } else if (event.target.matches("[data-note-alignment]")) {
+        const command = event.target.value;
+        if (!command) return;
+        editor.focus();
+        document.execCommand(command, false, null);
+        event.target.value = "";
+    }
+}
+
 function sanitizePESelfNoteHtml(value) {
-    const allowedTags = new Set(["b", "strong", "i", "em", "u", "ul", "ol", "li", "p", "div", "br"]);
+    const allowedTags = new Set(["b", "strong", "i", "em", "u", "ul", "ol", "li", "p", "div", "br", "font"]);
     const template = document.createElement("template");
     template.innerHTML = String(value || "");
     const sanitizeNode = node => {
@@ -2659,6 +2719,10 @@ function sanitizePESelfNoteHtml(value) {
         if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment();
         const tag = node.tagName.toLowerCase();
         const target = allowedTags.has(tag) ? document.createElement(tag) : document.createDocumentFragment();
+        if (target.nodeType === Node.ELEMENT_NODE) {
+            if (tag === "font" && /^[1-7]$/.test(node.getAttribute("size") || "")) target.setAttribute("size", node.getAttribute("size"));
+            if ((tag === "div" || tag === "p") && /^(left|center|right|justify)$/.test(node.style.textAlign || "")) target.style.textAlign = node.style.textAlign;
+        }
         [...node.childNodes].forEach(child => target.appendChild(sanitizeNode(child)));
         return target;
     };
@@ -2789,7 +2853,7 @@ function exportPESelfNoteDocx() {
     const url = URL.createObjectURL(buildStoredZip(files));
     const link = document.createElement("a");
     link.href = url;
-    link.download = "examportal-self-note.docx";
+    link.download = "examportal-notedown.docx";
     document.body.appendChild(link);
     link.click();
     link.remove();
