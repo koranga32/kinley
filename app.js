@@ -485,26 +485,36 @@ function clearPublicApiCache() {
 // This guarantees question saving keeps working even if the database
 // schema was never updated with an `explanation` field.
 const EXPLANATION_DELIM = "\n§§EXPLAIN§§\n";
+const QUESTION_META_DELIM = "\n§§QUESTION_META§§\n";
 
 function decodeQuestionWithExplanation(rawQuestion) {
-    const text = rawQuestion || "";
-    const idx = text.indexOf(EXPLANATION_DELIM);
-    if (idx === -1) return { question: text, explanation: "" };
+    const text = String(rawQuestion || "");
+    const explanationIndex = text.indexOf(EXPLANATION_DELIM);
+    const content = explanationIndex === -1 ? text : text.slice(0, explanationIndex);
+    const metaIndex = content.indexOf(QUESTION_META_DELIM);
+    let metadata = {};
+    if (metaIndex !== -1) {
+        try { metadata = JSON.parse(content.slice(metaIndex + QUESTION_META_DELIM.length)); } catch (error) {}
+    }
     return {
-        question: text.slice(0, idx),
-        explanation: text.slice(idx + EXPLANATION_DELIM.length)
+        question: metaIndex === -1 ? content : content.slice(0, metaIndex),
+        explanation: explanationIndex === -1 ? "" : text.slice(explanationIndex + EXPLANATION_DELIM.length),
+        answerType: metadata?.answer_type === "written" ? "written" : "multiple_choice",
+        writtenAnswer: metadata?.answer_type === "written" ? String(metadata.written_answer || "") : ""
     };
 }
 
 function mapExamRows(rows, sourceTable = "Exam") {
     return (rows || []).map(row => {
-        const { question, explanation } = decodeQuestionWithExplanation(row.question);
+        const { question, explanation, answerType, writtenAnswer } = decodeQuestionWithExplanation(row.question);
         return {
             id: row.id,
             sourceTable,
             category: row.category,
             question,
             explanation,
+            answerType: row.answer_type === "written" ? "written" : answerType,
+            writtenAnswer,
             options: [row.optionA, row.optionB, row.optionC, row.optionD],
             answer: parseCorrectAnswer(row.answer),
             imageCode: row.image || "",
@@ -519,6 +529,8 @@ function mapSecureExamRows(rows) {
         category: row.category,
         question: row.question || "",
         explanation: "",
+        answerType: "multiple_choice",
+        writtenAnswer: "",
         options: Array.isArray(row.options) ? row.options.slice(0, 4) : [],
         answer: -1,
         imageCode: "",
@@ -3245,6 +3257,76 @@ function getPEDISetQuestions(setName) {
     return getPETopicQuestions("Data Interpretation", setName);
 }
 
+function isPEWrittenAnswer(question) {
+    return question?.answerType === "written";
+}
+
+function writtenAnswerControlHtml(qId) {
+    return `
+        <div class="pe-written-answer" id="${qId}-written-wrap">
+            <label for="${qId}-written-input">Your answer</label>
+            <input type="text" id="${qId}-written-input" autocomplete="off" spellcheck="false" placeholder="Write your answer">
+        </div>
+    `;
+}
+
+function writtenAnswerActionHtml(qId) {
+    return `
+        <button type="button" class="pe-answer-toggle" data-pe-written-answer-qid="${qId}">Check answer</button>
+        <div class="pe-feedback-msg" id="${qId}-feedback"></div>
+    `;
+}
+
+function setPEWrittenAnswerLoading(qId, loading) {
+    const input = document.getElementById(`${qId}-written-input`);
+    const button = document.querySelector(`[data-pe-written-answer-qid="${qId}"]`);
+    if (input) input.disabled = loading;
+    if (button) button.disabled = loading;
+}
+
+function lockPEWrittenAnswer(qId) {
+    const input = document.getElementById(`${qId}-written-input`);
+    const button = document.querySelector(`[data-pe-written-answer-qid="${qId}"]`);
+    if (input) input.disabled = true;
+    if (button) button.disabled = true;
+}
+
+async function answerPEWrittenQuestion(qId) {
+    const input = document.getElementById(`${qId}-written-input`);
+    const writtenAnswer = String(input?.value || "");
+    if (!writtenAnswer.trim()) {
+        showToast("Please write your answer first.", "info");
+        input?.focus();
+        return;
+    }
+    setPEWrittenAnswerLoading(qId, true);
+    let result;
+    try {
+        const question = pePracticeQuestionsByDomId.get(qId);
+        if (!question) throw new Error("Question is no longer available.");
+        result = await apiRequest("question-solution", {
+            method: "POST",
+            body: { id: String(question.id), written_answer: writtenAnswer }
+        });
+    } catch (error) {
+        setPEWrittenAnswerLoading(qId, false);
+        showToast(`Could not check answer: ${error.message}`, "error");
+        return;
+    }
+    lockPEWrittenAnswer(qId);
+    const feedback = document.getElementById(`${qId}-feedback`);
+    const solutionText = document.getElementById(`${qId}-solution`)?.querySelector(".pe-solution-text");
+    const serverExplanation = typeof result.explanation === "string" ? result.explanation.trim() : "";
+    if (serverExplanation && solutionText) solutionText.textContent = serverExplanation;
+    togglePESolution(qId, true);
+    if (result.correct === true) {
+        if (feedback) { feedback.textContent = "Correct!"; feedback.className = "pe-feedback-msg correct"; }
+    } else if (feedback) {
+        feedback.textContent = "Not quite.";
+        feedback.className = "pe-feedback-msg incorrect";
+    }
+}
+
 function hammingDistance(a, b) {
     if (!a || !b || a.length !== b.length) return Number.POSITIVE_INFINITY;
     let distance = 0;
@@ -3417,6 +3499,7 @@ function renderPEDIQuestion() {
 
     container.innerHTML = activeGroup.questions.map((q, questionIndex) => {
         const options = Array.isArray(q.options) ? q.options : [];
+        const isWritten = isPEWrittenAnswer(q);
         const qId = `pe-di-g-${peDIActiveGraphIndex}-q-${questionIndex}`;
         pePracticeQuestionsByDomId.set(qId, q);
         const optionsHtml = options.slice(0, 4).map((opt, optionIndex) => `
@@ -3436,10 +3519,9 @@ function renderPEDIQuestion() {
                 </div>
                 <div class="pe-question-text">${escapePEHtml(q.question || "")}</div>
                 ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
-                <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
+                ${isWritten ? writtenAnswerControlHtml(qId) : `<div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>`}
                 <div class="pe-question-actions">
-                    <button type="button" class="pe-answer-toggle" data-pe-solution-toggle="${qId}" aria-expanded="false">Show answer</button>
-                    <div class="pe-feedback-msg" id="${qId}-feedback"></div>
+                    ${isWritten ? writtenAnswerActionHtml(qId) : `<button type="button" class="pe-answer-toggle" data-pe-solution-toggle="${qId}" aria-expanded="false">Show answer</button><div class="pe-feedback-msg" id="${qId}-feedback"></div>`}
                 </div>
                 <div class="pe-solution-box accent-purple" id="${qId}-solution">
                     <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
@@ -3451,6 +3533,9 @@ function renderPEDIQuestion() {
 
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
+    });
+    container.querySelectorAll("[data-pe-written-answer-qid]").forEach((button) => {
+        button.addEventListener("click", () => answerPEWrittenQuestion(button.dataset.peWrittenAnswerQid || ""));
     });
     bindPESolutionToggles(container);
     observePEDIChartGroups(container);
@@ -3472,6 +3557,7 @@ function renderPEQuestionList() {
     container.innerHTML = list.map((q, idx) => {
         const peInfo = parsePECategory(q.category);
         const options = Array.isArray(q.options) ? q.options : [];
+        const isWritten = isPEWrittenAnswer(q);
         const qId = `pe-q-${idx}`;
         const accent = peInfo.peType === "Past Paper" ? "#4caf50" : "#00bcd4";
         pePracticeQuestionsByDomId.set(qId, q);
@@ -3503,10 +3589,9 @@ function renderPEQuestionList() {
                 <div class="pe-question-text">${escapePEHtml(q.question || "")}</div>
                 ${safeMediaSource(q.imageCode, "image") ? `<img src="${safeMediaSource(q.imageCode, "image")}" class="pe-question-image" alt="Question image" loading="lazy" decoding="async">` : ""}
                 ${safeMediaSource(q.audioCode, "audio") ? `<div class="q-audio-wrap"><audio src="${safeMediaSource(q.audioCode, "audio")}" class="q-audio" controls preload="metadata"></audio></div>` : ""}
-                <div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>
+                ${isWritten ? writtenAnswerControlHtml(qId) : `<div class="pe-options-grid" id="${qId}-options">${optionsHtml}</div>`}
                 <div class="pe-question-actions">
-                    <button type="button" class="pe-answer-toggle" data-pe-solution-toggle="${qId}" aria-expanded="false">Show answer</button>
-                    <div class="pe-feedback-msg" id="${qId}-feedback"></div>
+                    ${isWritten ? writtenAnswerActionHtml(qId) : `<button type="button" class="pe-answer-toggle" data-pe-solution-toggle="${qId}" aria-expanded="false">Show answer</button><div class="pe-feedback-msg" id="${qId}-feedback"></div>`}
                 </div>
                 ${explanationHtml}
             </div>
@@ -3515,6 +3600,9 @@ function renderPEQuestionList() {
 
     container.querySelectorAll("[data-pe-answer-qid]").forEach((button) => {
         button.addEventListener("click", () => answerPEQuestion(button.dataset.peAnswerQid || "", Number(button.dataset.peAnswerOpt)));
+    });
+    container.querySelectorAll("[data-pe-written-answer-qid]").forEach((button) => {
+        button.addEventListener("click", () => answerPEWrittenQuestion(button.dataset.peWrittenAnswerQid || ""));
     });
     bindPESolutionToggles(container);
 }

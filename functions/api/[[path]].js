@@ -98,7 +98,14 @@ async function handleQuestions(context) {
             params.set("category", `eq.${category}`);
             return supabaseServerRequest(context.env, `Exam?${params.toString()}`);
         }));
-        return json(responses.flatMap(rows => rows || []), 200, PUBLIC_CACHE_SHORT);
+        return json(responses.flatMap(rows => rows || []).map(row => {
+            const stored = decodeStoredQuestion(row.question);
+            return {
+                ...row,
+                question: stored.question,
+                answer_type: stored.answerType
+            };
+        }), 200, PUBLIC_CACHE_SHORT);
     }
     if (view === "media") {
         const ids = validateMediaIds(url.searchParams.get("ids"));
@@ -186,17 +193,16 @@ async function handlePEResourceAnswer(context) {
 
 async function handleQuestionSolution(context) {
     if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    const payload = await readJson(context.request, 1024);
+    const payload = await readJson(context.request, 4096);
     if (!payload || typeof payload !== "object" || Array.isArray(payload)
-        || Object.keys(payload).some(key => !["id", "selected_index"].includes(key))) {
+        || Object.keys(payload).some(key => !["id", "selected_index", "written_answer"].includes(key))) {
         return apiError(400, "invalid_check", "Question check contains unexpected fields.");
     }
     const id = String(payload.id || "").trim();
-    const selectedIndex = Number(payload.selected_index);
     if (!/^\d{1,12}$/.test(id)) return apiError(400, "invalid_id", "Question ID is invalid.");
-    if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex > 3) {
-        return apiError(400, "invalid_selection", "Selected answer must be 0, 1, 2, or 3.");
-    }
+    const hasSelectedIndex = Object.hasOwn(payload, "selected_index");
+    const hasWrittenAnswer = Object.hasOwn(payload, "written_answer");
+    if (hasSelectedIndex === hasWrittenAnswer) return apiError(400, "invalid_check", "Provide one answer to check.");
     const rows = await supabaseServerRequest(
         context.env,
         `Exam?select=id,category,question,answer&id=eq.${id}&limit=1`
@@ -205,9 +211,30 @@ async function handleQuestionSolution(context) {
     if (!String(rows[0].category || "").startsWith("__PE__::")) {
         return apiError(403, "solution_unavailable", "Solutions are available only in PE practice.");
     }
+    const stored = decodeStoredQuestion(rows[0].question);
+    if (hasWrittenAnswer) {
+        if (stored.answerType !== "written") return apiError(400, "invalid_answer_type", "This question requires a multiple-choice answer.");
+        const submitted = payload.written_answer;
+        if (typeof submitted !== "string" || submitted.length > 2000) {
+            return apiError(400, "invalid_written_answer", "Written answer must be text up to 2000 characters.");
+        }
+        const expected = String(stored.writtenAnswer || "").trim().toLocaleLowerCase();
+        if (!expected) return apiError(404, "written_answer_unavailable", "Written answer is not available.");
+        return json({
+            id: String(rows[0].id),
+            correct: submitted.trim().toLocaleLowerCase() === expected,
+            explanation: stored.explanation
+        });
+    }
+    if (stored.answerType === "written") return apiError(400, "invalid_answer_type", "This question requires a written answer.");
+    const selectedIndex = Number(payload.selected_index);
+    if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex > 3) {
+        return apiError(400, "invalid_selection", "Selected answer must be 0, 1, 2, or 3.");
+    }
     return json({
         id: String(rows[0].id),
-        correct: selectedIndex === parseAnswerIndex(rows[0].answer)
+        correct: selectedIndex === parseAnswerIndex(rows[0].answer),
+        explanation: stored.explanation
     });
 }
 
@@ -330,8 +357,30 @@ function parseAnswerIndex(value) {
     return -1;
 }
 
+const QUESTION_META_DELIM = "\n§§QUESTION_META§§\n";
+const EXPLANATION_DELIM = "\n§§EXPLAIN§§\n";
+
+function decodeStoredQuestion(raw) {
+    const text = String(raw || "");
+    const explanationIndex = text.indexOf(EXPLANATION_DELIM);
+    const content = explanationIndex === -1 ? text : text.slice(0, explanationIndex);
+    const explanation = explanationIndex === -1 ? "" : text.slice(explanationIndex + EXPLANATION_DELIM.length);
+    const metaIndex = content.indexOf(QUESTION_META_DELIM);
+    const question = metaIndex === -1 ? content : content.slice(0, metaIndex);
+    let metadata = {};
+    if (metaIndex !== -1) {
+        try { metadata = JSON.parse(content.slice(metaIndex + QUESTION_META_DELIM.length)); } catch (error) {}
+    }
+    return {
+        question,
+        explanation,
+        answerType: metadata?.answer_type === "written" ? "written" : "multiple_choice",
+        writtenAnswer: metadata?.answer_type === "written" ? String(metadata.written_answer || "") : ""
+    };
+}
+
 function publicQuestionText(raw) {
-    return String(raw || "").split("\n§§EXPLAIN§§\n", 1)[0];
+    return decodeStoredQuestion(raw).question;
 }
 
 let examSessionSchemaReady = false;

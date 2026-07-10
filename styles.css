@@ -3983,6 +3983,35 @@
             margin-bottom: 14px;
         }
 
+        .pe-written-answer {
+            display: grid;
+            gap: 6px;
+            max-width: 440px;
+            margin-bottom: 14px;
+        }
+
+        .pe-written-answer label {
+            color: #cbd2dd;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .pe-written-answer input {
+            min-height: 38px;
+            padding: 8px 10px;
+            border: 1.5px solid #383d46;
+            border-radius: 7px;
+            background: #20232a;
+            color: #f5f7fb;
+            font: inherit;
+            font-size: 13px;
+        }
+
+        .pe-written-answer input:focus {
+            outline: none;
+            border-color: var(--clr, #4caf50);
+        }
+
         .pe-option {
             padding: 11px 14px;
             border: 1.5px solid #383d46;
