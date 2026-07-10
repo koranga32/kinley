@@ -2562,12 +2562,25 @@
         .pe-resource-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px; margin-top: 7px; }
         .pe-resource-feedback { color: #b8e8c5; font-size: 13px; font-weight: 700; }
         .pe-guide-carousel { width: min(100%, 360px); margin: 0 auto; }
+        .pe-guide-library { width: min(100%, 820px); margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(230px, 0.8fr); gap: 16px; align-items: start; }
+        .pe-guide-current { min-width: 0; }
+        .pe-guide-current > h3 { margin-top: 10px; text-align: center; }
         .pe-guide-link { display: block; color: inherit; text-decoration: none; }
         .pe-guide-link-button { width: 100%; margin: 0; padding: 0; border: 0; background: transparent; font: inherit; text-align: inherit; cursor: pointer; appearance: none; }
         .pe-guide-preview { display: grid; place-items: center; aspect-ratio: 16 / 10; overflow: hidden; background: #1f232b; border: 1px solid #4a5260; border-radius: 8px; }
         .pe-guide-preview img { width: 100%; height: 100%; object-fit: contain; }
         .pe-guide-placeholder { color: #aeb4c0; text-align: center; }
         .pe-guide-meta { margin-top: 10px; color: #aeb4c0; text-align: center; font-size: 12px; }
+        .pe-guide-reading { min-width: 0; padding: 12px; border: 1px solid #4a5260; border-radius: 8px; background: #1f232b; }
+        .pe-guide-reading > h3 { margin: 0 0 10px; text-align: center; }
+        .pe-guide-reading-list { display: grid; gap: 7px; }
+        .pe-guide-reading-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #3f4652; border-radius: 7px; background: #2b2f36; color: #e8ebf1; text-align: left; cursor: pointer; }
+        .pe-guide-reading-item:hover { border-color: #60a5fa; background: #303641; }
+        .pe-guide-reading-item.active { border-color: #60a5fa; background: #1f4fa5; }
+        .pe-guide-reading-item i { flex: 0 0 auto; font-size: 20px; }
+        .pe-guide-reading-item span { min-width: 0; display: grid; gap: 2px; }
+        .pe-guide-reading-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pe-guide-reading-item small { color: #aeb4c0; font-size: 11px; }
         .pe-note-toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-bottom: 10px; }
         .pe-note-toolbar button { min-width: 34px; }
         .pe-note-editor { min-height: 210px; padding: 12px; border: 1px solid #4a5260; border-radius: 6px; background: #1f232b; color: #f5f7fb; outline: none; }
@@ -3801,6 +3814,7 @@
 
             #pe-home-panel.active .pe-home-dashboard-section:last-child { display: block; }
             .pe-resource-panel { min-height: 220px; overflow-y: visible; }
+            .pe-guide-library { grid-template-columns: 1fr; }
 
             .pe-content:has(#pe-di-viewer-screen.active) {
                 overflow-y: auto;

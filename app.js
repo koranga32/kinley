@@ -2560,17 +2560,29 @@ function renderPEGuidePanel(panel) {
         <p class="pe-guide-meta">${documentUrl ? "Opens supporting document" : websiteUrl ? "Opens external website" : "Document preview"}</p>
     `;
     panel.innerHTML = `
-        <div class="pe-guide-carousel">
-            ${guideBody}
-            <p class="pe-guide-meta">Guide ${peGuideCarouselIndex + 1} of ${guides.length}</p>
+        <div class="pe-guide-library">
+            <div class="pe-guide-current">
+                ${guideBody}
+            </div>
+            <aside class="pe-guide-reading" aria-label="Reading materials">
+                <h3>Reading Materials</h3>
+                <div class="pe-guide-reading-list">
+                    ${guides.map((item, index) => {
+                        const hasDocument = Boolean(safeResourceUrl(item.document_url));
+                        const hasWebsite = Boolean(safeResourceUrl(item.website_url));
+                        const materialType = hasDocument ? "Document" : hasWebsite ? "Website" : "Preview only";
+                        const icon = hasDocument ? "bi-file-earmark-text" : hasWebsite ? "bi-link-45deg" : "bi-book";
+                        return `
+                            <button type="button" class="pe-guide-reading-item${index === peGuideCarouselIndex ? " active" : ""}" data-pe-resource-action="select-guide" data-guide-index="${index}" aria-pressed="${index === peGuideCarouselIndex}">
+                                <i class="bi ${icon}" aria-hidden="true"></i>
+                                <span><strong>${escapeHTML(item.title || `Guide ${index + 1}`)}</strong><small>${materialType}</small></span>
+                            </button>
+                        `;
+                    }).join("")}
+                </div>
+            </aside>
         </div>
     `;
-    if (guides.length > 1 && peActiveResourceTab === "guide" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        peGuideCarouselTimer = setInterval(() => {
-            peGuideCarouselIndex = (peGuideCarouselIndex + 1) % guides.length;
-            renderPEGuidePanel(panel);
-        }, 4000);
-    }
 }
 
 function renderPESelfNotePanel(panel) {
@@ -2614,7 +2626,14 @@ function handlePEHomeDashboardClick(event) {
         return;
     }
     const action = event.target.closest("[data-pe-resource-action]")?.dataset.peResourceAction;
-    if (action === "open-guide") {
+    if (action === "select-guide") {
+        const index = Number(event.target.closest("[data-guide-index]")?.dataset.guideIndex);
+        const guideCount = peResourcesCatalog.filter(item => item.kind === "guide").length;
+        if (Number.isInteger(index) && index >= 0 && index < guideCount) {
+            peGuideCarouselIndex = index;
+            renderPEGuidePanel(document.getElementById("pe-resource-guide"));
+        }
+    } else if (action === "open-guide") {
         const guideId = event.target.closest("[data-guide-id]")?.dataset.guideId || "";
         const guide = peResourcesCatalog.find(item => String(item.id || "") === guideId && item.kind === "guide");
         const targetUrl = safeResourceUrl(guide?.document_url) || safeResourceUrl(guide?.website_url);
