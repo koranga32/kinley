@@ -1,13 +1,7 @@
 import { apiError, handleError, json, methodNotAllowed, readJson, validationError, withSessionCookie } from "../_shared/http.js";
 import { enforceRateLimits, getSession, rejectCrossSiteRequest } from "../_shared/security.js";
-import { supabaseServerRequest, supabaseStorageUpload } from "../_shared/supabase.js";
+import { supabaseServerRequest } from "../_shared/supabase.js";
 import {
-    validateAdminBulkQuestionsPayload,
-    validateAdminFlashcardPayload,
-    validateAdminOtpRequestPayload,
-    validateAdminOtpVerifyPayload,
-    validateAdminQuestionPayload,
-    validateAdminQuotePayload,
     validateContactPayload,
     validateEmptyPayload,
     validateExamStartPayload,
@@ -25,10 +19,6 @@ const PUBLIC_CACHE_MEDIA = {
     "Cache-Control": "public, max-age=300, s-maxage=1800, stale-while-revalidate=600"
 };
 const MEDIA_BUCKET = "exam-media";
-const MEDIA_MIME_TYPES = new Set([
-    "image/jpeg", "image/png", "image/webp",
-    "audio/mpeg", "audio/mp4", "audio/wav"
-]);
 
 const POLICIES = {
     health: { windowMs: MINUTE, ipLimit: 30, sessionLimit: 30 },
@@ -279,38 +269,6 @@ async function handleFlashcards(context) {
     ), 200, PUBLIC_CACHE_SHORT);
 }
 
-async function handleAdminQuestions(context) {
-    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const authFailure = await requireAdminAccess(context);
-    if (authFailure) return authFailure;
-    const fields = "id,category,question,optionA,optionB,optionC,optionD,answer";
-    const [examRows, peOnlineRows] = await Promise.all([
-        supabaseServerRequest(context.env, `Exam?select=${fields}&order=id.asc`),
-        supabaseServerRequest(context.env, `PEOnlineExam?select=${fields}&order=id.asc`)
-    ]);
-    return json({ exam: examRows || [], peOnline: peOnlineRows || [] });
-}
-
-async function handleAdminQuestionMedia(context) {
-    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const authFailure = await requireAdminAccess(context);
-    if (authFailure) return authFailure;
-    const url = new URL(context.request.url);
-    const table = String(url.searchParams.get("table") || "");
-    const id = String(url.searchParams.get("id") || "").trim();
-    if (!["Exam", "PEOnlineExam"].includes(table)) {
-        return apiError(400, "invalid_table", "Question table must be Exam or PEOnlineExam.");
-    }
-    if (!/^\d{1,12}$/.test(id)) {
-        return apiError(400, "invalid_id", "Question ID is invalid.");
-    }
-    const rows = await supabaseServerRequest(
-        context.env,
-        `${table}?select=id,image,audio&id=eq.${encodeURIComponent(id)}&limit=1`
-    );
-    return json(rows || []);
-}
-
 function normalizeOption(value) {
     const text = String(value || "").trim();
     const isoDateOnly = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d{3})?Z$/;
@@ -384,7 +342,6 @@ function publicQuestionText(raw) {
 }
 
 let examSessionSchemaReady = false;
-let adminOtpSchemaReady = false;
 
 async function ensureExamSessionSchema(db) {
     if (examSessionSchemaReady) return;
@@ -403,59 +360,6 @@ async function ensureExamSessionSchema(db) {
     examSessionSchemaReady = true;
 }
 
-async function ensureAdminOtpSchema(db) {
-    if (adminOtpSchemaReady) return;
-    await db.prepare(`
-        create table if not exists admin_otp_requests (
-            request_id text primary key,
-            session_id text not null,
-            code_hash text not null,
-            access_token text not null,
-            refresh_token text,
-            attempts integer not null default 0,
-            expires_at integer not null,
-            used_at integer
-        )
-    `).run();
-    await db.prepare(`
-        create index if not exists admin_otp_expiry_idx
-        on admin_otp_requests (expires_at)
-    `).run();
-    adminOtpSchemaReady = true;
-}
-
-async function sha256Hex(value) {
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-    return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function generateOtpCode() {
-    const range = 1000000;
-    const ceiling = 0x100000000 - (0x100000000 % range);
-    const values = new Uint32Array(1);
-    do {
-        crypto.getRandomValues(values);
-    } while (values[0] >= ceiling);
-    return String(values[0] % range).padStart(6, "0");
-}
-
-function maskEmailAddress(email) {
-    const [localPart, domain = ""] = String(email || "").split("@");
-    if (!localPart || !domain) return "your email";
-    const localMasked = localPart.length <= 2
-        ? `${localPart[0] || "*"}*`
-        : `${localPart.slice(0, 2)}${"*".repeat(Math.max(localPart.length - 2, 1))}`;
-    return `${localMasked}@${domain}`;
-}
-
-async function purgeExpiredAdminOtps(db) {
-    const cutoff = Date.now();
-    await db.prepare("delete from admin_otp_requests where expires_at < ?1 or used_at is not null")
-        .bind(cutoff)
-        .run()
-        .catch(() => {});
-}
-
 async function sendTransactionalEmail(context, email) {
     const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -471,73 +375,6 @@ async function sendTransactionalEmail(context, email) {
         throw new Error("email_delivery_failed");
     }
     return result;
-}
-
-async function authenticateAdminPassword(context, password) {
-    if (!context.env.SUPABASE_URL || !context.env.ADMIN_EMAIL || !context.env.SUPABASE_PUBLISHABLE_KEY) {
-        throw new Error("security_not_configured");
-    }
-    const response = await fetch(`${context.env.SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-        method: "POST",
-        headers: {
-            apikey: context.env.SUPABASE_PUBLISHABLE_KEY,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            email: context.env.ADMIN_EMAIL,
-            password
-        })
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.access_token) {
-        return null;
-    }
-    return result;
-}
-
-async function requireAdminAccess(context) {
-    const authorization = context.request.headers.get("authorization") || "";
-    if (!authorization.startsWith("Bearer ")) {
-        return apiError(401, "missing_admin_token", "Admin authentication is required.");
-    }
-    if (!context.env.SUPABASE_URL || !context.env.SUPABASE_PUBLISHABLE_KEY || !context.env.ADMIN_EMAIL) {
-        return apiError(503, "security_not_configured", "Admin security is not configured yet.");
-    }
-    const response = await fetch(`${context.env.SUPABASE_URL}/auth/v1/user`, {
-        headers: {
-            apikey: context.env.SUPABASE_PUBLISHABLE_KEY,
-            Authorization: authorization
-        }
-    });
-    const result = await response.json().catch(() => ({}));
-    const email = String(result?.email || "");
-    if (!response.ok || !email) {
-        return apiError(401, "invalid_admin_token", "Admin session is invalid or expired.");
-    }
-    if (email.toLowerCase() !== String(context.env.ADMIN_EMAIL || "").toLowerCase()) {
-        return apiError(403, "admin_forbidden", "This account is not allowed to perform admin changes.");
-    }
-    return null;
-}
-
-function encodeQuestionWithExplanation(questionText, explanation) {
-    const cleanExplanation = String(explanation || "").trim();
-    if (!cleanExplanation) return questionText;
-    return `${questionText}\n§§EXPLAIN§§\n${cleanExplanation}`;
-}
-
-function toSupabaseQuestionPayload(question) {
-    return {
-        category: question.category,
-        question: encodeQuestionWithExplanation(question.question, question.explanation),
-        optionA: question.options[0],
-        optionB: question.options[1],
-        optionC: question.options[2],
-        optionD: question.options[3],
-        answer: ["A", "B", "C", "D"][question.answer] || "A",
-        image: question.imageCode || "",
-        audio: question.audioCode || ""
-    };
 }
 
 function trustedStoragePrefix(env) {
@@ -574,61 +411,6 @@ function normalizePublicMediaRow(env, row, idTransform = value => value) {
         image: normalizePublicMediaValue(env, row.image, "image"),
         audio: normalizePublicMediaValue(env, row.audio, "audio")
     };
-}
-
-function decodeMediaDataUrl(dataUrl, expectedType) {
-    const match = /^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl);
-    if (!match || !match[1].toLowerCase().startsWith(`${expectedType}/`)) {
-        throw validationError("invalid_media", `A valid base64 ${expectedType} file is required.`);
-    }
-    const contentType = match[1].toLowerCase();
-    if (!MEDIA_MIME_TYPES.has(contentType)) {
-        throw validationError("unsupported_media_type", `The ${expectedType} file type is not supported.`);
-    }
-    let binary;
-    try {
-        binary = atob(match[2]);
-    } catch {
-        throw validationError("invalid_media", `The ${expectedType} file is invalid.`);
-    }
-    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
-    if (!bytes.length || bytes.length > 6 * 1024 * 1024) {
-        throw validationError("invalid_media_size", `The ${expectedType} file must be no larger than 6 MB.`);
-    }
-    return { bytes, contentType };
-}
-
-function mediaExtension(contentType) {
-    return ({
-        "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
-        "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/wav": "wav"
-    })[contentType];
-}
-
-async function storeQuestionMedia(env, value, expectedType, table, category) {
-    if (!value) return "";
-    if (/^https:\/\//i.test(value)) {
-        if (!value.startsWith(trustedStoragePrefix(env))) {
-            throw validationError("untrusted_media_url", "Only media from this project's exam-media bucket is allowed.");
-        }
-        return value;
-    }
-    const { bytes, contentType } = decodeMediaDataUrl(value, expectedType);
-    const section = table === "PEOnlineExam"
-        ? "pe-online"
-        : String(category || "").startsWith("__PE__::")
-            ? "pe-practice"
-            : "normal-exam";
-    const objectPath = `${section}/${expectedType}/${crypto.randomUUID()}.${mediaExtension(contentType)}`;
-    return supabaseStorageUpload(env, MEDIA_BUCKET, objectPath, bytes, contentType);
-}
-
-async function prepareQuestionMedia(env, question) {
-    const [imageCode, audioCode] = await Promise.all([
-        storeQuestionMedia(env, question.imageCode, "image", question.table, question.category),
-        storeQuestionMedia(env, question.audioCode, "audio", question.table, question.category)
-    ]);
-    return { ...question, imageCode, audioCode };
 }
 
 function buildSecureQuestions(rows, idPrefix = "") {
@@ -956,190 +738,6 @@ async function handleContact(context) {
         return apiError(502, "contact_delivery_failed", "Message delivery failed. Please try again later.");
     }
     return json({ ok: true }, 201);
-}
-
-async function handleAdminOtpRequest(context, sessionId) {
-    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    if (!context.env.RESEND_API_KEY || !context.env.ADMIN_EMAIL || !context.env.ADMIN_OTP_EMAIL) {
-        return apiError(503, "security_not_configured", "Admin email verification is not configured yet.");
-    }
-    const { password } = validateAdminOtpRequestPayload(await readJson(context.request, 4096));
-    const authData = await authenticateAdminPassword(context, password);
-    if (!authData) {
-        return apiError(401, "invalid_credentials", "Admin password is incorrect.");
-    }
-
-    await ensureAdminOtpSchema(context.env.RATE_LIMIT_DB);
-    const requestId = crypto.randomUUID();
-    const code = generateOtpCode();
-    const now = Date.now();
-    const expiresAt = now + 5 * MINUTE;
-    const codeHash = await sha256Hex(`${context.env.RATE_LIMIT_SALT}:admin-otp:${requestId}:${code}`);
-    await context.env.RATE_LIMIT_DB.prepare("delete from admin_otp_requests where session_id = ?1")
-        .bind(sessionId)
-        .run();
-    await context.env.RATE_LIMIT_DB.prepare(`
-        insert into admin_otp_requests (
-            request_id, session_id, code_hash, access_token, refresh_token, attempts, expires_at, used_at
-        ) values (?1, ?2, ?3, ?4, ?5, 0, ?6, null)
-    `).bind(
-        requestId,
-        sessionId,
-        codeHash,
-        String(authData.access_token || ""),
-        String(authData.refresh_token || ""),
-        expiresAt
-    ).run();
-
-    const maskedEmail = maskEmailAddress(context.env.ADMIN_OTP_EMAIL);
-    const message = [
-        "Your ExamPortal admin verification code is:",
-        "",
-        code,
-        "",
-        "This code expires in 5 minutes.",
-        "If you did not request this, please ignore this email."
-    ].join("\n");
-    try {
-        await sendTransactionalEmail(context, {
-            from: "ExamPortal <onboarding@resend.dev>",
-            to: [context.env.ADMIN_OTP_EMAIL],
-            subject: "ExamPortal admin verification code",
-            text: message
-        });
-    } catch (error) {
-        await context.env.RATE_LIMIT_DB.prepare("delete from admin_otp_requests where request_id = ?1")
-            .bind(requestId)
-            .run()
-            .catch(() => {});
-        return apiError(502, "otp_delivery_failed", "Verification code could not be sent. Please try again.");
-    }
-
-    if (Math.random() < 0.2) context.waitUntil(purgeExpiredAdminOtps(context.env.RATE_LIMIT_DB));
-
-    return json({
-        ok: true,
-        request_id: requestId,
-        destination: maskedEmail,
-        expires_in_seconds: 300
-    }, 201);
-}
-
-async function handleAdminOtpVerify(context, sessionId) {
-    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    if (!context.env.RATE_LIMIT_SALT) {
-        return apiError(503, "security_not_configured", "Admin email verification is not configured yet.");
-    }
-    const { request_id: requestId, code } = validateAdminOtpVerifyPayload(await readJson(context.request, 4096));
-    await ensureAdminOtpSchema(context.env.RATE_LIMIT_DB);
-    const now = Date.now();
-    const row = await context.env.RATE_LIMIT_DB.prepare(`
-        select request_id, session_id, code_hash, access_token, refresh_token, attempts, expires_at, used_at
-        from admin_otp_requests
-        where request_id = ?1
-        limit 1
-    `).bind(requestId).first();
-    if (!row || row.session_id !== sessionId || row.used_at || Number(row.expires_at) < now) {
-        return apiError(401, "invalid_or_expired_code", "Verification code is invalid or expired.");
-    }
-    if (Number(row.attempts || 0) >= 5) {
-        await context.env.RATE_LIMIT_DB.prepare("delete from admin_otp_requests where request_id = ?1")
-            .bind(requestId)
-            .run();
-        return apiError(429, "too_many_attempts", "Too many incorrect codes. Request a new code.");
-    }
-    const codeHash = await sha256Hex(`${context.env.RATE_LIMIT_SALT}:admin-otp:${requestId}:${code}`);
-    if (codeHash !== row.code_hash) {
-        await context.env.RATE_LIMIT_DB.prepare("update admin_otp_requests set attempts = attempts + 1 where request_id = ?1")
-            .bind(requestId)
-            .run();
-        return apiError(401, "invalid_or_expired_code", "Verification code is invalid or expired.");
-    }
-    await context.env.RATE_LIMIT_DB.prepare("update admin_otp_requests set used_at = ?2 where request_id = ?1")
-        .bind(requestId, now)
-        .run();
-    if (Math.random() < 0.2) context.waitUntil(purgeExpiredAdminOtps(context.env.RATE_LIMIT_DB));
-    return json({
-        ok: true,
-        access_token: String(row.access_token || ""),
-        refresh_token: String(row.refresh_token || "")
-    }, 201);
-}
-
-async function handleAdminQuestion(context) {
-    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    const authFailure = await requireAdminAccess(context);
-    if (authFailure) return authFailure;
-    const validatedPayload = validateAdminQuestionPayload(await readJson(context.request, 20 * 1024 * 1024));
-    const payload = await prepareQuestionMedia(context.env, validatedPayload);
-    const path = payload.id
-        ? `${payload.table}?id=eq.${encodeURIComponent(payload.id)}`
-        : payload.table;
-    await supabaseServerRequest(context.env, path, {
-        method: payload.id ? "PATCH" : "POST",
-        body: toSupabaseQuestionPayload(payload),
-        prefer: "return=minimal"
-    });
-    return json({ ok: true }, payload.id ? 200 : 201);
-}
-
-async function handleAdminBulkQuestions(context) {
-    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    const authFailure = await requireAdminAccess(context);
-    if (authFailure) return authFailure;
-    const payload = validateAdminBulkQuestionsPayload(await readJson(context.request, 10 * 1024 * 1024));
-    const preparedQuestions = [];
-    for (const question of payload.questions) {
-        preparedQuestions.push(await prepareQuestionMedia(context.env, question));
-    }
-    await supabaseServerRequest(context.env, payload.table, {
-        method: "POST",
-        body: preparedQuestions.map(toSupabaseQuestionPayload),
-        prefer: "return=minimal"
-    });
-    return json({ ok: true, count: payload.questions.length }, 201);
-}
-
-async function handleAdminFlashcard(context) {
-    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    const authFailure = await requireAdminAccess(context);
-    if (authFailure) return authFailure;
-    const payload = validateAdminFlashcardPayload(await readJson(context.request, 16384));
-    const path = payload.id
-        ? `${"CurrentAffairFlashcards"}?id=eq.${encodeURIComponent(payload.id)}`
-        : "CurrentAffairFlashcards";
-    await supabaseServerRequest(context.env, path, {
-        method: payload.id ? "PATCH" : "POST",
-        body: {
-            scope: payload.scope,
-            category: payload.category,
-            date_stamp: payload.date_stamp,
-            exam_focus: payload.exam_focus,
-            answer: payload.answer
-        },
-        prefer: "return=minimal"
-    });
-    return json({ ok: true }, payload.id ? 200 : 201);
-}
-
-async function handleAdminQuote(context) {
-    if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
-    const authFailure = await requireAdminAccess(context);
-    if (authFailure) return authFailure;
-    const payload = validateAdminQuotePayload(await readJson(context.request, 16384));
-    const path = payload.id
-        ? `${"daily_quotes"}?id=eq.${encodeURIComponent(payload.id)}`
-        : "daily_quotes";
-    await supabaseServerRequest(context.env, path, {
-        method: payload.id ? "PATCH" : "POST",
-        body: {
-            english_quote: payload.english_quote,
-            dzongkha_quote: payload.dzongkha_quote,
-            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        },
-        prefer: "return=minimal"
-    });
-    return json({ ok: true }, payload.id ? 200 : 201);
 }
 
 export async function onRequest(context) {
