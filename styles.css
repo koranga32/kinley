@@ -2454,6 +2454,12 @@
             margin-top: 30px;
         }
 
+        .pe-home-dashboard-section {
+            width: min(100%, 900px);
+            margin-left: auto;
+            margin-right: auto;
+        }
+
         .pe-content:has(#pe-home-panel.active) {
             overflow: hidden;
             padding: 16px 24px;
@@ -2480,6 +2486,7 @@
         #pe-home-panel.active h2 {
             margin-bottom: 6px;
             font-size: 1.3rem;
+            text-align: center;
         }
 
         .pe-overview-card,
@@ -2526,6 +2533,7 @@
         .pe-resource-tabs {
             display: flex;
             flex-wrap: wrap;
+            justify-content: center;
             gap: 6px;
             margin-bottom: 6px;
         }
@@ -2544,18 +2552,21 @@
 
         .pe-resource-tab.active { background: #2563eb; border-color: #60a5fa; color: #fff; }
         .pe-resource-panel { min-height: 0; flex: 1 1 auto; overflow-y: auto; }
+        .pe-resource-panel > h3,
+        .pe-resource-panel > .pe-empty-msg { text-align: center; }
         .pe-resource-document { white-space: pre-wrap; color: #e8ebf1; font-size: 12px; line-height: 1.35; }
         .pe-resource-practice { margin-top: 8px; padding-top: 8px; border-top: 1px solid #383d46; }
         .pe-resource-practice input { width: min(160px, 100%); margin: 4px; }
-        .pe-resource-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 7px; }
+        .pe-resource-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px; margin-top: 7px; }
         .pe-resource-feedback { color: #b8e8c5; font-size: 13px; font-weight: 700; }
         .pe-guide-carousel { width: min(100%, 360px); margin: 0 auto; }
         .pe-guide-link { display: block; color: inherit; text-decoration: none; }
+        .pe-guide-link-button { width: 100%; margin: 0; padding: 0; border: 0; background: transparent; font: inherit; text-align: inherit; cursor: pointer; appearance: none; }
         .pe-guide-preview { display: grid; place-items: center; aspect-ratio: 16 / 10; overflow: hidden; background: #1f232b; border: 1px solid #4a5260; border-radius: 8px; }
         .pe-guide-preview img { width: 100%; height: 100%; object-fit: contain; }
         .pe-guide-placeholder { color: #aeb4c0; text-align: center; }
         .pe-guide-meta { margin-top: 10px; color: #aeb4c0; text-align: center; font-size: 12px; }
-        .pe-note-toolbar { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+        .pe-note-toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-bottom: 10px; }
         .pe-note-toolbar button { min-width: 34px; }
         .pe-note-editor { min-height: 210px; padding: 12px; border: 1px solid #4a5260; border-radius: 6px; background: #1f232b; color: #f5f7fb; outline: none; }
         .pe-note-editor:focus { border-color: #60a5fa; box-shadow: 0 0 0 2px rgba(96,165,250,0.2); }

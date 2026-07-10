@@ -2546,6 +2546,7 @@ function renderPEGuidePanel(panel) {
     const documentUrl = safeResourceUrl(guide.document_url);
     const websiteUrl = safeResourceUrl(guide.website_url);
     const guideLinkUrl = documentUrl || websiteUrl;
+    const guideLinkLabel = documentUrl ? "Open supporting document" : "Open external website";
     const preview = safeMediaURL(guide.preview_url, "image")
         || (/\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(documentUrl) ? documentUrl : "");
     const previewBody = `
@@ -2554,7 +2555,7 @@ function renderPEGuidePanel(panel) {
         </div>
     `;
     const guideBody = `
-        ${guideLinkUrl ? `<a class="pe-guide-link" href="${escapeHTML(guideLinkUrl)}" target="_blank" rel="noopener noreferrer">${previewBody}</a>` : previewBody}
+        ${guideLinkUrl ? `<button type="button" class="pe-guide-link pe-guide-link-button" data-pe-resource-action="open-guide" data-guide-id="${escapeHTML(String(guide.id || ""))}" title="${guideLinkLabel}" aria-label="${guideLinkLabel}">${previewBody}</button>` : previewBody}
         <h3>${escapeHTML(guide.title || "Guide")}</h3>
         <p class="pe-guide-meta">${documentUrl ? "Opens supporting document" : websiteUrl ? "Opens external website" : "Document preview"}</p>
     `;
@@ -2613,7 +2614,12 @@ function handlePEHomeDashboardClick(event) {
         return;
     }
     const action = event.target.closest("[data-pe-resource-action]")?.dataset.peResourceAction;
-    if (action === "check-formula") {
+    if (action === "open-guide") {
+        const guideId = event.target.closest("[data-guide-id]")?.dataset.guideId || "";
+        const guide = peResourcesCatalog.find(item => String(item.id || "") === guideId && item.kind === "guide");
+        const targetUrl = safeResourceUrl(guide?.document_url) || safeResourceUrl(guide?.website_url);
+        if (targetUrl) window.open(targetUrl, "_blank", "noopener,noreferrer");
+    } else if (action === "check-formula") {
         void checkPEFormulaAnswer(event.target.closest("[data-formula-id]")?.dataset.formulaId || "");
     } else if (action === "save-draft") {
         const editor = document.getElementById("pe-note-editor");
