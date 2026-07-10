@@ -2531,8 +2531,9 @@ function renderPEGuidePanel(panel) {
     }
     peGuideCarouselIndex %= guides.length;
     const guide = guides[peGuideCarouselIndex];
-    const preview = safeMediaURL(guide.preview_url, "image");
     const documentUrl = safeResourceUrl(guide.document_url);
+    const preview = safeMediaURL(guide.preview_url, "image")
+        || (/\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(documentUrl) ? documentUrl : "");
     const guideBody = `
         <div class="pe-guide-preview">
             ${preview ? `<img src="${escapeHTML(preview)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div>Document preview</div></div>'}
