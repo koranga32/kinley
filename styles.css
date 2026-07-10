@@ -2556,7 +2556,9 @@
         .pe-resource-panel > .pe-empty-msg { text-align: center; }
         .pe-resource-document { white-space: pre-wrap; color: #e8ebf1; font-size: 12px; line-height: 1.35; }
         .pe-resource-practice { margin-top: 8px; padding-top: 8px; border-top: 1px solid #383d46; }
-        .pe-resource-practice input { width: min(160px, 100%); margin: 4px; }
+        .pe-formula-answer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px; }
+        .pe-formula-answer-row label { margin: 0; }
+        .pe-resource-practice input { width: min(160px, 100%); margin: 0; }
         .pe-resource-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px; margin-top: 7px; }
         .pe-resource-feedback { color: #b8e8c5; font-size: 13px; font-weight: 700; }
         .pe-guide-carousel { width: min(100%, 360px); margin: 0 auto; }

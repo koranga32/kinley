@@ -2514,9 +2514,9 @@ function renderPEFormulaPanel(panel) {
         ${prompt ? `
             <div class="pe-resource-practice">
                 <h3>Practice</h3>
-                <label>${escapeHTML(prompt)}</label>
-                <div><input type="text" class="pe-resource-answer" aria-label="Formula practice answer" data-formula-answer></div>
-                <div class="pe-resource-actions">
+                <div class="pe-formula-answer-row">
+                    <label>${escapeHTML(prompt)}</label>
+                    <input type="text" class="pe-resource-answer" aria-label="Formula practice answer" data-formula-answer>
                     <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula" data-formula-id="${escapeHTML(String(formula.id || ""))}">Check answer</button>
                     <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
                 </div>
