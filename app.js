@@ -2458,10 +2458,10 @@ function renderPEHomeDashboard() {
     const di = getPEOverview("Data Interpretation");
     const currentAffairs = Array.isArray(cafNotes) ? cafNotes.length : 0;
     const cards = [
-        ["BCSC", bcss.questions, "Q"],
-        ["PP", past.questions, "Q"],
-        ["DI", di.questions, `Q · ${di.graphs} G`],
-        ["CA", currentAffairs, "Q"]
+        ["BCSC(main)", bcss.questions, "Q"],
+        ["Past Paper", past.questions, "Q"],
+        ["Data Interpretation", di.questions, `Q · ${di.graphs} G`],
+        ["Current Affairs", currentAffairs, "Q"]
     ];
     const questionTotal = cards.reduce((total, [, count]) => total + Number(count || 0), 0);
     overview.innerHTML = `
@@ -2520,27 +2520,35 @@ function renderPEFormulaPanel(panel) {
     }
     if (!topics.has(peFormulaTopic)) peFormulaTopic = topicNames[0];
     const questions = topics.get(peFormulaTopic) || [];
-    peFormulaQuestionIndex = Math.max(0, Math.min(peFormulaQuestionIndex, questions.length - 1));
-    const formula = questions[peFormulaQuestionIndex];
-    const prompt = String(formula?.practice_prompt || "").trim();
-    const notes = String(formula?.content || "").trim();
-    const documentUrl = safeResourceUrl(formula?.document_url);
+    const pageSize = 4;
+    const pageCount = Math.max(1, Math.ceil(questions.length / pageSize));
+    peFormulaQuestionIndex = Math.max(0, Math.min(peFormulaQuestionIndex, pageCount - 1));
+    const start = peFormulaQuestionIndex * pageSize;
+    const visibleQuestions = questions.slice(start, start + pageSize);
     panel.innerHTML = `
         <div class="pe-formula-library">
             <div class="pe-formula-current">
-                <span class="pe-resource-count">Question ${peFormulaQuestionIndex + 1} of ${questions.length}</span>
-                <h3>${escapeHTML(peFormulaTopic)}</h3>
-                ${notes ? `<div class="pe-resource-document">${escapeHTML(notes).replace(/\n/g, "<br>")}</div>` : ""}
-                <p class="pe-formula-question">${escapeHTML(prompt || "No question text has been published yet.")}</p>
-                <label class="pe-formula-answer-label" for="pe-formula-answer">Write your answer</label>
-                <input id="pe-formula-answer" type="text" class="pe-resource-answer" aria-label="Formula practice answer" data-formula-answer>
+                <div class="pe-formula-header">
+                    <span class="pe-resource-count">Questions ${start + 1}-${Math.min(start + visibleQuestions.length, questions.length)} of ${questions.length}</span>
+                    <strong>Use Box given below to write Your Answer</strong>
+                </div>
+                <div class="pe-formula-question-list">
+                    ${visibleQuestions.map((formula, index) => {
+                        const prompt = String(formula.practice_prompt || "").trim();
+                        return `
+                            <div class="pe-formula-row" data-formula-row>
+                                <span class="pe-formula-question"><strong>${start + index + 1}.</strong> ${escapeHTML(prompt || "No question text has been published yet.")}</span>
+                                <input type="text" class="pe-resource-answer" aria-label="Answer for question ${start + index + 1}" data-formula-answer>
+                                <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula" data-formula-id="${escapeHTML(String(formula.id || ""))}" ${prompt ? "" : "disabled"}>Check</button>
+                                <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
                 <div class="pe-formula-nav">
                     <button type="button" class="pe-di-graph-btn" data-pe-resource-action="formula-prev" ${peFormulaQuestionIndex === 0 ? "disabled" : ""}>Previous</button>
-                    <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula" data-formula-id="${escapeHTML(String(formula?.id || ""))}" ${prompt ? "" : "disabled"}>Check</button>
-                    <button type="button" class="pe-di-graph-btn" data-pe-resource-action="formula-next" ${peFormulaQuestionIndex >= questions.length - 1 ? "disabled" : ""}>Next</button>
+                    <button type="button" class="pe-di-graph-btn" data-pe-resource-action="formula-next" ${peFormulaQuestionIndex >= pageCount - 1 ? "disabled" : ""}>Next</button>
                 </div>
-                <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
-                ${documentUrl ? `<div class="pe-resource-actions"><a class="pe-di-graph-btn" href="${escapeHTML(documentUrl)}" target="_blank" rel="noopener noreferrer">Open supporting document</a></div>` : ""}
             </div>
             <aside class="pe-formula-topics" aria-label="Formula topics">
                 <h3>Formula Topics</h3>
@@ -2580,15 +2588,13 @@ function renderPEGuidePanel(panel) {
     const guideLinkLabel = documentUrl ? "Open supporting document" : "Open external website";
     const preview = safeMediaURL(guide.preview_url, "image");
     const documentIsImage = /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(documentUrl);
-    const embeddedUrl = documentUrl || websiteUrl;
     const embeddedType = documentUrl ? "Document" : websiteUrl ? "Website" : "Preview";
-    const guideMaterial = documentIsImage
-        ? `<img src="${escapeHTML(documentUrl)}" alt="${escapeHTML(guide.title || "Guide document")}" loading="lazy">`
-        : embeddedUrl
-            ? `<iframe src="${escapeHTML(embeddedUrl)}" title="${escapeHTML(guide.title || embeddedType)}" loading="lazy" referrerpolicy="no-referrer"${websiteUrl && !documentUrl ? ' sandbox="allow-forms allow-popups allow-same-origin allow-scripts"' : ""}></iframe>`
-            : preview
-                ? `<img src="${escapeHTML(preview)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">`
-                : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div>No preview available</div></div>';
+    const displayImage = documentIsImage ? documentUrl : preview;
+    const readingContent = String(guide.content || "").trim();
+    const guideMaterial = `
+        ${displayImage ? `<img src="${escapeHTML(displayImage)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : `<div class="pe-guide-placeholder"><i class="bi ${websiteUrl && !documentUrl ? "bi-link-45deg" : "bi-file-earmark-text"}" aria-hidden="true"></i><div>${websiteUrl && !documentUrl ? "Website preview" : "Document preview"}</div></div>`}
+        ${readingContent ? `<div class="pe-guide-reading-content">${escapeHTML(readingContent).replace(/\n/g, "<br>")}</div>` : ""}
+    `;
     panel.innerHTML = `
         <div class="pe-guide-library">
             <div class="pe-guide-current">
@@ -2669,7 +2675,8 @@ function handlePEHomeDashboardClick(event) {
         renderPEFormulaPanel(document.getElementById("pe-resource-formula"));
     } else if (action === "formula-next") {
         const questions = getPEFormulaTopics().get(peFormulaTopic) || [];
-        if (peFormulaQuestionIndex < questions.length - 1) peFormulaQuestionIndex += 1;
+        const pageCount = Math.max(1, Math.ceil(questions.length / 4));
+        if (peFormulaQuestionIndex < pageCount - 1) peFormulaQuestionIndex += 1;
         renderPEFormulaPanel(document.getElementById("pe-resource-formula"));
     } else if (action === "select-guide") {
         const index = Number(event.target.closest("[data-guide-index]")?.dataset.guideIndex);
@@ -2684,7 +2691,8 @@ function handlePEHomeDashboardClick(event) {
         const targetUrl = safeResourceUrl(guide?.document_url) || safeResourceUrl(guide?.website_url);
         if (targetUrl) window.open(targetUrl, "_blank", "noopener,noreferrer");
     } else if (action === "check-formula") {
-        void checkPEFormulaAnswer(event.target.closest("[data-formula-id]")?.dataset.formulaId || "");
+        const button = event.target.closest("[data-formula-id]");
+        void checkPEFormulaAnswer(button?.dataset.formulaId || "", button);
     } else if (action === "save-draft") {
         const editor = document.getElementById("pe-note-editor");
         try { sessionStorage.setItem(PE_NOTE_DRAFT_KEY, sanitizePESelfNoteHtml(editor?.innerHTML || "")); } catch (e) {}
@@ -2738,9 +2746,10 @@ function handlePESelfNotePaste(event) {
     document.execCommand("insertText", false, text);
 }
 
-async function checkPEFormulaAnswer(id) {
-    const answer = document.querySelector("[data-formula-answer]")?.value.trim() || "";
-    const feedback = document.querySelector("[data-formula-feedback]");
+async function checkPEFormulaAnswer(id, trigger) {
+    const row = trigger?.closest?.("[data-formula-row]");
+    const answer = row?.querySelector("[data-formula-answer]")?.value.trim() || "";
+    const feedback = row?.querySelector("[data-formula-feedback]");
     if (!id || !answer) {
         if (feedback) feedback.textContent = "Enter an answer first";
         return;
