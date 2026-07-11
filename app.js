@@ -2460,19 +2460,18 @@ function renderPEHomeDashboard() {
     const di = getPEOverview("Data Interpretation");
     const currentAffairs = Array.isArray(cafNotes) ? cafNotes.length : 0;
     const cards = [
-        ["BCSC(main)", bcss.questions, "Q"],
-        ["Past Paper", past.questions, "Q"],
-        ["Data Interpretation", di.questions, `Q · ${di.graphs} G`],
-        ["Current Affairs", currentAffairs, "Q"]
+        ["BCSC(main)", bcss.questions],
+        ["Past Paper", past.questions],
+        ["Data Interpretation", di.questions],
+        ["Current Affairs", currentAffairs]
     ];
     const questionTotal = cards.reduce((total, [, count]) => total + Number(count || 0), 0);
     overview.innerHTML = `
         <div class="pe-overview-circles">
-            ${cards.map(([label, count, detail]) => `
+            ${cards.map(([label, count]) => `
                 <div class="pe-overview-item">
                     <div class="pe-overview-circle">
                         <strong class="pe-overview-value">${Number(count || 0)}</strong>
-                        <span class="pe-overview-label">${escapeHTML(detail)}</span>
                     </div>
                     <span>${escapeHTML(label)}</span>
                 </div>
