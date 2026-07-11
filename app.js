@@ -5,6 +5,7 @@ const ALPHA = ["A","B","C","D"];
 const DB_TIMEOUT_MS = 60000;
 const API_TIMEOUT_MS = 20000;
 const DB_CACHE_KEY = "supabase_exam_catalog_v3_counts_only";
+const LEGACY_QUESTION_CACHE_KEYS = ["supabase_exam_pool_v2_no_answers"];
 const SECONDS_PER_QUESTION = 30;
 const PE_BCSC_MAIN_TYPE = "BCSC(main)";
 
@@ -210,6 +211,7 @@ function closeImageZoom() {
 
 	async function initializeApp() {
 	    showLoading(false);
+        clearLegacyQuestionCaches();
         loadDeferredVisualStyles();
         localStorage.removeItem("exam_theme_mode");
         applyThemeMode("light");
@@ -390,10 +392,27 @@ function setLoaderProgress(pct) {
     if (bar) bar.style.width = pct + "%";
 }
 
+function normalizeCountsOnlyCatalog(data) {
+    return (Array.isArray(data) ? data : []).map(item => ({
+        peType: String(item?.peType || ""),
+        topic: String(item?.topic || ""),
+        count: Number(item?.count || 0)
+    })).filter(item => item.peType && item.topic && Number.isFinite(item.count) && item.count >= 0);
+}
+
 function saveDatabaseCache(data) {
-    const serialized = JSON.stringify(data);
-    try { sessionStorage.setItem(DB_CACHE_KEY, serialized); } catch (e) {}
+    const countsOnlyCatalog = normalizeCountsOnlyCatalog(data);
+    const serialized = JSON.stringify(countsOnlyCatalog);
     try { localStorage.setItem(DB_CACHE_KEY, serialized); } catch (e) {}
+    try { sessionStorage.removeItem(DB_CACHE_KEY); } catch (e) {}
+}
+
+function clearLegacyQuestionCaches() {
+    for (const key of LEGACY_QUESTION_CACHE_KEYS) {
+        try { localStorage.removeItem(key); } catch (e) {}
+        try { sessionStorage.removeItem(key); } catch (e) {}
+    }
+    try { sessionStorage.removeItem(DB_CACHE_KEY); } catch (e) {}
 }
 
 function clearDatabaseCache() {
@@ -765,7 +784,7 @@ function collectQuestionMediaIds(questions, matcher) {
         .filter(id => matcher.test(id)))];
 }
 
-async function fetchSelectedQuestionMedia(questions, { persistCache = true } = {}) {
+async function fetchSelectedQuestionMedia(questions) {
     const mediaRows = [];
     const normalIds = collectQuestionMediaIds(questions, /^\d+$/);
     const peOnlinePrefixedIds = collectQuestionMediaIds(questions, /^peo:\d+$/);
@@ -794,7 +813,6 @@ async function fetchSelectedQuestionMedia(questions, { persistCache = true } = {
     cacheMediaRows(mediaRows);
     mergeMediaRowsIntoQuestions(questionPool, mediaRows);
     mergeMediaRowsIntoQuestions(questions, mediaRows);
-    if (persistCache) saveDatabaseCache(questionPool);
 }
 
 function preloadImageAsset(src) {
@@ -959,10 +977,14 @@ async function loadDatabase(options = {}) {
 async function loadDatabaseOnce(silent) {
 
     // ── Cache-first: render instantly if we have data ──
-    const cached = sessionStorage.getItem(DB_CACHE_KEY) || localStorage.getItem(DB_CACHE_KEY);
+    const cached = localStorage.getItem(DB_CACHE_KEY);
     if (cached) {
         try {
-            processData(JSON.parse(cached));
+            const parsed = JSON.parse(cached);
+            const safeCatalog = normalizeCountsOnlyCatalog(parsed);
+            if (!Array.isArray(parsed) || safeCatalog.length !== parsed.length) throw new Error("INVALID_CATALOG_CACHE");
+            processData(safeCatalog);
+            saveDatabaseCache(safeCatalog);
             databaseReady = true;
             if (!examPreparing && !silent) showLoading(false);
             // Refresh in background silently (no spinner)
@@ -1024,13 +1046,20 @@ async function loadDatabaseOnce(silent) {
         if (e.message === "TIMEOUT") {
             const fallback = localStorage.getItem(DB_CACHE_KEY);
             if (fallback) {
-                processData(JSON.parse(fallback));
-                databaseReady = true;
-                if (!silent) {
-                    showToast("Using saved questions. Internet is slow.", "info");
-                    showLoading(false);
+                try {
+                    const parsed = JSON.parse(fallback);
+                    const safeCatalog = normalizeCountsOnlyCatalog(parsed);
+                    if (!Array.isArray(parsed) || safeCatalog.length !== parsed.length) throw new Error("INVALID_CATALOG_CACHE");
+                    processData(safeCatalog);
+                    databaseReady = true;
+                    if (!silent) {
+                        showToast("Using saved questions. Internet is slow.", "info");
+                        showLoading(false);
+                    }
+                    return true;
+                } catch (cacheError) {
+                    clearDatabaseCache();
                 }
-                return true;
             }
             if (!silent) {
                 showToast("Database is taking too long. Please try again.", "error");
@@ -1248,7 +1277,7 @@ async function prefetchPEDISetGraph(setName) {
             // A reused set name can contain more than one chart. Fetch every
             // question's media so each newly uploaded chart can begin its own
             // group instead of silently inheriting the first chart forever.
-            await fetchSelectedQuestionMedia(setQuestions, { persistCache: false });
+            await fetchSelectedQuestionMedia(setQuestions);
             const firstGraph = setQuestions
                 .map(question => safeMediaURL(question.imageCode, "image"))
                 .find(Boolean) || "";
