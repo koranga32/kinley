@@ -12,6 +12,8 @@ import {
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const QUESTION_WINDOW_SIZE = 5;
+const QUESTION_POOL_CACHE_SECONDS = 120;
+const questionPoolMemoryCache = new Map();
 const PUBLIC_CACHE_SHORT = {
     "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=120"
 };
@@ -27,6 +29,7 @@ const POLICIES = {
     "pe-resources": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "pe-resource-pdf": { windowMs: MINUTE, ipLimit: 45, sessionLimit: 60 },
     "pe-resource-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 90 },
+    "pe-di-graph": { windowMs: MINUTE, ipLimit: 2400, sessionLimit: 240 },
     "exam-start": { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
     "exam-question": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 180 },
     "question-solution": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 90 },
@@ -43,6 +46,48 @@ const POLICIES = {
 function routeName(context) {
     const path = context.params.path;
     return Array.isArray(path) ? path.join("/") : String(path || "");
+}
+
+async function getServerQuestionPool(context, cacheName, loader) {
+    const now = Date.now();
+    const memoryEntry = questionPoolMemoryCache.get(cacheName);
+    if (memoryEntry && memoryEntry.expiresAt > now) return memoryEntry.promise;
+
+    const promise = (async () => {
+        const cache = globalThis.caches?.default;
+        const internalUrl = new URL(context.request.url);
+        internalUrl.pathname = `/__server-cache/question-pool/${encodeURIComponent(cacheName)}`;
+        internalUrl.search = "";
+        const internalKey = new Request(internalUrl.toString(), { method: "GET" });
+        if (cache) {
+            const cached = await cache.match(internalKey);
+            if (cached?.ok && cached.headers.get("X-ExamPortal-Server-Cache") === "question-pool") {
+                return cached.json();
+            }
+        }
+
+        const rows = await loader();
+        if (cache) {
+            await cache.put(internalKey, new Response(JSON.stringify(rows || []), {
+                headers: {
+                    "Content-Type": "application/json; charset=utf-8",
+                    "Cache-Control": `max-age=${QUESTION_POOL_CACHE_SECONDS}`,
+                    "X-ExamPortal-Server-Cache": "question-pool",
+                    "X-Robots-Tag": "noindex, nofollow"
+                }
+            }));
+        }
+        return rows || [];
+    })().catch(error => {
+        questionPoolMemoryCache.delete(cacheName);
+        throw error;
+    });
+
+    questionPoolMemoryCache.set(cacheName, {
+        promise,
+        expiresAt: now + (QUESTION_POOL_CACHE_SECONDS * 1000)
+    });
+    return promise;
 }
 
 async function handleQuestions(context) {
@@ -103,9 +148,9 @@ async function handleQuestions(context) {
         if (!ids.length) return apiError(400, "missing_ids", "Question media IDs are required.");
         const rows = await supabaseServerRequest(
             context.env,
-            `Exam?select=id,image,audio&id=in.(${ids.join(",")})`
+            `Exam?select=id,category,image,audio&id=in.(${ids.join(",")})`
         );
-        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row)), 200, PUBLIC_CACHE_MEDIA);
+        return json((rows || []).map(row => normalizePublicQuestionMediaRow(context, row, "Exam")), 200, PUBLIC_CACHE_MEDIA);
     }
     if (view === "category-media") {
         const category = String(url.searchParams.get("category") || "").normalize("NFKC").trim();
@@ -113,12 +158,12 @@ async function handleQuestions(context) {
             return apiError(400, "invalid_category", "A valid category is required.");
         }
         const params = new URLSearchParams({
-            select: "id,image,audio",
+            select: "id,category,image,audio",
             order: "id.asc"
         });
         params.set("category", `eq.${category}`);
         const rows = await supabaseServerRequest(context.env, `Exam?${params.toString()}`);
-        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row)), 200, PUBLIC_CACHE_MEDIA);
+        return json((rows || []).map(row => normalizePublicQuestionMediaRow(context, row, "Exam")), 200, PUBLIC_CACHE_MEDIA);
     }
     return apiError(400, "invalid_view", "Question view must be catalog, pe-catalog, pe-practice, media, or category-media.");
 }
@@ -275,16 +320,16 @@ async function handlePEOnlineQuestions(context) {
         if (!ids.length) return apiError(400, "missing_ids", "PE Online media IDs are required.");
         const rows = await supabaseServerRequest(
             context.env,
-            `PEOnlineExam?select=id,image,audio&id=in.(${ids.join(",")})`
+            `PEOnlineExam?select=id,category,image,audio&id=in.(${ids.join(",")})`
         );
-        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row, value => `peo:${value}`)), 200, PUBLIC_CACHE_MEDIA);
+        return json((rows || []).map(row => normalizePublicQuestionMediaRow(context, row, "PEOnlineExam")), 200, PUBLIC_CACHE_MEDIA);
     }
     if (view === "all-media") {
         const rows = await supabaseServerRequest(
             context.env,
-            "PEOnlineExam?select=id,image,audio&order=id.asc"
+            "PEOnlineExam?select=id,category,image,audio&order=id.asc"
         );
-        return json((rows || []).map(row => normalizePublicMediaRow(context.env, row, value => `peo:${value}`)), 200, PUBLIC_CACHE_MEDIA);
+        return json((rows || []).map(row => normalizePublicQuestionMediaRow(context, row, "PEOnlineExam")), 200, PUBLIC_CACHE_MEDIA);
     }
     return apiError(400, "invalid_view", "PE Online question view must be catalog, media, or all-media.");
 }
@@ -442,6 +487,80 @@ function normalizePublicMediaRow(env, row, idTransform = value => value) {
     };
 }
 
+function normalizePublicQuestionMediaRow(context, row, table) {
+    const isPEOnline = table === "PEOnlineExam";
+    const normalized = normalizePublicMediaRow(
+        context.env,
+        row,
+        value => isPEOnline ? `peo:${value}` : value
+    );
+    const info = parsePECategory(row.category);
+    if (info?.peType === "Data Interpretation" && normalized.image) {
+        const url = new URL(context.request.url);
+        url.pathname = "/api/pe-di-graph";
+        url.search = new URLSearchParams({
+            id: String(row.id),
+            source: isPEOnline ? "pe-online" : "practice"
+        }).toString();
+        normalized.image = url.toString();
+    }
+    delete normalized.category;
+    return normalized;
+}
+
+async function handlePEDIGraph(context) {
+    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
+    const url = new URL(context.request.url);
+    const id = String(url.searchParams.get("id") || "").trim();
+    const source = String(url.searchParams.get("source") || "practice");
+    if (!/^\d{1,12}$/.test(id) || !["practice", "pe-online"].includes(source)) {
+        return apiError(400, "invalid_graph", "A valid Data Interpretation graph is required.");
+    }
+
+    const cache = globalThis.caches?.default;
+    const cacheUrl = new URL(url.origin);
+    cacheUrl.pathname = `/__server-cache/pe-di-graph/${source}/${id}`;
+    const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
+    if (cache) {
+        const cached = await cache.match(cacheKey);
+        if (cached?.ok && cached.headers.get("X-ExamPortal-Server-Cache") === "di-graph") return cached;
+    }
+
+    const table = source === "pe-online" ? "PEOnlineExam" : "Exam";
+    const rows = await supabaseServerRequest(
+        context.env,
+        `${table}?select=id,category,image&id=eq.${id}&limit=1`
+    );
+    const row = rows?.[0];
+    if (parsePECategory(row?.category)?.peType !== "Data Interpretation") {
+        return apiError(404, "graph_not_found", "Data Interpretation graph was not found.");
+    }
+    const graphUrl = normalizePublicMediaValue(context.env, row.image, "image");
+    if (!graphUrl || !graphUrl.startsWith(trustedStoragePrefix(context.env))) {
+        return apiError(404, "graph_not_found", "Data Interpretation graph was not found.");
+    }
+    const upstream = await fetch(graphUrl, { headers: { Accept: "image/avif,image/webp,image/*" } });
+    const contentType = String(upstream.headers.get("content-type") || "").toLowerCase();
+    if (!upstream.ok || !contentType.startsWith("image/")) {
+        return apiError(502, "graph_fetch_failed", "Data Interpretation graph could not be loaded.");
+    }
+    const response = new Response(upstream.body, {
+        status: 200,
+        headers: {
+            "Content-Type": contentType,
+            "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
+            "X-ExamPortal-Server-Cache": "di-graph",
+            "X-Content-Type-Options": "nosniff"
+        }
+    });
+    if (cache) {
+        const cacheWrite = cache.put(cacheKey, response.clone());
+        if (typeof context.waitUntil === "function") context.waitUntil(cacheWrite);
+        else await cacheWrite;
+    }
+    return response;
+}
+
 function buildSecureQuestions(rows, idPrefix = "") {
     const prepared = [];
     for (const row of rows || []) {
@@ -548,10 +667,10 @@ async function handleExamStart(context) {
         return apiError(400, "invalid_category", "Choose a normal exam category.");
     }
     const fields = "id,category,question,optionA,optionB,optionC,optionD,answer";
-    const rows = await supabaseServerRequest(
+    const rows = await getServerQuestionPool(context, `exam:${category}`, () => supabaseServerRequest(
         context.env,
         `Exam?select=${fields}&category=eq.${encodeURIComponent(category)}&order=id.asc`
-    );
+    ));
     const prepared = buildSecureQuestions(shuffled(rows || []));
     if (!prepared.length) return apiError(404, "no_questions", "No valid questions were found in this category.");
     const publicQuestions = prepared.map(item => item.publicQuestion);
@@ -606,7 +725,9 @@ async function handlePEOnlineStart(context) {
     if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
     validateEmptyPayload(await readJson(context.request, 1024), "PE Online start request");
     const fields = "id,category,question,optionA,optionB,optionC,optionD,answer";
-    const rows = await supabaseServerRequest(context.env, `PEOnlineExam?select=${fields}&order=id.asc`);
+    const rows = await getServerQuestionPool(context, "pe-online:all", () => (
+        supabaseServerRequest(context.env, `PEOnlineExam?select=${fields}&order=id.asc`)
+    ));
     const selected = selectPEOnlineRows(rows || []);
     const prepared = buildSecureQuestions(selected, "peo:");
     if (!prepared.length) return apiError(404, "no_questions", "No valid PE Online questions were found.");
@@ -789,6 +910,7 @@ export async function onRequest(context) {
         else if (name === "pe-resources") response = await handlePEResources(context);
         else if (name === "pe-resource-pdf") response = await handlePEResourcePdf(context);
         else if (name === "pe-resource-answer") response = await handlePEResourceAnswer(context);
+        else if (name === "pe-di-graph") response = await handlePEDIGraph(context);
         else if (name === "exam-start") response = await handleExamStart(context);
         else if (name === "exam-question") response = await handleExamQuestion(context);
         else if (name === "question-solution") response = await handleQuestionSolution(context);
