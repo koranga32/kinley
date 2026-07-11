@@ -54,6 +54,8 @@ let peGuideCarouselIndex = 0;
 let peGuideCarouselTimer = null;
 let peFormulaTopic = "";
 let peFormulaQuestionIndex = 0;
+let pePdfJsPromise = null;
+let pePdfRenderToken = 0;
 let cafStateLoaded = false;
 let cafStatePromise = null;
 let submitInProgress = false;
@@ -2569,8 +2571,62 @@ function safeResourceUrl(value) {
     return /^https:\/\/[^\s]+$/i.test(source) ? source : "";
 }
 
+function loadPEPdfJs() {
+    if (!pePdfJsPromise) {
+        pePdfJsPromise = import("/vendor/pdfjs/pdf.min.mjs").then(pdfjs => {
+            pdfjs.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/pdf.worker.min.mjs";
+            return pdfjs;
+        });
+    }
+    return pePdfJsPromise;
+}
+
+async function renderPEGuidePdf(panel, guideId, fallbackPreview, renderToken) {
+    const container = panel?.querySelector("[data-pe-pdf-viewer]");
+    if (!container || !guideId) return;
+    try {
+        const pdfjs = await loadPEPdfJs();
+        if (renderToken !== pePdfRenderToken || !container.isConnected) return;
+        const loadingTask = pdfjs.getDocument({ url: `/api/pe-resource-pdf?id=${encodeURIComponent(guideId)}` });
+        const pdf = await loadingTask.promise;
+        if (renderToken !== pePdfRenderToken || !container.isConnected) return;
+        container.innerHTML = "";
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+            if (renderToken !== pePdfRenderToken || !container.isConnected) return;
+            const page = await pdf.getPage(pageNumber);
+            const baseViewport = page.getViewport({ scale: 1 });
+            const availableWidth = Math.max(280, container.clientWidth - 16);
+            const scale = Math.min(2, availableWidth / baseViewport.width);
+            const viewport = page.getViewport({ scale });
+            const outputScale = Math.min(2, window.devicePixelRatio || 1);
+            const pageWrap = document.createElement("div");
+            pageWrap.className = "pe-pdf-page";
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.floor(viewport.width * outputScale);
+            canvas.height = Math.floor(viewport.height * outputScale);
+            canvas.style.width = `${Math.floor(viewport.width)}px`;
+            canvas.style.height = `${Math.floor(viewport.height)}px`;
+            canvas.setAttribute("aria-label", `PDF page ${pageNumber} of ${pdf.numPages}`);
+            pageWrap.appendChild(canvas);
+            container.appendChild(pageWrap);
+            await page.render({
+                canvasContext: canvas.getContext("2d", { alpha: false }),
+                viewport,
+                transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0]
+            }).promise;
+        }
+    } catch (error) {
+        if (renderToken !== pePdfRenderToken || !container.isConnected) return;
+        console.error("PE guide PDF rendering failed", error);
+        container.innerHTML = fallbackPreview
+            ? `<img src="${escapeHTML(fallbackPreview)}" alt="Guide preview" loading="lazy"><p class="pe-pdf-error">The PDF preview could not load. Click the heading to open the document.</p>`
+            : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><div>The PDF preview could not load. Click the heading to open the document.</div></div>';
+    }
+}
+
 function renderPEGuidePanel(panel) {
     if (!panel) return;
+    const renderToken = ++pePdfRenderToken;
     const guides = peResourcesCatalog.filter(item => item.kind === "guide");
     if (peGuideCarouselTimer) {
         clearInterval(peGuideCarouselTimer);
@@ -2588,11 +2644,12 @@ function renderPEGuidePanel(panel) {
     const guideLinkLabel = documentUrl ? "Open supporting document" : "Open external website";
     const preview = safeMediaURL(guide.preview_url, "image");
     const documentIsImage = /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(documentUrl);
+    const documentIsPdf = /\.pdf(?:$|[?#])/i.test(documentUrl);
     const embeddedType = documentUrl ? "Document" : websiteUrl ? "Website" : "Preview";
     const displayImage = documentIsImage ? documentUrl : preview;
     const readingContent = String(guide.content || "").trim();
     const guideMaterial = `
-        ${displayImage ? `<img src="${escapeHTML(displayImage)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : `<div class="pe-guide-placeholder"><i class="bi ${websiteUrl && !documentUrl ? "bi-link-45deg" : "bi-file-earmark-text"}" aria-hidden="true"></i><div>${websiteUrl && !documentUrl ? "Website preview" : "Document preview"}</div></div>`}
+        ${documentIsPdf ? '<div class="pe-pdf-viewer" data-pe-pdf-viewer><div class="pe-pdf-loading">Loading PDF…</div></div>' : displayImage ? `<img src="${escapeHTML(displayImage)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : `<div class="pe-guide-placeholder"><i class="bi ${websiteUrl && !documentUrl ? "bi-link-45deg" : "bi-file-earmark-text"}" aria-hidden="true"></i><div>${websiteUrl && !documentUrl ? "Website preview" : "Document preview"}</div></div>`}
         ${readingContent ? `<div class="pe-guide-reading-content">${escapeHTML(readingContent).replace(/\n/g, "<br>")}</div>` : ""}
     `;
     panel.innerHTML = `
@@ -2621,6 +2678,9 @@ function renderPEGuidePanel(panel) {
             </aside>
         </div>
     `;
+    if (documentIsPdf && peActiveResourceTab === "guide") {
+        requestAnimationFrame(() => { void renderPEGuidePdf(panel, String(guide.id || ""), preview, renderToken); });
+    }
 }
 
 function renderPESelfNotePanel(panel) {
@@ -2798,17 +2858,21 @@ function buildStoredZip(files) {
 }
 
 function buildDocxParagraphs(editor) {
-    const paragraphs = [[]];
+    const paragraphs = [{ runs: [], alignment: "" }];
     const current = () => paragraphs[paragraphs.length - 1];
-    const finish = () => { if (current().length) paragraphs.push([]); };
+    const finish = alignment => {
+        if (!current().runs.length) return;
+        if (alignment) current().alignment = alignment;
+        paragraphs.push({ runs: [], alignment: "" });
+    };
     const addText = (value, format) => {
         const parts = String(value || "").replace(/\r/g, "").split("\n");
         parts.forEach((part, index) => {
-            if (part) current().push({ text: part, format });
+            if (part) current().runs.push({ text: part, format });
             if (index < parts.length - 1) finish();
         });
     };
-    const visit = (node, format = {}) => {
+    const visit = (node, format = {}, alignment = "") => {
         if (node.nodeType === Node.TEXT_NODE) {
             addText(node.nodeValue, format);
             return;
@@ -2816,33 +2880,42 @@ function buildDocxParagraphs(editor) {
         if (node.nodeType !== Node.ELEMENT_NODE) return;
         const tag = node.tagName.toLowerCase();
         if (tag === "br") {
-            finish();
+            finish(alignment);
             return;
         }
+        const fontSizeMap = { "1": 16, "2": 20, "3": 24, "4": 28, "5": 36, "6": 48, "7": 72 };
         const nextFormat = {
             bold: format.bold || tag === "b" || tag === "strong",
             italic: format.italic || tag === "i" || tag === "em",
-            underline: format.underline || tag === "u"
+            underline: format.underline || tag === "u",
+            size: tag === "font" ? fontSizeMap[node.getAttribute("size") || ""] || format.size : format.size
         };
+        const nextAlignment = (tag === "p" || tag === "div") && /^(left|center|right|justify)$/.test(node.style.textAlign || "")
+            ? node.style.textAlign
+            : alignment;
         if (tag === "ul" || tag === "ol") {
             [...node.children].forEach((item, index) => {
                 if (item.tagName?.toLowerCase() !== "li") return;
                 addText(tag === "ol" ? `${index + 1}. ` : "• ", nextFormat);
-                [...item.childNodes].forEach(child => visit(child, nextFormat));
-                finish();
+                [...item.childNodes].forEach(child => visit(child, nextFormat, nextAlignment));
+                finish(nextAlignment);
             });
             return;
         }
-        [...node.childNodes].forEach(child => visit(child, nextFormat));
-        if (tag === "p" || tag === "div") finish();
+        [...node.childNodes].forEach(child => visit(child, nextFormat, nextAlignment));
+        if (tag === "p" || tag === "div") finish(nextAlignment);
     };
     [...editor.childNodes].forEach(node => visit(node));
-    return paragraphs.filter(paragraph => paragraph.length).map(runs => `<w:p>${runs.map(run => {
-        const properties = run.format.bold || run.format.italic || run.format.underline
-            ? `<w:rPr>${run.format.bold ? "<w:b/>" : ""}${run.format.italic ? "<w:i/>" : ""}${run.format.underline ? '<w:u w:val="single"/>' : ""}</w:rPr>`
+    return paragraphs.filter(paragraph => paragraph.runs.length).map(paragraph => {
+        const alignmentValue = paragraph.alignment === "justify" ? "both" : paragraph.alignment;
+        const paragraphProperties = alignmentValue ? `<w:pPr><w:jc w:val="${alignmentValue}"/></w:pPr>` : "";
+        return `<w:p>${paragraphProperties}${paragraph.runs.map(run => {
+        const properties = run.format.bold || run.format.italic || run.format.underline || run.format.size
+            ? `<w:rPr>${run.format.bold ? "<w:b/>" : ""}${run.format.italic ? "<w:i/>" : ""}${run.format.underline ? '<w:u w:val="single"/>' : ""}${run.format.size ? `<w:sz w:val="${run.format.size}"/><w:szCs w:val="${run.format.size}"/>` : ""}</w:rPr>`
             : "";
         return `<w:r>${properties}<w:t xml:space="preserve">${xmlEscape(run.text)}</w:t></w:r>`;
-    }).join("")}</w:p>`).join("");
+        }).join("")}</w:p>`;
+    }).join("");
 }
 
 function exportPESelfNoteDocx() {

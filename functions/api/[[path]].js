@@ -25,6 +25,7 @@ const POLICIES = {
     questions: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "pe-overview": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "pe-resources": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-resource-pdf": { windowMs: MINUTE, ipLimit: 45, sessionLimit: 60 },
     "pe-resource-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 90 },
     "exam-start": { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
     "exam-question": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 180 },
@@ -156,6 +157,34 @@ async function handlePEResources(context) {
         document_url: normalizePublicMediaValue(context.env, row.document_url, "application"),
         preview_url: normalizePublicMediaValue(context.env, row.preview_url, "image")
     })), 200, PUBLIC_CACHE_SHORT);
+}
+
+async function handlePEResourcePdf(context) {
+    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
+    const id = new URL(context.request.url).searchParams.get("id") || "";
+    if (!/^\d+$/.test(id)) return apiError(400, "invalid_resource_id", "A valid guide resource ID is required.");
+    const rows = await supabaseServerRequest(
+        context.env,
+        `PEResources?select=id,document_url&id=eq.${encodeURIComponent(id)}&kind=eq.guide&published=eq.true&limit=1`
+    );
+    const documentUrl = normalizePublicMediaValue(context.env, rows?.[0]?.document_url, "application");
+    const trustedPrefix = `${String(context.env.SUPABASE_URL || "").replace(/\/$/, "")}/storage/v1/object/public/${MEDIA_BUCKET}/`;
+    if (!documentUrl || !documentUrl.startsWith(trustedPrefix) || !/\.pdf(?:$|[?#])/i.test(documentUrl)) {
+        return apiError(404, "pdf_not_found", "This guide does not have an available PDF document.");
+    }
+    const upstream = await fetch(documentUrl, { headers: { Accept: "application/pdf" } });
+    if (!upstream.ok || !String(upstream.headers.get("content-type") || "").toLowerCase().includes("application/pdf")) {
+        return apiError(502, "pdf_fetch_failed", "The guide PDF could not be loaded.");
+    }
+    return new Response(upstream.body, {
+        status: 200,
+        headers: {
+            "Content-Type": "application/pdf",
+            "Cache-Control": "public, max-age=300, s-maxage=1800, stale-while-revalidate=600",
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff"
+        }
+    });
 }
 
 async function handlePEResourceAnswer(context) {
@@ -758,6 +787,7 @@ export async function onRequest(context) {
         else if (name === "questions") response = await handleQuestions(context);
         else if (name === "pe-overview") response = await handlePEOverview(context);
         else if (name === "pe-resources") response = await handlePEResources(context);
+        else if (name === "pe-resource-pdf") response = await handlePEResourcePdf(context);
         else if (name === "pe-resource-answer") response = await handlePEResourceAnswer(context);
         else if (name === "exam-start") response = await handleExamStart(context);
         else if (name === "exam-question") response = await handleExamQuestion(context);

@@ -2568,6 +2568,12 @@
         .pe-guide-material { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; border: 1px solid #4a5260; border-radius: 8px; background: #1f232b; }
         .pe-guide-material > img { width: 100%; max-height: 60%; flex: 0 0 auto; object-fit: contain; background: #151922; }
         .pe-guide-material > img:only-child { height: 100%; max-height: none; }
+        .pe-pdf-viewer { display: grid; align-content: start; gap: 12px; padding: 10px; background: #343941; }
+        .pe-pdf-page { display: flex; justify-content: center; overflow: hidden; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.28); }
+        .pe-pdf-page canvas { display: block; max-width: 100%; height: auto !important; }
+        .pe-pdf-loading,
+        .pe-pdf-error { padding: 22px; color: #aeb4c0; text-align: center; }
+        .pe-pdf-viewer > img { width: 100%; max-height: 360px; object-fit: contain; }
         .pe-guide-placeholder { min-height: 180px; display: grid; place-content: center; gap: 8px; color: #aeb4c0; text-align: center; }
         .pe-guide-placeholder i { font-size: 28px; }
         .pe-guide-reading-content { padding: 14px; color: #e8ebf1; text-align: left; line-height: 1.55; }
