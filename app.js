@@ -51,6 +51,7 @@ let peHomeDashboardLoadPromise = null;
 let peHomeDashboardLoadedAt = 0;
 let peActiveResourceTab = "guide";
 let peGuideCarouselIndex = 0;
+let peGuideSelected = false;
 let peGuideCarouselTimer = null;
 let peFormulaTopic = "";
 let peFormulaQuestionIndex = 0;
@@ -2333,6 +2334,11 @@ async function openPEPortal() {
     // Reset to Home panel and a collapsed sidebar every time PE is opened.
     // On desktop the hover handlers will expand it when the cursor enters.
     clearActivePEPracticeMemory();
+    cancelPEPdfWork();
+    peGuideSelected = false;
+    peGuideCarouselIndex = 0;
+    const guidePanel = document.getElementById("pe-resource-guide");
+    if (guidePanel) guidePanel.dataset.peGuideRenderKey = "";
     peTopicQuestionCache = new Map();
     peActiveTopic = null;
     peDIActiveSet = null;
@@ -2371,6 +2377,7 @@ async function openPEPortal() {
 }
 
 function closePEPortal() {
+    cancelPEPdfWork();
     document.getElementById("pe-view").style.display = "none";
     document.getElementById("setup-view").style.display = "block";
     document.getElementById("setup-options").style.display = setupContinued ? "grid" : "none";
@@ -2621,6 +2628,37 @@ function renderPEGuidePanel(panel) {
         panel.innerHTML = '<div class="pe-empty-msg">Published guides will appear here.</div>';
         return;
     }
+    if (!peGuideSelected) {
+        const previewGuide = guides.find(item => safeMediaURL(item.preview_url, "image")) || guides[0];
+        const preview = safeMediaURL(previewGuide?.preview_url, "image");
+        const renderKey = `unselected:${preview}`;
+        if (panel.dataset.peGuideRenderKey === renderKey && panel.querySelector(".pe-guide-library")) return;
+        cancelPEPdfWork();
+        panel.dataset.peGuideRenderKey = renderKey;
+        panel.innerHTML = `
+            <div class="pe-guide-library">
+                <div class="pe-guide-current">
+                    <h3 class="pe-guide-heading-static">Select a reading material</h3>
+                    <div class="pe-guide-material">
+                        ${preview ? `<img src="${escapeHTML(preview)}" alt="Guide preview" loading="eager">` : '<div class="pe-guide-placeholder"><i class="bi bi-book" aria-hidden="true"></i><div>Select a reading material to view its content.</div></div>'}
+                    </div>
+                    <p class="pe-guide-meta">Choose an item from Reading Materials</p>
+                </div>
+                <aside class="pe-guide-reading" aria-label="Reading materials">
+                    <h3>Reading Materials</h3>
+                    <div class="pe-guide-reading-list">
+                        ${guides.map((item, index) => {
+                            const hasDocument = Boolean(safeResourceUrl(item.document_url));
+                            const hasWebsite = Boolean(safeResourceUrl(item.website_url));
+                            const materialType = hasDocument ? "Document" : hasWebsite ? "Website" : "Preview only";
+                            const icon = hasDocument ? "bi-file-earmark-text" : hasWebsite ? "bi-link-45deg" : "bi-book";
+                            return `<button type="button" class="pe-guide-reading-item" data-pe-resource-action="select-guide" data-guide-index="${index}" aria-pressed="false"><i class="bi ${icon}" aria-hidden="true"></i><span><strong>${escapeHTML(item.title || `Guide ${index + 1}`)}</strong><small>${materialType}</small></span></button>`;
+                        }).join("")}
+                    </div>
+                </aside>
+            </div>`;
+        return;
+    }
     peGuideCarouselIndex %= guides.length;
     const guide = guides[peGuideCarouselIndex];
     const documentUrl = safeResourceUrl(guide.document_url);
@@ -2742,6 +2780,7 @@ function handlePEHomeDashboardClick(event) {
         const index = Number(event.target.closest("[data-guide-index]")?.dataset.guideIndex);
         const guideCount = peResourcesCatalog.filter(item => item.kind === "guide").length;
         if (Number.isInteger(index) && index >= 0 && index < guideCount) {
+            peGuideSelected = true;
             peGuideCarouselIndex = index;
             renderPEGuidePanel(document.getElementById("pe-resource-guide"));
         }
