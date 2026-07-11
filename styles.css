@@ -2528,6 +2528,8 @@
         .pe-pdf-viewer { display: grid; align-content: start; gap: 12px; padding: 10px; background: #343941; }
         .pe-pdf-page { display: flex; justify-content: center; overflow: hidden; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.28); }
         .pe-pdf-page canvas { display: block; max-width: 100%; height: auto !important; }
+        .pe-guide-material > img,
+        .pe-pdf-page canvas { cursor: zoom-in; }
         .pe-pdf-loading,
         .pe-pdf-error { padding: 22px; color: #aeb4c0; text-align: center; }
         .pe-pdf-viewer > img { width: 100%; max-height: 360px; object-fit: contain; }
@@ -2558,8 +2560,9 @@
         .pe-formula-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; color: #e8ebf1; }
         .pe-formula-header > strong { font-size: 12px; }
         .pe-formula-question-list { display: grid; gap: 8px; }
-        .pe-formula-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 190px) auto minmax(42px, auto); align-items: center; gap: 7px; padding: 9px; border: 1px solid #383d46; border-radius: 7px; background: #2b2f36; }
+        .pe-formula-row { display: grid; gap: 9px; padding: 10px; border: 1px solid #383d46; border-radius: 7px; background: #2b2f36; }
         .pe-formula-question { margin: 0; color: #f5f7fb; text-align: left; }
+        .pe-formula-answer-line { display: grid; grid-template-columns: auto minmax(120px, 300px) auto minmax(42px, 1fr); align-items: center; gap: 7px; padding-left: 22px; color: #e8ebf1; }
         .pe-formula-row .pe-resource-answer { width: 100%; min-width: 0; margin: 0; }
         .pe-formula-row .pe-resource-feedback { font-size: 11px; }
         .pe-formula-nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
@@ -3801,9 +3804,8 @@
             .pe-guide-material { min-height: 360px; }
             .pe-guide-reading-list,
             .pe-formula-topic-list { overflow-y: visible; }
-            .pe-formula-row { grid-template-columns: minmax(0, 1fr) auto; }
-            .pe-formula-row .pe-formula-question { grid-column: 1 / -1; }
-            .pe-formula-row .pe-resource-feedback { grid-column: 1 / -1; }
+            .pe-formula-answer-line { grid-template-columns: auto minmax(0, 1fr) auto; padding-left: 0; }
+            .pe-formula-answer-line .pe-resource-feedback { grid-column: 2 / -1; }
 
             .pe-content:has(#pe-di-viewer-screen.active) {
                 overflow-y: auto;

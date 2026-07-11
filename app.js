@@ -110,7 +110,9 @@ const IMAGE_ZOOM_SELECTOR = [
     "#pe-di-chart-img",
     "#peo-graph-img",
     ".q-image",
-    ".pe-question-image"
+    ".pe-question-image",
+    ".pe-guide-material > img",
+    ".pe-pdf-page canvas"
 ].join(",");
 let imageZoomLastTap = { target: null, time: 0 };
 
@@ -124,7 +126,9 @@ function bindImageZoomEvents() {
 
 function getZoomableImage(target) {
     const image = target?.closest?.(IMAGE_ZOOM_SELECTOR);
-    if (!image || !image.getAttribute("src")) return null;
+    if (!image) return null;
+    if (image.tagName === "CANVAS") return image.width && image.height ? image : null;
+    if (!image.getAttribute("src")) return null;
     return image;
 }
 
@@ -158,7 +162,9 @@ function handleImageZoomTap(event) {
 }
 
 function openImageZoom(sourceImage) {
-    const source = sourceImage.currentSrc || sourceImage.src || sourceImage.getAttribute("src");
+    const source = sourceImage.tagName === "CANVAS"
+        ? sourceImage.toDataURL("image/png")
+        : sourceImage.currentSrc || sourceImage.src || sourceImage.getAttribute("src");
     if (!source) return;
 
     closeImageZoom();
@@ -172,7 +178,7 @@ function openImageZoom(sourceImage) {
     const image = document.createElement("img");
     image.className = "image-zoom-img";
     image.src = source;
-    image.alt = sourceImage.alt || "Zoomed image";
+    image.alt = sourceImage.getAttribute("aria-label") || sourceImage.alt || "Zoomed document";
     image.decoding = "async";
 
     overlay.appendChild(image);
@@ -2500,10 +2506,13 @@ function renderPEFormulaPanel(panel) {
                         const prompt = String(formula.practice_prompt || "").trim();
                         return `
                             <div class="pe-formula-row" data-formula-row>
-                                <span class="pe-formula-question"><strong>${start + index + 1}.</strong> ${escapeHTML(prompt || "No question text has been published yet.")}</span>
-                                <input type="text" class="pe-resource-answer" aria-label="Answer for question ${start + index + 1}" data-formula-answer>
-                                <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula" data-formula-id="${escapeHTML(String(formula.id || ""))}" ${prompt ? "" : "disabled"}>Check</button>
-                                <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
+                                <div class="pe-formula-question"><strong>${start + index + 1}.</strong> ${escapeHTML(prompt || "No question text has been published yet.")}</div>
+                                <div class="pe-formula-answer-line">
+                                    <span>Ans:</span>
+                                    <input type="text" class="pe-resource-answer" aria-label="Answer for question ${start + index + 1}" data-formula-answer>
+                                    <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="check-formula" data-formula-id="${escapeHTML(String(formula.id || ""))}" ${prompt ? "" : "disabled"}>Check</button>
+                                    <span class="pe-resource-feedback" data-formula-feedback aria-live="polite"></span>
+                                </div>
                             </div>
                         `;
                     }).join("")}
