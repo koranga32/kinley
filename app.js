@@ -49,6 +49,7 @@ let peTopicQuestionCache = new Map();
 let peOverviewCatalog = [];
 let peResourcesCatalog = [];
 let peHomeDashboardLoadPromise = null;
+let peHomeDashboardLoadedAt = 0;
 let peActiveResourceTab = "guide";
 let peGuideCarouselIndex = 0;
 let peGuideCarouselTimer = null;
@@ -56,6 +57,8 @@ let peFormulaTopic = "";
 let peFormulaQuestionIndex = 0;
 let pePdfJsPromise = null;
 let pePdfRenderToken = 0;
+let pePdfLoadingTask = null;
+let pePdfRenderTask = null;
 let cafStateLoaded = false;
 let cafStatePromise = null;
 let submitInProgress = false;
@@ -423,8 +426,6 @@ async function apiRequest(path, { method = "GET", body, headers = {} } = {}) {
             publicApiCache.set(path, { data: undefined, expiresAt: 0, promise: pending });
             return pending;
         }
-    } else {
-        clearPublicApiCache();
     }
 
     return fetchApiJson(path, { method: normalizedMethod, body, headers });
@@ -472,6 +473,8 @@ function getPublicApiCacheTTL(path) {
     if (path === "questions?view=pe-catalog") return 5 * 60 * 1000;
     if (path === "pe-online-questions?view=catalog") return 5 * 60 * 1000;
     if (path === "pe-online-questions?view=all-media") return 10 * 60 * 1000;
+    if (path === "pe-overview") return 5 * 60 * 1000;
+    if (path === "pe-resources") return 5 * 60 * 1000;
     if (path === "flashcards") return 60 * 1000;
     if (path === "quotes") return 60 * 1000;
     if (path.startsWith("questions?view=media&ids=")) return 10 * 60 * 1000;
@@ -482,6 +485,7 @@ function getPublicApiCacheTTL(path) {
 
 function clearPublicApiCache() {
     publicApiCache = new Map();
+    peHomeDashboardLoadedAt = 0;
 }
 
 // ─── EXPLANATION ENCODING ──────────────────────────────
@@ -1227,7 +1231,7 @@ function clearActivePEPracticeMemory() {
     if (diChart) diChart.removeAttribute("src");
 }
 
-async function prefetchPEDISetGraph(setName, { blockForMs = 0 } = {}) {
+async function prefetchPEDISetGraph(setName) {
     const normalizedSetName = String(setName || "").trim();
     if (!normalizedSetName) return;
 
@@ -1240,14 +1244,11 @@ async function prefetchPEDISetGraph(setName, { blockForMs = 0 } = {}) {
             // question's media so each newly uploaded chart can begin its own
             // group instead of silently inheriting the first chart forever.
             await fetchSelectedQuestionMedia(setQuestions, { persistCache: false });
-            await preparePEDIGraphFingerprints(normalizedSetName);
-            const graphSources = [...new Set(setQuestions
+            const firstGraph = setQuestions
                 .map(question => safeMediaURL(question.imageCode, "image"))
-                .filter(Boolean))];
-            if (graphSources[0]) await preloadImageAsset(graphSources[0]);
-            graphSources.slice(1).forEach(source => {
-                void preloadImageAsset(source);
-            });
+                .find(Boolean) || "";
+            if (firstGraph && peDIActiveSet === normalizedSetName) showPEDIChart(firstGraph);
+            await preparePEDIGraphFingerprints(normalizedSetName);
             const audioQuestions = setQuestions.filter(q => q.audioCode).slice(0, 2);
             if (audioQuestions.length) {
                 await warmQuestionAssets(audioQuestions, { reportProgress: false });
@@ -1260,13 +1261,7 @@ async function prefetchPEDISetGraph(setName, { blockForMs = 0 } = {}) {
         peDIGraphPrefetch.set(normalizedSetName, promise);
     }
 
-    const existingPromise = peDIGraphPrefetch.get(normalizedSetName);
-    if (blockForMs > 0 && existingPromise) {
-        await Promise.race([
-            existingPromise,
-            new Promise(resolve => setTimeout(resolve, blockForMs))
-        ]);
-    }
+    return peDIGraphPrefetch.get(normalizedSetName);
 }
 
 function handleCategorySelectionChange() {
@@ -1994,7 +1989,7 @@ async function caLoadState({ render = true, force = false } = {}) {
         try {
             const rows = await apiRequest("flashcards");
             cafNotes = cafNormalizeRows(rows);
-            if (document.getElementById("pe-home-panel")?.classList.contains("active")) renderPEHomeDashboard();
+            if (document.getElementById("pe-home-panel")?.classList.contains("active")) renderPEHomeDashboard({ resources: false });
         } catch (e) {
             cafNotes = cafSeedNotes.map((item, idx) => ({ ...item, id: null, _seedIndex: idx }));
         }
@@ -2435,6 +2430,9 @@ function getPEOverview(type) {
 }
 
 async function loadPEHomeDashboard() {
+    if (peHomeDashboardLoadedAt && Date.now() - peHomeDashboardLoadedAt < 5 * 60 * 1000) {
+        return;
+    }
     if (peHomeDashboardLoadPromise) return peHomeDashboardLoadPromise;
     peHomeDashboardLoadPromise = Promise.all([
         apiRequest("pe-overview"),
@@ -2442,6 +2440,7 @@ async function loadPEHomeDashboard() {
     ]).then(([overview, resources]) => {
         peOverviewCatalog = Array.isArray(overview?.categories) ? overview.categories : [];
         peResourcesCatalog = Array.isArray(resources) ? resources : [];
+        peHomeDashboardLoadedAt = Date.now();
         renderPEHomeDashboard();
     }).catch(error => {
         console.error("PE home dashboard load failed:", error);
@@ -2452,7 +2451,7 @@ async function loadPEHomeDashboard() {
     return peHomeDashboardLoadPromise;
 }
 
-function renderPEHomeDashboard() {
+function renderPEHomeDashboard({ resources = true } = {}) {
     const overview = document.getElementById("pe-overview-card");
     if (!overview) return;
     const bcss = getPEOverview(PE_BCSC_MAIN_TYPE);
@@ -2479,7 +2478,7 @@ function renderPEHomeDashboard() {
         </div>
         <p class="pe-overview-total">Total available: <strong>${questionTotal} questions</strong> · <strong>${di.graphs} graph${di.graphs === 1 ? "" : "s"}</strong></p>
     `;
-    renderPEResourceTabs();
+    if (resources) renderPEResourceTabs();
 }
 
 function renderPEResourceTabs() {
@@ -2496,9 +2495,9 @@ function renderPEResourceTabs() {
     Object.entries(panels).forEach(([name, panel]) => {
         if (panel) panel.hidden = name !== peActiveResourceTab;
     });
-    renderPEFormulaPanel(panels.formula);
-    renderPEGuidePanel(panels.guide);
-    renderPESelfNotePanel(panels.note);
+    if (peActiveResourceTab === "formula") renderPEFormulaPanel(panels.formula);
+    else if (peActiveResourceTab === "guide") renderPEGuidePanel(panels.guide);
+    else if (peActiveResourceTab === "note") renderPESelfNotePanel(panels.note);
 }
 
 function getPEFormulaTopics() {
@@ -2580,6 +2579,13 @@ function loadPEPdfJs() {
     return pePdfJsPromise;
 }
 
+function cancelPEPdfWork() {
+    try { pePdfRenderTask?.cancel(); } catch (error) {}
+    try { void pePdfLoadingTask?.destroy(); } catch (error) {}
+    pePdfRenderTask = null;
+    pePdfLoadingTask = null;
+}
+
 async function renderPEGuidePdf(panel, guideId, fallbackPreview, renderToken) {
     const container = panel?.querySelector("[data-pe-pdf-viewer]");
     if (!container || !guideId) return;
@@ -2587,6 +2593,7 @@ async function renderPEGuidePdf(panel, guideId, fallbackPreview, renderToken) {
         const pdfjs = await loadPEPdfJs();
         if (renderToken !== pePdfRenderToken || !container.isConnected) return;
         const loadingTask = pdfjs.getDocument({ url: `/api/pe-resource-pdf?id=${encodeURIComponent(guideId)}` });
+        pePdfLoadingTask = loadingTask;
         const pdf = await loadingTask.promise;
         if (renderToken !== pePdfRenderToken || !container.isConnected) return;
         container.innerHTML = "";
@@ -2608,12 +2615,18 @@ async function renderPEGuidePdf(panel, guideId, fallbackPreview, renderToken) {
             canvas.setAttribute("aria-label", `PDF page ${pageNumber} of ${pdf.numPages}`);
             pageWrap.appendChild(canvas);
             container.appendChild(pageWrap);
-            await page.render({
+            const renderTask = page.render({
                 canvasContext: canvas.getContext("2d", { alpha: false }),
                 viewport,
                 transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0]
-            }).promise;
+            });
+            pePdfRenderTask = renderTask;
+            await renderTask.promise;
+            pePdfRenderTask = null;
+            if (pageNumber < pdf.numPages) await new Promise(resolve => requestAnimationFrame(resolve));
         }
+        await pdf.destroy();
+        if (pePdfLoadingTask === loadingTask) pePdfLoadingTask = null;
     } catch (error) {
         if (renderToken !== pePdfRenderToken || !container.isConnected) return;
         console.error("PE guide PDF rendering failed", error);
@@ -2625,13 +2638,14 @@ async function renderPEGuidePdf(panel, guideId, fallbackPreview, renderToken) {
 
 function renderPEGuidePanel(panel) {
     if (!panel) return;
-    const renderToken = ++pePdfRenderToken;
     const guides = peResourcesCatalog.filter(item => item.kind === "guide");
     if (peGuideCarouselTimer) {
         clearInterval(peGuideCarouselTimer);
         peGuideCarouselTimer = null;
     }
     if (!guides.length) {
+        cancelPEPdfWork();
+        panel.dataset.peGuideRenderKey = "";
         panel.innerHTML = '<div class="pe-empty-msg">Published guides will appear here.</div>';
         return;
     }
@@ -2647,6 +2661,18 @@ function renderPEGuidePanel(panel) {
     const embeddedType = documentUrl ? "Document" : websiteUrl ? "Website" : "Preview";
     const displayImage = documentIsImage ? documentUrl : preview;
     const readingContent = String(guide.content || "").trim();
+    const renderKey = JSON.stringify([
+        guide.id || "",
+        guide.title || "",
+        documentUrl,
+        websiteUrl,
+        preview,
+        readingContent
+    ]);
+    if (panel.dataset.peGuideRenderKey === renderKey && panel.querySelector(".pe-guide-library")) return;
+    cancelPEPdfWork();
+    const renderToken = ++pePdfRenderToken;
+    panel.dataset.peGuideRenderKey = renderKey;
     const guideMaterial = `
         ${documentIsPdf ? '<div class="pe-pdf-viewer" data-pe-pdf-viewer><div class="pe-pdf-loading">Loading PDF…</div></div>' : displayImage ? `<img src="${escapeHTML(displayImage)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : `<div class="pe-guide-placeholder"><i class="bi ${websiteUrl && !documentUrl ? "bi-link-45deg" : "bi-file-earmark-text"}" aria-hidden="true"></i><div>${websiteUrl && !documentUrl ? "Website preview" : "Document preview"}</div></div>`}
         ${readingContent ? `<div class="pe-guide-reading-content">${escapeHTML(readingContent).replace(/\n/g, "<br>")}</div>` : ""}
@@ -2684,6 +2710,7 @@ function renderPEGuidePanel(panel) {
 
 function renderPESelfNotePanel(panel) {
     if (!panel) return;
+    if (panel.querySelector("#pe-note-editor")) return;
     let draft = "";
     try { draft = sessionStorage.getItem(PE_NOTE_DRAFT_KEY) || ""; } catch (e) {}
     panel.innerHTML = `
@@ -2714,7 +2741,9 @@ function renderPESelfNotePanel(panel) {
 function handlePEHomeDashboardClick(event) {
     const tab = event.target.closest("[data-pe-resource-tab]");
     if (tab) {
-        peActiveResourceTab = tab.dataset.peResourceTab || "guide";
+        const nextTab = tab.dataset.peResourceTab || "guide";
+        if (nextTab === peActiveResourceTab && tab.getAttribute("aria-selected") === "true") return;
+        peActiveResourceTab = nextTab;
         renderPEResourceTabs();
         return;
     }
@@ -3331,7 +3360,6 @@ function showPEFolderScreen() {
 // Chart pane stays fixed on the left (position: sticky) while the
 // question pane on the right shows one question at a time with // Next/Previous — same model GMAT/GRE/CAT use for chart-based sets.
 let peDIActiveSet = null; // the set/topic name currently open in the viewer
-let peDIQuestionObserver = null;
 let peDIActiveGraphIndex = 0;
 
 function renderPEDIGrid() {
@@ -3396,27 +3424,20 @@ async function openPEDIViewer(setName) {
     if (firstCachedGraph) chartImg.src = firstCachedGraph;
     else chartImg.removeAttribute("src");
     if (!setQuestions.length) return;
-    try {
-        await prefetchPEDISetGraph(setName, { blockForMs: 1200 });
-        // The short wait keeps opening responsive; then finish the queued
-        // media request so a slower second/third chart is never skipped.
-        const mediaPromise = peDIGraphPrefetch.get(String(setName || "").trim());
-        if (mediaPromise) await mediaPromise;
+    void prefetchPEDISetGraph(setName).then(() => {
         if (peDIActiveSet !== setName) return;
         // Re-render after media arrives. This assigns every question to the
         // correct sequential chart group and resets numbering for that group.
         renderPEDIQuestion();
-    } catch (error) {
+    }).catch(error => {
         console.error("Data Interpretation graph load failed:", error);
         if (peDIActiveSet === setName) {
             showToast("The questions opened, but the graph could not be downloaded.", "info");
         }
-    }
+    });
 }
 
 function closePEDIViewer() {
-    peDIQuestionObserver?.disconnect();
-    peDIQuestionObserver = null;
     clearActivePEPracticeMemory();
     peDIActiveSet = null;
     peDIActiveGraphIndex = 0;
@@ -3639,15 +3660,6 @@ function renderPEDIGraphControls(groupCount) {
     });
 }
 
-function observePEDIChartGroups(container) {
-    peDIQuestionObserver?.disconnect();
-    peDIQuestionObserver = null;
-    const cards = [...container.querySelectorAll("[data-di-graph-src]")];
-    if (!cards.length) return;
-
-    showPEDIChart(cards[0].dataset.diGraphSrc || "");
-}
-
 function renderPEDIQuestion() {
     const container = document.getElementById("pe-di-questions-container");
     if (!peDIActiveSet) {
@@ -3713,7 +3725,6 @@ function renderPEDIQuestion() {
         button.addEventListener("click", () => answerPEWrittenQuestion(button.dataset.peWrittenAnswerQid || ""));
     });
     bindPESolutionToggles(container);
-    observePEDIChartGroups(container);
 }
 
 // ─── Question attempt flow (attempt first, then reveal) ────
