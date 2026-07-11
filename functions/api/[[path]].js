@@ -25,7 +25,6 @@ const MEDIA_BUCKET = "exam-media";
 const POLICIES = {
     health: { windowMs: MINUTE, ipLimit: 30, sessionLimit: 30 },
     questions: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
-    "pe-overview": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "pe-resources": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
     "pe-resource-pdf": { windowMs: MINUTE, ipLimit: 45, sessionLimit: 60 },
     "pe-resource-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 90 },
@@ -166,28 +165,6 @@ async function handleQuestions(context) {
         return json((rows || []).map(row => normalizePublicQuestionMediaRow(context, row, "Exam")), 200, PUBLIC_CACHE_MEDIA);
     }
     return apiError(400, "invalid_view", "Question view must be catalog, pe-catalog, pe-practice, media, or category-media.");
-}
-
-async function handlePEOverview(context) {
-    if (context.request.method !== "GET") return methodNotAllowed(["GET"]);
-    const rows = await supabaseServerRequest(context.env, "Exam?select=category,image&order=id.asc");
-    const types = new Map();
-    for (const row of rows || []) {
-        const info = parsePECategory(row.category);
-        if (!info) continue;
-        const current = types.get(info.peType) || { type: info.peType, questions: 0, graphPaths: new Set() };
-        current.questions += 1;
-        if (info.peType === "Data Interpretation" && String(row.image || "").trim()) {
-            current.graphPaths.add(String(row.image).trim());
-        }
-        types.set(info.peType, current);
-    }
-    const categories = [...types.values()].map(item => ({
-        type: item.type,
-        questions: item.questions,
-        graphs: item.graphPaths.size
-    }));
-    return json({ categories }, 200, PUBLIC_CACHE_SHORT);
 }
 
 async function handlePEResources(context) {
@@ -906,7 +883,6 @@ export async function onRequest(context) {
         let response;
         if (name === "health") response = json({ ok: true, service: "ExamPortal API" });
         else if (name === "questions") response = await handleQuestions(context);
-        else if (name === "pe-overview") response = await handlePEOverview(context);
         else if (name === "pe-resources") response = await handlePEResources(context);
         else if (name === "pe-resource-pdf") response = await handlePEResourcePdf(context);
         else if (name === "pe-resource-answer") response = await handlePEResourceAnswer(context);

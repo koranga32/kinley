@@ -2450,17 +2450,12 @@
             font-size: 0.95rem;
         }
 
-        .pe-home-dashboard-section + .pe-home-dashboard-section {
-            margin-top: 30px;
-        }
-
         .pe-home-dashboard-section {
             margin-left: auto;
             margin-right: auto;
         }
 
-        #pe-home-panel.active .pe-home-dashboard-section:first-child { width: min(100%, 560px); }
-        #pe-home-panel.active .pe-home-dashboard-section:last-child { width: min(100%, 1100px); }
+        #pe-home-panel.active .pe-home-dashboard-section { width: min(100%, 1180px); }
 
         .pe-content:has(#pe-home-panel.active) {
             overflow: hidden;
@@ -2471,15 +2466,10 @@
             height: 100%;
             min-height: 0;
             display: grid;
-            grid-template-rows: auto minmax(0, 1fr);
-            gap: 8px;
+            grid-template-rows: minmax(0, 1fr);
         }
 
-        #pe-home-panel.active .pe-home-dashboard-section + .pe-home-dashboard-section {
-            margin-top: 0;
-        }
-
-        #pe-home-panel.active .pe-home-dashboard-section:last-child {
+        #pe-home-panel.active .pe-home-dashboard-section {
             min-height: 0;
             display: flex;
             flex-direction: column;
@@ -2491,45 +2481,12 @@
             text-align: center;
         }
 
-        .pe-overview-card,
         .pe-resource-panel {
             background: #2b2f36;
             border: 1px solid #383d46;
             border-radius: 10px;
             padding: 8px;
         }
-
-        .pe-overview-circles {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-evenly;
-            gap: 6px;
-        }
-
-        .pe-overview-item {
-            display: grid;
-            justify-items: center;
-            gap: 4px;
-            min-width: 74px;
-            color: #f5f7fb;
-            text-align: center;
-        }
-
-        .pe-overview-circle {
-            width: 58px;
-            aspect-ratio: 1;
-            display: grid;
-            align-content: center;
-            justify-items: center;
-            gap: 2px;
-            border: 1px solid #4a5260;
-            border-radius: 50%;
-            color: #e8ebf1;
-        }
-
-        .pe-overview-value { font-size: 16px; font-weight: 800; line-height: 1; }
-        .pe-overview-label { color: #aeb4c0; font-size: 9px; }
-        .pe-overview-total { margin: 6px 0 0; padding-top: 5px; border-top: 1px solid #383d46; color: #c9ccd2; text-align: center; font-size: 11px; }
 
         .pe-resource-tabs {
             display: flex;
@@ -2611,6 +2568,8 @@
         .pe-note-select { width: min(180px, 100%); height: 30px; padding: 3px 7px; border: 1px solid #4a5260; border-radius: 5px; background: #1f232b; color: #f5f7fb; }
         .pe-note-size { width: auto; }
         .pe-note-editor { min-height: 210px; padding: 12px; border: 1px solid #4a5260; border-radius: 6px; background: #1f232b; color: #f5f7fb; outline: none; }
+        #pe-resource-note:not([hidden]) { display: flex; flex-direction: column; }
+        #pe-resource-note:not([hidden]) .pe-note-editor { flex: 1 1 auto; }
         .pe-note-editor:focus { border-color: #60a5fa; box-shadow: 0 0 0 2px rgba(96,165,250,0.2); }
         .pe-note-editor ul,
         .pe-note-editor ol {
@@ -3835,11 +3794,7 @@
                 display: block;
             }
 
-            #pe-home-panel.active .pe-home-dashboard-section + .pe-home-dashboard-section {
-                margin-top: 24px;
-            }
-
-            #pe-home-panel.active .pe-home-dashboard-section:last-child { display: block; }
+            #pe-home-panel.active .pe-home-dashboard-section { display: block; }
             .pe-resource-panel { min-height: 220px; overflow-y: visible; }
             .pe-guide-library,
             .pe-formula-library { height: auto; grid-template-columns: 1fr; }

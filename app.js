@@ -46,7 +46,6 @@ let publicApiCache = new Map();
 let peQuestionsCache = [];
 let peTopicBuckets = new Map();
 let peTopicQuestionCache = new Map();
-let peOverviewCatalog = [];
 let peResourcesCatalog = [];
 let peHomeDashboardLoadPromise = null;
 let peHomeDashboardLoadedAt = 0;
@@ -473,7 +472,6 @@ function getPublicApiCacheTTL(path) {
     if (path === "questions?view=pe-catalog") return 5 * 60 * 1000;
     if (path === "pe-online-questions?view=catalog") return 5 * 60 * 1000;
     if (path === "pe-online-questions?view=all-media") return 10 * 60 * 1000;
-    if (path === "pe-overview") return 5 * 60 * 1000;
     if (path === "pe-resources") return 5 * 60 * 1000;
     if (path === "flashcards") return 60 * 1000;
     if (path === "quotes") return 60 * 1000;
@@ -1989,7 +1987,6 @@ async function caLoadState({ render = true, force = false } = {}) {
         try {
             const rows = await apiRequest("flashcards");
             cafNotes = cafNormalizeRows(rows);
-            if (document.getElementById("pe-home-panel")?.classList.contains("active")) renderPEHomeDashboard({ resources: false });
         } catch (e) {
             cafNotes = cafSeedNotes.map((item, idx) => ({ ...item, id: null, _seedIndex: idx }));
         }
@@ -2425,20 +2422,12 @@ function renderPETopicGrid(gridId, peTypeFilter, searchInputId, accentColor) {
 
 const PE_NOTE_DRAFT_KEY = "examportal_pe_self_note_draft_v1";
 
-function getPEOverview(type) {
-    return peOverviewCatalog.find(item => item.type === type) || { questions: 0, graphs: 0 };
-}
-
 async function loadPEHomeDashboard() {
     if (peHomeDashboardLoadedAt && Date.now() - peHomeDashboardLoadedAt < 5 * 60 * 1000) {
         return;
     }
     if (peHomeDashboardLoadPromise) return peHomeDashboardLoadPromise;
-    peHomeDashboardLoadPromise = Promise.all([
-        apiRequest("pe-overview"),
-        apiRequest("pe-resources")
-    ]).then(([overview, resources]) => {
-        peOverviewCatalog = Array.isArray(overview?.categories) ? overview.categories : [];
+    peHomeDashboardLoadPromise = apiRequest("pe-resources").then(resources => {
         peResourcesCatalog = Array.isArray(resources) ? resources : [];
         peHomeDashboardLoadedAt = Date.now();
         renderPEHomeDashboard();
@@ -2451,34 +2440,8 @@ async function loadPEHomeDashboard() {
     return peHomeDashboardLoadPromise;
 }
 
-function renderPEHomeDashboard({ resources = true } = {}) {
-    const overview = document.getElementById("pe-overview-card");
-    if (!overview) return;
-    const bcss = getPEOverview(PE_BCSC_MAIN_TYPE);
-    const past = getPEOverview("Past Paper");
-    const di = getPEOverview("Data Interpretation");
-    const currentAffairs = Array.isArray(cafNotes) ? cafNotes.length : 0;
-    const cards = [
-        ["BCSC(main)", bcss.questions],
-        ["Past Paper", past.questions],
-        ["Data Interpretation", di.questions],
-        ["Current Affairs", currentAffairs]
-    ];
-    const questionTotal = cards.reduce((total, [, count]) => total + Number(count || 0), 0);
-    overview.innerHTML = `
-        <div class="pe-overview-circles">
-            ${cards.map(([label, count]) => `
-                <div class="pe-overview-item">
-                    <div class="pe-overview-circle">
-                        <strong class="pe-overview-value">${Number(count || 0)}</strong>
-                    </div>
-                    <span>${escapeHTML(label)}</span>
-                </div>
-            `).join("")}
-        </div>
-        <p class="pe-overview-total">Total available: <strong>${questionTotal} questions</strong> · <strong>${di.graphs} graph${di.graphs === 1 ? "" : "s"}</strong></p>
-    `;
-    if (resources) renderPEResourceTabs();
+function renderPEHomeDashboard() {
+    renderPEResourceTabs();
 }
 
 function renderPEResourceTabs() {
