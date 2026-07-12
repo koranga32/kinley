@@ -4244,6 +4244,61 @@
             }
         }
 
+        /* Glassmorphism entry and public modal surfaces. */
+        #setup-view {
+            isolation: isolate;
+            background:
+                radial-gradient(circle at 14% 32%, rgba(139, 211, 200, 0.40) 0 8%, rgba(139, 211, 200, 0.12) 15%, transparent 25%),
+                radial-gradient(circle at 86% 20%, rgba(151, 220, 210, 0.36) 0 10%, rgba(151, 220, 210, 0.10) 17%, transparent 28%),
+                radial-gradient(circle at 72% 84%, rgba(126, 205, 193, 0.32) 0 7%, rgba(126, 205, 193, 0.09) 14%, transparent 23%),
+                linear-gradient(145deg, #15191d 0%, #1c2025 48%, #13171b 100%);
+        }
+        #setup-view > .panel,
+        .modal-backdrop .modal-box {
+            background: rgba(22, 27, 31, 0.58);
+            border: 1px solid rgba(226, 242, 240, 0.42);
+            -webkit-backdrop-filter: blur(22px) saturate(125%);
+            backdrop-filter: blur(22px) saturate(125%);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.17), 0 24px 64px rgba(0,0,0,0.34);
+        }
+        .modal-backdrop {
+            background:
+                radial-gradient(circle at 15% 34%, rgba(139, 211, 200, 0.36) 0 8%, rgba(139, 211, 200, 0.10) 15%, transparent 25%),
+                radial-gradient(circle at 84% 19%, rgba(151, 220, 210, 0.34) 0 10%, rgba(151, 220, 210, 0.09) 17%, transparent 28%),
+                linear-gradient(145deg, rgba(18,22,26,0.96), rgba(27,31,36,0.96));
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+        }
+        .modal-backdrop .modal-title,
+        .modal-backdrop .modal-subtitle,
+        .modal-backdrop .modal-security-note { color: #f5f8f8; }
+        .modal-backdrop .contact-field label,
+        .modal-backdrop .contact-form-note { color: #e7eeee; }
+        .modal-backdrop .contact-precaution {
+            background: rgba(139, 211, 200, 0.10);
+            border-color: rgba(226, 242, 240, 0.28);
+            color: #f1f6f5;
+        }
+        #setup-view > .panel .setup-badge {
+            background: rgba(221, 240, 237, 0.10);
+            border-color: rgba(226, 242, 240, 0.38);
+        }
+        #setup-view > .panel .form-control,
+        .modal-backdrop .pw-input,
+        .modal-backdrop .otp-digit-input {
+            background: rgba(242, 247, 247, 0.88);
+            border-color: rgba(255,255,255,0.48);
+        }
+
+        @media (max-width: 560px) {
+            #setup-view > .panel,
+            .modal-backdrop .modal-box {
+                border-radius: 15px;
+                -webkit-backdrop-filter: blur(17px) saturate(120%);
+                backdrop-filter: blur(17px) saturate(120%);
+            }
+        }
+
         @media (max-width: 360px) {
             .brand-text p { display: none; }
             .header-right .btn { padding-left: 6px; padding-right: 6px; }
