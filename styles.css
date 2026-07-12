@@ -4244,6 +4244,46 @@
             }
         }
 
+        /* Final shared prism-glass popup surface; page backgrounds remain unchanged. */
+        #setup-view > .panel,
+        .modal-backdrop .modal-box {
+            position: relative;
+            isolation: isolate;
+            background:
+                linear-gradient(135deg, rgba(255,255,255,0.10), transparent 40%),
+                rgba(19, 24, 28, 0.38);
+            border: 1px solid rgba(226, 242, 240, 0.38);
+            -webkit-backdrop-filter: blur(24px) saturate(130%);
+            backdrop-filter: blur(24px) saturate(130%);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.24), inset 0 -1px 0 rgba(255,255,255,0.05), 0 24px 64px rgba(0,0,0,0.32);
+        }
+        #setup-view > .panel::before,
+        .modal-backdrop .modal-box::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            padding: 1px;
+            border-radius: inherit;
+            pointer-events: none;
+            background: conic-gradient(from 210deg, rgba(127,221,211,0.86), rgba(255,255,255,0.22), rgba(224,181,102,0.80), rgba(147,211,232,0.72), rgba(127,221,211,0.86));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+        #setup-view > .panel::after,
+        .modal-backdrop .modal-box::after {
+            content: "";
+            position: absolute;
+            z-index: 5;
+            left: 10%;
+            right: 10%;
+            top: 0;
+            height: 1px;
+            pointer-events: none;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.72), transparent);
+        }
+
         /* Glassmorphism entry and public modal surfaces. */
         #setup-view {
             isolation: isolate;
