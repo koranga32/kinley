@@ -55,6 +55,11 @@ let peFormulaTopic = "";
 let peFormulaQuestionIndex = 0;
 let peGuideLocalFile = null;
 let peGuideLocalObjectUrl = "";
+let peGuideLocalPdfJsPromise = null;
+let peGuideLocalPdfRenderToken = 0;
+let peGuideLocalPdfLoadingTask = null;
+let peGuideLocalPdfDocument = null;
+let peGuideLocalPdfRenderTasks = new Set();
 let peGuideNoteWorkingHtml = "";
 let peGuideNoteLoaded = false;
 let cafStateLoaded = false;
@@ -2531,7 +2536,100 @@ function safeResourceUrl(value) {
     return /^https:\/\/[^\s]+$/i.test(source) ? source : "";
 }
 
+function loadPEGuideLocalPdfJs() {
+    if (!peGuideLocalPdfJsPromise) {
+        peGuideLocalPdfJsPromise = import("/vendor/pdfjs/pdf.min.mjs").then(pdfjs => {
+            pdfjs.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/pdf.worker.min.mjs";
+            return pdfjs;
+        });
+    }
+    return peGuideLocalPdfJsPromise;
+}
+
+function cancelPEGuideLocalPdfRender() {
+    peGuideLocalPdfRenderToken += 1;
+    peGuideLocalPdfRenderTasks.forEach(task => {
+        try { task.cancel(); } catch (error) {}
+    });
+    peGuideLocalPdfRenderTasks.clear();
+    const loadingTask = peGuideLocalPdfLoadingTask;
+    const pdfDocument = peGuideLocalPdfDocument;
+    peGuideLocalPdfLoadingTask = null;
+    peGuideLocalPdfDocument = null;
+    try { void loadingTask?.destroy().catch(() => {}); } catch (error) {}
+    try { void pdfDocument?.destroy().catch(() => {}); } catch (error) {}
+}
+
+async function renderPEGuideLocalPdf(panel, sourceFile, renderToken) {
+    const container = panel?.querySelector("[data-pe-local-pdf]");
+    if (!container || !(sourceFile instanceof Blob)) return;
+    try {
+        const pdfjs = await loadPEGuideLocalPdfJs();
+        if (renderToken !== peGuideLocalPdfRenderToken || !container.isConnected) return;
+        const pdfBytes = new Uint8Array(await sourceFile.arrayBuffer());
+        if (renderToken !== peGuideLocalPdfRenderToken || !container.isConnected) return;
+        const loadingTask = pdfjs.getDocument({ data: pdfBytes });
+        peGuideLocalPdfLoadingTask = loadingTask;
+        const pdf = await loadingTask.promise;
+        if (renderToken !== peGuideLocalPdfRenderToken || !container.isConnected) {
+            await pdf.destroy();
+            return;
+        }
+        peGuideLocalPdfLoadingTask = null;
+        peGuideLocalPdfDocument = pdf;
+        container.replaceChildren();
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+            if (renderToken !== peGuideLocalPdfRenderToken || !container.isConnected) return;
+            const page = await pdf.getPage(pageNumber);
+            const baseViewport = page.getViewport({ scale: 1 });
+            const availableWidth = Math.max(280, container.clientWidth - 16);
+            const viewport = page.getViewport({ scale: Math.min(1.75, availableWidth / baseViewport.width) });
+            const outputScale = Math.min(1.75, Math.max(1, window.devicePixelRatio || 1));
+            const pageWrap = document.createElement("div");
+            pageWrap.className = "pe-guide-local-pdf-page";
+            pageWrap.style.width = `${Math.floor(viewport.width)}px`;
+            pageWrap.style.height = `${Math.floor(viewport.height)}px`;
+            pageWrap.setAttribute("aria-label", `PDF page ${pageNumber} of ${pdf.numPages}`);
+
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
+            canvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
+            canvas.style.width = `${Math.floor(viewport.width)}px`;
+            canvas.style.height = `${Math.floor(viewport.height)}px`;
+            const textLayer = document.createElement("div");
+            textLayer.className = "pe-guide-local-pdf-text-layer";
+            textLayer.style.setProperty("--scale-factor", String(viewport.scale));
+            pageWrap.append(canvas, textLayer);
+            container.appendChild(pageWrap);
+
+            const renderTask = page.render({
+                canvasContext: canvas.getContext("2d", { alpha: false }),
+                viewport,
+                transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0]
+            });
+            peGuideLocalPdfRenderTasks.add(renderTask);
+            const selectableText = new pdfjs.TextLayer({
+                textContentSource: page.streamTextContent({ includeMarkedContent: true }),
+                container: textLayer,
+                viewport
+            });
+            try {
+                await Promise.all([renderTask.promise, selectableText.render()]);
+            } finally {
+                peGuideLocalPdfRenderTasks.delete(renderTask);
+                try { page.cleanup(); } catch (error) {}
+            }
+        }
+    } catch (error) {
+        if (renderToken !== peGuideLocalPdfRenderToken || !container.isConnected || error?.name === "RenderingCancelledException") return;
+        console.error("Temporary Guide PDF rendering failed", error);
+        container.innerHTML = '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><div>This temporary PDF could not be previewed. Click its heading to open it in a new tab.</div></div>';
+    }
+}
+
 function resetPEGuideLocalFile() {
+    cancelPEGuideLocalPdfRender();
     if (peGuideLocalObjectUrl) URL.revokeObjectURL(peGuideLocalObjectUrl);
     peGuideLocalObjectUrl = "";
     peGuideLocalFile = null;
@@ -2604,7 +2702,7 @@ function buildPEGuideLocalMaterial() {
     const type = String(file.type || "").toLowerCase();
     const extension = String(file.name || "").split(".").pop()?.toLowerCase() || "";
     if (type === "application/pdf" || extension === "pdf") {
-        return `<iframe class="pe-guide-local-frame" src="${escapeHTML(peGuideLocalObjectUrl)}#page=1&view=FitH&toolbar=0" title="${name}"></iframe>`;
+        return `<div class="pe-guide-local-pdf" data-pe-local-pdf aria-label="${name}"><div class="pe-guide-local-pdf-status">Loading temporary PDF…</div></div>`;
     }
     if (type.startsWith("image/") || /^(?:jpg|jpeg|png|webp|gif)$/.test(extension)) {
         return `<img src="${escapeHTML(peGuideLocalObjectUrl)}" alt="${name}">`;
@@ -2636,6 +2734,8 @@ function renderPEGuidePanel(panel) {
     const renderKey = JSON.stringify([initialPreview, guide?.id || "", guide?.title || "", documentUrl, websiteUrl, preview, readingContent, localName, peGuideLocalObjectUrl, ...guideListSignature]);
     if (panel.dataset.peGuideRenderKey === renderKey && panel.querySelector(".pe-guide-library")) return;
 
+    cancelPEGuideLocalPdfRender();
+    const localPdfRenderToken = peGuideLocalPdfRenderToken;
     panel.dataset.peGuideRenderKey = renderKey;
 
     let headingMarkup = '<h3 class="pe-guide-heading-static">Select a reading material</h3>';
@@ -2682,6 +2782,10 @@ function renderPEGuidePanel(panel) {
             ${buildPEGuideNotesMarkup()}
         </div>
     `;
+
+    if (peGuideLocalFile && /(?:^application\/pdf$|\.pdf$)/i.test(`${peGuideLocalFile.type || ""}|${peGuideLocalFile.name || ""}`)) {
+        requestAnimationFrame(() => { void renderPEGuideLocalPdf(panel, peGuideLocalFile.sourceFile, localPdfRenderToken); });
+    }
 
 }
 
@@ -2823,7 +2927,7 @@ async function loadPEGuideLocalFile(file) {
 
     resetPEGuideLocalFile();
     peGuideLocalObjectUrl = URL.createObjectURL(file);
-    peGuideLocalFile = { name: file.name, type: file.type, size: file.size, previewText: "" };
+    peGuideLocalFile = { name: file.name, type: file.type, size: file.size, previewText: "", sourceFile: file };
     if (extension === "txt") {
         try { peGuideLocalFile.previewText = (await file.text()).slice(0, 2_000_000); } catch (error) {}
     }
@@ -2838,12 +2942,12 @@ async function copyPEGuideSelection() {
     let selectedText = String(window.getSelection?.()?.toString() || "").trim();
     if (!selectedText) {
         try {
-            const frame = document.querySelector("#pe-resource-guide .pe-guide-local-frame, #pe-resource-guide .pe-guide-pdf-frame");
+            const frame = document.querySelector("#pe-resource-guide .pe-guide-pdf-frame");
             selectedText = String(frame?.contentWindow?.getSelection?.()?.toString() || "").trim();
         } catch (error) {}
     }
     if (!selectedText) {
-        setPEGuideNoteFeedback(document.querySelector("#pe-resource-guide .pe-guide-local-frame, #pe-resource-guide .pe-guide-pdf-frame") ? "Select text inside the PDF and use Copy or Ctrl+C" : "Select document text first");
+        setPEGuideNoteFeedback(document.querySelector("#pe-resource-guide .pe-guide-pdf-frame") ? "Select text inside the PDF and use Copy or Ctrl+C" : "Select document text first");
         return;
     }
     try {
