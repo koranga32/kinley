@@ -2526,8 +2526,9 @@
         .pe-guide-material > img { width: 100%; max-height: 60%; flex: 0 0 auto; object-fit: contain; background: #151922; }
         .pe-guide-material > img:only-child { height: 100%; max-height: none; }
         .pe-pdf-viewer { display: grid; align-content: start; gap: 12px; padding: 10px; background: #343941; }
-        .pe-pdf-page { display: flex; justify-content: center; overflow: hidden; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.28); }
+        .pe-pdf-page { min-height: 280px; aspect-ratio: 8.5 / 11; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.28); }
         .pe-pdf-page canvas { display: block; max-width: 100%; height: auto !important; }
+        .pe-pdf-page-placeholder { color: #687386; font-size: 12px; font-weight: 700; }
         .pe-guide-material > img,
         .pe-pdf-page canvas { cursor: zoom-in; }
         .pe-pdf-loading,
@@ -4449,6 +4450,20 @@
             -webkit-backdrop-filter: blur(24px) saturate(130%);
             backdrop-filter: blur(24px) saturate(130%);
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.24), inset 0 -1px 0 rgba(255,255,255,0.05), 0 24px 64px rgba(0,0,0,0.32);
+            /* Popup copy must not reflow when deferred web fonts arrive. */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            text-rendering: optimizeLegibility;
+        }
+        body #setup-view > .panel.panel-narrow {
+            animation: none;
+        }
+        body #setup-view > .panel.panel-narrow :where(p, label, input, select, button, span),
+        body .modal-backdrop .modal-box :where(p, label, input, select, textarea, button, span) {
+            font-family: inherit;
+        }
+        body #setup-view > .panel.panel-narrow :where(h1, h2, h3),
+        body .modal-backdrop .modal-box :where(h1, h2, h3) {
+            font-family: Georgia, "Times New Roman", serif;
         }
         body #setup-view > .panel.panel-narrow::before,
         body .modal-backdrop .modal-box::before {

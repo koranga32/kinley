@@ -38,8 +38,6 @@ let peOnlineCatalog = {
     total: 0
 };
 let questionMediaCache = new Map();
-let categoryMediaPrefetch = { category: "", promise: null };
-let peOnlineMediaPrefetchPromise = null;
 let peTopicMediaPrefetch = new Map();
 let peDIGraphPrefetch = new Map();
 let peDIGraphFingerprintCache = new Map();
@@ -60,10 +58,16 @@ let pePdfJsPromise = null;
 let pePdfRenderToken = 0;
 let pePdfLoadingTask = null;
 let pePdfRenderTask = null;
+let pePdfDocument = null;
+let pePdfObserver = null;
+let pePdfRenderQueue = Promise.resolve();
+let pePdfActiveRenderTasks = new Set();
 let cafStateLoaded = false;
 let cafStatePromise = null;
 let submitInProgress = false;
-const QUESTION_PREFETCH_AHEAD = 5;
+const QUESTION_PREFETCH_AHEAD = 1;
+const EXAM_STARTUP_MEDIA_COUNT = 2;
+const EXAM_MEDIA_RETAIN_RADIUS = 2;
 
 function bindStaticUiEvents() {
     document.getElementById("contact-modal")?.addEventListener("click", handleContactBackdropClick);
@@ -419,8 +423,6 @@ function clearDatabaseCache() {
     try { sessionStorage.removeItem(DB_CACHE_KEY); } catch (e) {}
     try { localStorage.removeItem(DB_CACHE_KEY); } catch (e) {}
     questionMediaCache = new Map();
-    categoryMediaPrefetch = { category: "", promise: null };
-    peOnlineMediaPrefetchPromise = null;
     peTopicMediaPrefetch = new Map();
     peDIGraphPrefetch = new Map();
     peDIGraphFingerprintCache = new Map();
@@ -497,12 +499,10 @@ function getPublicApiCacheTTL(path) {
     if (path === "questions?view=catalog") return 5 * 60 * 1000;
     if (path === "questions?view=pe-catalog") return 5 * 60 * 1000;
     if (path === "pe-online-questions?view=catalog") return 5 * 60 * 1000;
-    if (path === "pe-online-questions?view=all-media") return 10 * 60 * 1000;
     if (path === "pe-resources") return 5 * 60 * 1000;
     if (path === "flashcards") return 60 * 1000;
     if (path === "quotes") return 60 * 1000;
     if (path.startsWith("questions?view=media&ids=")) return 10 * 60 * 1000;
-    if (path.startsWith("questions?view=category-media&category=")) return 10 * 60 * 1000;
     if (path.startsWith("pe-online-questions?view=media&ids=")) return 10 * 60 * 1000;
     return 0;
 }
@@ -660,8 +660,8 @@ async function fetchNormalExamQuestionWindow(index) {
 }
 
 async function ensureNormalExamQuestionLoaded(index) {
-    if (!normalExamMode || activeData[index]) return activeData[index];
-    await fetchNormalExamQuestionWindow(index);
+    if (!normalExamMode) return activeData[index];
+    if (!activeData[index]) await fetchNormalExamQuestionWindow(index);
     if (activeData[index]) {
         await fetchSelectedQuestionMedia([activeData[index]]);
     }
@@ -669,10 +669,18 @@ async function ensureNormalExamQuestionLoaded(index) {
 }
 
 async function prefetchNormalExamQuestion(index) {
-    if (!normalExamMode || index < 0 || index >= activeData.length || activeData[index]) return;
+    if (!normalExamMode || index < 0 || index >= activeData.length) return;
     try {
-        const rows = await fetchNormalExamQuestionWindow(index);
-        const warmable = rows.map(entry => entry.question).filter(Boolean);
+        let warmable = [];
+        if (activeData[index]) {
+            warmable = [activeData[index]];
+        } else {
+            const rows = await fetchNormalExamQuestionWindow(index);
+            warmable = rows
+                .filter(entry => entry.index === index)
+                .map(entry => entry.question)
+                .filter(Boolean);
+        }
         if (warmable.length) {
             await fetchSelectedQuestionMedia(warmable);
             await warmQuestionAssets(warmable, { reportProgress: false });
@@ -728,7 +736,10 @@ async function prefetchPEOnlineQuestion(index) {
             warmable = [activeData[index]];
         } else {
             const rows = await fetchPEOnlineQuestionWindow(index);
-            warmable = rows.map(entry => entry.question).filter(Boolean);
+            warmable = rows
+                .filter(entry => entry.index === index)
+                .map(entry => entry.question)
+                .filter(Boolean);
         }
         if (warmable.length) {
             await fetchSelectedQuestionMedia(warmable);
@@ -769,6 +780,17 @@ function cacheMediaRows(mediaRows) {
             image: typeof row.image === "string" ? row.image : current.image,
             audio: typeof row.audio === "string" ? row.audio : current.audio
         });
+    });
+}
+
+function releaseDistantExamMedia(centerIndex) {
+    if (!normalExamMode && !peOnlineMode) return;
+    activeData.forEach((question, index) => {
+        if (!question || Math.abs(index - centerIndex) <= EXAM_MEDIA_RETAIN_RADIUS) return;
+        const id = String(question.id || "").trim();
+        question.imageCode = "";
+        question.audioCode = "";
+        if (id) questionMediaCache.delete(id);
     });
 }
 
@@ -875,54 +897,8 @@ async function warmQuestionAssets(questions, { reportProgress = true } = {}) {
     }
 }
 
-async function warmMediaRows(mediaRows) {
-    const warmable = (mediaRows || []).map(row => ({
-        imageCode: typeof row.image === "string" ? row.image : "",
-        audioCode: typeof row.audio === "string" ? row.audio : ""
-    }));
-    await warmQuestionAssets(warmable, { reportProgress: false });
-}
-
-async function prefetchCategoryMedia(category, { blockForMs = 0 } = {}) {
-    const normalizedCategory = String(category || "").trim();
-    if (!normalizedCategory) return;
-
-    if (categoryMediaPrefetch.category !== normalizedCategory || !categoryMediaPrefetch.promise) {
-        categoryMediaPrefetch = {
-            category: normalizedCategory,
-            promise: (async () => {
-                const rows = await apiRequest(`questions?view=category-media&category=${encodeURIComponent(normalizedCategory)}`);
-                if (!Array.isArray(rows) || !rows.length) return;
-                cacheMediaRows(rows);
-                await warmMediaRows(rows.filter(row => row.image || row.audio));
-            })().catch(error => {
-                console.error("Category media prefetch failed:", error);
-            })
-        };
-    }
-
-    if (blockForMs > 0) {
-        await Promise.race([
-            categoryMediaPrefetch.promise,
-            new Promise(resolve => setTimeout(resolve, blockForMs))
-        ]);
-    }
-}
-
-function prefetchPEOnlineMedia() {
-    if (peOnlineMediaPrefetchPromise) return peOnlineMediaPrefetchPromise;
-    peOnlineMediaPrefetchPromise = (async () => {
-        const rows = await apiRequest("pe-online-questions?view=all-media");
-        if (!Array.isArray(rows) || !rows.length) return;
-        cacheMediaRows(rows);
-    })().catch(error => {
-        peOnlineMediaPrefetchPromise = null;
-        console.error("PE Online media prefetch failed:", error);
-    });
-    return peOnlineMediaPrefetchPromise;
-}
-
 async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam media…") {
+    const startupQuestions = (questions || []).slice(0, EXAM_STARTUP_MEDIA_COUNT);
     let mediaLoaderVisible = false;
     const mediaLoaderDelay = setTimeout(() => {
         mediaLoaderVisible = true;
@@ -931,8 +907,8 @@ async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam m
     }, 450);
 
     try {
-        await fetchSelectedQuestionMedia(questions);
-        const hasMedia = (questions || []).some(q => q.imageCode || q.audioCode);
+        await fetchSelectedQuestionMedia(startupQuestions);
+        const hasMedia = startupQuestions.some(q => q.imageCode || q.audioCode);
         clearTimeout(mediaLoaderDelay);
         if (!hasMedia) return;
 
@@ -943,7 +919,7 @@ async function prepareExamAssetsBeforeTimer(questions, label = "Preparing exam m
         }
         setLoaderProgress(45);
         await Promise.race([
-            warmQuestionAssets(questions),
+            warmQuestionAssets(startupQuestions),
             new Promise(resolve => setTimeout(resolve, 12000))
         ]);
         setLoaderProgress(100);
@@ -1172,18 +1148,6 @@ function updateTestSummary() {
 
 }
 
-function queueSelectedCategoryMediaPrefetch(options = {}) {
-    if (!examCatalogReady) return;
-    const select = document.getElementById("category-select");
-    const category = String(select?.value || "").trim();
-    if (!category) return;
-    void prefetchCategoryMedia(category, options).catch(() => {});
-}
-
-function queuePEOnlineMediaPrefetch() {
-    void Promise.resolve(prefetchPEOnlineMedia()).catch(() => {});
-}
-
 function getPETopicQuestions(peType, topic) {
     const key = getPETopicPrefetchKey(peType, topic);
     if (peTopicQuestionCache.has(key)) return peTopicQuestionCache.get(key);
@@ -1300,8 +1264,6 @@ async function prefetchPEDISetGraph(setName) {
 
 function handleCategorySelectionChange() {
     updateTestSummary();
-    if (!setupContinued) return;
-    queueSelectedCategoryMediaPrefetch();
 }
 
 // ─── EXAM START ───────────────────────────────────────
@@ -1332,7 +1294,6 @@ async function startExam() {
             btn.innerHTML = "<span>Begin Examination</span> →";
             btn.disabled = false;
             setPostContinueActionButtons();
-            queueSelectedCategoryMediaPrefetch();
             document.getElementById("category-select").focus();
             examPreparing = false;
             showLoading(false);
@@ -1679,6 +1640,7 @@ async function navigate(idx) {
         activeCard.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
     handleQuestionAudio(currentIdx);
+    releaseDistantExamMedia(currentIdx);
     void prefetchNormalExamQuestion(currentIdx + QUESTION_PREFETCH_AHEAD);
 }
 
@@ -2397,7 +2359,6 @@ async function openPEPortal() {
     loadPEOnlineQuestionBank()
         .then(() => {
             updatePEOnlineCount();
-            queuePEOnlineMediaPrefetch();
         })
         .catch(error => {
             peOnlineCatalog.total = 0;
@@ -2588,10 +2549,107 @@ function loadPEPdfJs() {
 }
 
 function cancelPEPdfWork() {
+    pePdfRenderToken += 1;
+    pePdfObserver?.disconnect();
+    pePdfObserver = null;
+    pePdfActiveRenderTasks.forEach(task => {
+        try { task.cancel(); } catch (error) {}
+    });
+    pePdfActiveRenderTasks.clear();
     try { pePdfRenderTask?.cancel(); } catch (error) {}
-    try { void pePdfLoadingTask?.destroy(); } catch (error) {}
+    const loadingTask = pePdfLoadingTask;
+    const pdfDocument = pePdfDocument;
     pePdfRenderTask = null;
     pePdfLoadingTask = null;
+    pePdfDocument = null;
+    pePdfRenderQueue = Promise.resolve();
+    try { void loadingTask?.destroy().catch(() => {}); } catch (error) {}
+    try { void pdfDocument?.destroy().catch(() => {}); } catch (error) {}
+}
+
+function resetPEPdfPagePlaceholder(pageWrap) {
+    const canvas = pageWrap.querySelector("canvas");
+    if (canvas) {
+        canvas.width = 1;
+        canvas.height = 1;
+    }
+    pageWrap.replaceChildren();
+    const placeholder = document.createElement("span");
+    placeholder.className = "pe-pdf-page-placeholder";
+    placeholder.textContent = `Page ${pageWrap.dataset.pageNumber}`;
+    pageWrap.appendChild(placeholder);
+    pageWrap.dataset.pdfState = "idle";
+}
+
+function getPEPdfOutputScale(viewport) {
+    const mobile = window.matchMedia?.("(max-width: 768px)")?.matches ?? window.innerWidth <= 768;
+    const deviceScale = Math.max(1, window.devicePixelRatio || 1);
+    const scaleLimit = mobile ? 1.25 : 1.5;
+    const pixelLimit = mobile ? 4_000_000 : 8_000_000;
+    const desiredScale = Math.min(scaleLimit, deviceScale);
+    const desiredPixels = viewport.width * viewport.height * desiredScale * desiredScale;
+    if (desiredPixels <= pixelLimit) return desiredScale;
+    return Math.max(1, Math.sqrt(pixelLimit / (viewport.width * viewport.height)));
+}
+
+async function renderPEPdfPage(pdf, container, pageWrap, renderToken) {
+    if (
+        renderToken !== pePdfRenderToken ||
+        !container.isConnected ||
+        pageWrap.dataset.pdfNear !== "true" ||
+        pageWrap.dataset.pdfState !== "queued"
+    ) {
+        if (pageWrap.isConnected) pageWrap.dataset.pdfState = "idle";
+        return;
+    }
+
+    pageWrap.dataset.pdfState = "rendering";
+    const pageNumber = Number(pageWrap.dataset.pageNumber);
+    let page;
+    let renderTask;
+    try {
+        page = await pdf.getPage(pageNumber);
+        if (renderToken !== pePdfRenderToken || pageWrap.dataset.pdfNear !== "true") {
+            page.cleanup();
+            pageWrap.dataset.pdfState = "idle";
+            return;
+        }
+        const baseViewport = page.getViewport({ scale: 1 });
+        const availableWidth = Math.max(280, container.clientWidth - 20);
+        const scale = Math.min(1.5, availableWidth / baseViewport.width);
+        const viewport = page.getViewport({ scale });
+        const outputScale = getPEPdfOutputScale(viewport);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
+        canvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        canvas.setAttribute("aria-label", `PDF page ${pageNumber} of ${pdf.numPages}`);
+        pageWrap.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+        pageWrap.replaceChildren(canvas);
+        renderTask = page.render({
+            canvasContext: canvas.getContext("2d", { alpha: false }),
+            viewport,
+            transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0]
+        });
+        pePdfRenderTask = renderTask;
+        pePdfActiveRenderTasks.add(renderTask);
+        await renderTask.promise;
+        if (renderToken !== pePdfRenderToken || pageWrap.dataset.pdfNear !== "true") {
+            resetPEPdfPagePlaceholder(pageWrap);
+            return;
+        }
+        pageWrap.dataset.pdfState = "rendered";
+    } catch (error) {
+        if (renderToken === pePdfRenderToken && pageWrap.isConnected && error?.name !== "RenderingCancelledException") {
+            console.error(`PE guide PDF page ${pageNumber} failed`, error);
+            resetPEPdfPagePlaceholder(pageWrap);
+        }
+    } finally {
+        if (renderTask) pePdfActiveRenderTasks.delete(renderTask);
+        if (pePdfRenderTask === renderTask) pePdfRenderTask = null;
+        try { page?.cleanup(); } catch (error) {}
+    }
 }
 
 async function renderPEGuidePdf(panel, guideId, fallbackPreview, renderToken) {
@@ -2603,38 +2661,47 @@ async function renderPEGuidePdf(panel, guideId, fallbackPreview, renderToken) {
         const loadingTask = pdfjs.getDocument({ url: `/api/pe-resource-pdf?id=${encodeURIComponent(guideId)}` });
         pePdfLoadingTask = loadingTask;
         const pdf = await loadingTask.promise;
-        if (renderToken !== pePdfRenderToken || !container.isConnected) return;
+        if (renderToken !== pePdfRenderToken || !container.isConnected) {
+            await pdf.destroy();
+            return;
+        }
+        pePdfLoadingTask = null;
+        pePdfDocument = pdf;
         container.innerHTML = "";
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-            if (renderToken !== pePdfRenderToken || !container.isConnected) return;
-            const page = await pdf.getPage(pageNumber);
-            const baseViewport = page.getViewport({ scale: 1 });
-            const availableWidth = Math.max(280, container.clientWidth - 16);
-            const scale = Math.min(2, availableWidth / baseViewport.width);
-            const viewport = page.getViewport({ scale });
-            const outputScale = Math.min(2, window.devicePixelRatio || 1);
             const pageWrap = document.createElement("div");
             pageWrap.className = "pe-pdf-page";
-            const canvas = document.createElement("canvas");
-            canvas.width = Math.floor(viewport.width * outputScale);
-            canvas.height = Math.floor(viewport.height * outputScale);
-            canvas.style.width = `${Math.floor(viewport.width)}px`;
-            canvas.style.height = `${Math.floor(viewport.height)}px`;
-            canvas.setAttribute("aria-label", `PDF page ${pageNumber} of ${pdf.numPages}`);
-            pageWrap.appendChild(canvas);
+            pageWrap.dataset.pageNumber = String(pageNumber);
+            pageWrap.dataset.pdfState = "idle";
+            pageWrap.dataset.pdfNear = "false";
+            resetPEPdfPagePlaceholder(pageWrap);
             container.appendChild(pageWrap);
-            const renderTask = page.render({
-                canvasContext: canvas.getContext("2d", { alpha: false }),
-                viewport,
-                transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0]
-            });
-            pePdfRenderTask = renderTask;
-            await renderTask.promise;
-            pePdfRenderTask = null;
-            if (pageNumber < pdf.numPages) await new Promise(resolve => requestAnimationFrame(resolve));
         }
-        await pdf.destroy();
-        if (pePdfLoadingTask === loadingTask) pePdfLoadingTask = null;
+
+        const scrollRoot = container.closest(".pe-guide-material");
+        if (typeof IntersectionObserver === "function") {
+            pePdfObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    const pageWrap = entry.target;
+                    pageWrap.dataset.pdfNear = entry.isIntersecting ? "true" : "false";
+                    if (entry.isIntersecting && pageWrap.dataset.pdfState === "idle") {
+                        pageWrap.dataset.pdfState = "queued";
+                        pePdfRenderQueue = pePdfRenderQueue
+                            .then(() => renderPEPdfPage(pdf, container, pageWrap, renderToken))
+                            .catch(error => console.error("PE PDF render queue failed", error));
+                    } else if (!entry.isIntersecting && pageWrap.dataset.pdfState === "rendered") {
+                        resetPEPdfPagePlaceholder(pageWrap);
+                    }
+                });
+            }, { root: scrollRoot, rootMargin: "700px 0px", threshold: 0.01 });
+            container.querySelectorAll(".pe-pdf-page").forEach(pageWrap => pePdfObserver.observe(pageWrap));
+        } else {
+            container.querySelectorAll(".pe-pdf-page:nth-child(-n+2)").forEach(pageWrap => {
+                pageWrap.dataset.pdfNear = "true";
+                pageWrap.dataset.pdfState = "queued";
+                pePdfRenderQueue = pePdfRenderQueue.then(() => renderPEPdfPage(pdf, container, pageWrap, renderToken));
+            });
+        }
     } catch (error) {
         if (renderToken !== pePdfRenderToken || !container.isConnected) return;
         console.error("PE guide PDF rendering failed", error);
@@ -3167,6 +3234,7 @@ async function peoSyncWorkspaceView() {
     }
 
     await ensurePEOnlineQuestionLoaded(currentIdx);
+    releaseDistantExamMedia(currentIdx);
     const q = activeData[currentIdx];
     if (!q) return;
     const workspace = document.getElementById("peo-workspace");
