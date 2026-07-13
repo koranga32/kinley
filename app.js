@@ -60,6 +60,8 @@ let peGuideLocalPdfRenderToken = 0;
 let peGuideLocalPdfLoadingTask = null;
 let peGuideLocalPdfDocument = null;
 let peGuideLocalPdfRenderTasks = new Set();
+let peGuideLocalPdfZoom = 1;
+let peGuideLocalPdfSelectedText = "";
 let peGuideNoteWorkingHtml = "";
 let peGuideNoteLoaded = false;
 let cafStateLoaded = false;
@@ -70,6 +72,8 @@ const EXAM_STARTUP_MEDIA_COUNT = 2;
 const EXAM_MEDIA_RETAIN_RADIUS = 2;
 
 function bindStaticUiEvents() {
+    document.addEventListener("contextmenu", handleActiveExamContextMenu);
+    document.addEventListener("keydown", handleActiveExamSecurityKeydown);
     document.getElementById("contact-modal")?.addEventListener("click", handleContactBackdropClick);
     document.getElementById("contact-form")?.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -99,6 +103,7 @@ function bindStaticUiEvents() {
     document.getElementById("pe-home-panel")?.addEventListener("change", handlePEGuideControlChange);
     document.getElementById("pe-home-panel")?.addEventListener("input", handlePEGuideNoteInput);
     document.getElementById("pe-home-panel")?.addEventListener("paste", handlePEGuideNotePaste);
+    document.addEventListener("selectionchange", capturePEGuideLocalPdfSelection);
     document.getElementById("caf-bhutan-box")?.addEventListener("click", () => cafSelectRegion("Bhutan"));
     document.getElementById("caf-intl-box")?.addEventListener("click", () => cafSelectRegion("International"));
     document.getElementById("caf-category-dropdown")?.addEventListener("change", () => cafFilterData());
@@ -111,6 +116,24 @@ function bindStaticUiEvents() {
     document.getElementById("pe-question-back-btn")?.addEventListener("click", showPEFolderScreen);
     document.getElementById("pe-di-back-btn")?.addEventListener("click", closePEDIViewer);
     bindImageZoomEvents();
+}
+
+function isNormalExamViewActive() {
+    return normalExamMode && document.getElementById("exam-view")?.classList.contains("show");
+}
+
+function handleActiveExamContextMenu(event) {
+    if (isNormalExamViewActive()) event.preventDefault();
+}
+
+function handleActiveExamSecurityKeydown(event) {
+    if (!isNormalExamViewActive()) return;
+    if ((event.ctrlKey || event.metaKey) && ["c", "u", "s"].includes(String(event.key || "").toLowerCase())) {
+        event.preventDefault();
+        alert("Copying and viewing page elements is disabled during the examination.");
+    } else if (event.key === "F12") {
+        event.preventDefault();
+    }
 }
 
 const IMAGE_ZOOM_SELECTOR = [
@@ -1392,25 +1415,6 @@ function selectMobileBubble(questionIndex, optionIndex, element) {
 
 // ─── BUILD EXAM UI ────────────────────────────────────
 function buildExam() {
-    //ADDED FOR SECURITY: Prevents right-click and copying shortcuts
-    document.addEventListener('contextmenu', function(event) {
-        event.preventDefault();
-    });
-
-    document.addEventListener('keydown', function(event) {
-        if (event.ctrlKey || event.metaKey) {
-            if (event.key === 'c' || event.key === 'C' || 
-                event.key === 'u' || event.key === 'U' || 
-                event.key === 's' || event.key === 'S') {
-                event.preventDefault();
-                alert("Copying and viewing page elements is disabled during the examination.");
-            }
-        }
-        if (event.key === 'F12') {
-            event.preventDefault();
-        }
-    });
-    // END OF SECURITY INJECTION
     const qContainer   = document.getElementById("questions-container");
     const omrContainer = document.getElementById("omr-container");
     // OMR sidebar: clicking a bubble selects answer AND auto-advances
@@ -2560,9 +2564,59 @@ function cancelPEGuideLocalPdfRender() {
     try { void pdfDocument?.destroy().catch(() => {}); } catch (error) {}
 }
 
+function capturePEGuideLocalPdfSelection() {
+    const selection = window.getSelection?.();
+    if (!selection || selection.isCollapsed || selection.rangeCount < 1) return;
+    const selectedText = String(selection.toString() || "").trim();
+    if (!selectedText) return;
+    const commonNode = selection.getRangeAt(0).commonAncestorContainer;
+    const commonElement = commonNode.nodeType === Node.ELEMENT_NODE ? commonNode : commonNode.parentElement;
+    if (commonElement?.closest?.(".pe-guide-local-pdf-text-layer")) peGuideLocalPdfSelectedText = selectedText;
+}
+
+function setPEGuideLocalPdfZoom(container, nextZoom, anchor = null) {
+    if (!container) return;
+    const previousZoom = peGuideLocalPdfZoom;
+    const clampedZoom = Math.min(3, Math.max(0.6, Number(nextZoom) || 1));
+    if (Math.abs(clampedZoom - previousZoom) < 0.01) return;
+    const scroller = container.closest(".pe-guide-material");
+    const scrollerRect = scroller?.getBoundingClientRect();
+    const anchorX = anchor && scrollerRect ? anchor.clientX - scrollerRect.left + scroller.scrollLeft : (scroller?.scrollLeft || 0) + (scroller?.clientWidth || 0) / 2;
+    const anchorY = anchor && scrollerRect ? anchor.clientY - scrollerRect.top + scroller.scrollTop : (scroller?.scrollTop || 0) + (scroller?.clientHeight || 0) / 2;
+    peGuideLocalPdfZoom = clampedZoom;
+    container.style.setProperty("--pe-local-pdf-zoom", String(clampedZoom));
+    if (scroller) {
+        const ratio = clampedZoom / previousZoom;
+        requestAnimationFrame(() => {
+            scroller.scrollLeft = Math.max(0, anchorX * ratio - (anchor && scrollerRect ? anchor.clientX - scrollerRect.left : scroller.clientWidth / 2));
+            scroller.scrollTop = Math.max(0, anchorY * ratio - (anchor && scrollerRect ? anchor.clientY - scrollerRect.top : scroller.clientHeight / 2));
+        });
+    }
+}
+
+function handlePEGuideLocalPdfWheel(event) {
+    const container = event.target.closest?.(".pe-guide-local-pdf");
+    if (!container || (!event.ctrlKey && !event.metaKey)) return;
+    event.preventDefault();
+    setPEGuideLocalPdfZoom(container, peGuideLocalPdfZoom * Math.exp(-event.deltaY * 0.002), event);
+}
+
+function handlePEGuideLocalPdfKeydown(event) {
+    const container = event.target.closest?.(".pe-guide-local-pdf");
+    if (!container || (!event.ctrlKey && !event.metaKey)) return;
+    if (!["+", "=", "-", "0"].includes(event.key)) return;
+    event.preventDefault();
+    const nextZoom = event.key === "0" ? 1 : event.key === "-" ? peGuideLocalPdfZoom / 1.15 : peGuideLocalPdfZoom * 1.15;
+    setPEGuideLocalPdfZoom(container, nextZoom);
+}
+
 async function renderPEGuideLocalPdf(panel, sourceFile, renderToken) {
     const container = panel?.querySelector("[data-pe-local-pdf]");
     if (!container || !(sourceFile instanceof Blob)) return;
+    container.addEventListener("wheel", handlePEGuideLocalPdfWheel, { passive: false });
+    container.addEventListener("keydown", handlePEGuideLocalPdfKeydown);
+    container.addEventListener("pointerup", () => queueMicrotask(capturePEGuideLocalPdfSelection));
+    container.addEventListener("touchend", () => queueMicrotask(capturePEGuideLocalPdfSelection), { passive: true });
     try {
         const pdfjs = await loadPEGuideLocalPdfJs();
         if (renderToken !== peGuideLocalPdfRenderToken || !container.isConnected) return;
@@ -2578,6 +2632,7 @@ async function renderPEGuideLocalPdf(panel, sourceFile, renderToken) {
         peGuideLocalPdfLoadingTask = null;
         peGuideLocalPdfDocument = pdf;
         container.replaceChildren();
+        container.style.setProperty("--pe-local-pdf-zoom", String(peGuideLocalPdfZoom));
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
             if (renderToken !== peGuideLocalPdfRenderToken || !container.isConnected) return;
@@ -2599,7 +2654,7 @@ async function renderPEGuideLocalPdf(panel, sourceFile, renderToken) {
             canvas.style.height = `${Math.floor(viewport.height)}px`;
             const textLayer = document.createElement("div");
             textLayer.className = "pe-guide-local-pdf-text-layer";
-            textLayer.style.setProperty("--scale-factor", String(viewport.scale));
+            textLayer.style.setProperty("--total-scale-factor", String(viewport.scale));
             pageWrap.append(canvas, textLayer);
             container.appendChild(pageWrap);
 
@@ -2633,6 +2688,8 @@ function resetPEGuideLocalFile() {
     if (peGuideLocalObjectUrl) URL.revokeObjectURL(peGuideLocalObjectUrl);
     peGuideLocalObjectUrl = "";
     peGuideLocalFile = null;
+    peGuideLocalPdfZoom = 1;
+    peGuideLocalPdfSelectedText = "";
 }
 
 function capturePEGuideNoteWorkingDraft(panel = document.getElementById("pe-resource-guide")) {
@@ -2702,7 +2759,7 @@ function buildPEGuideLocalMaterial() {
     const type = String(file.type || "").toLowerCase();
     const extension = String(file.name || "").split(".").pop()?.toLowerCase() || "";
     if (type === "application/pdf" || extension === "pdf") {
-        return `<div class="pe-guide-local-pdf" data-pe-local-pdf aria-label="${name}"><div class="pe-guide-local-pdf-status">Loading temporary PDF…</div></div>`;
+        return `<div class="pe-guide-local-pdf" data-pe-local-pdf tabindex="0" aria-label="${name}. Pinch or use Control plus scroll to zoom. Select text normally to copy it."><div class="pe-guide-local-pdf-status">Loading temporary PDF…</div></div>`;
     }
     if (type.startsWith("image/") || /^(?:jpg|jpeg|png|webp|gif)$/.test(extension)) {
         return `<img src="${escapeHTML(peGuideLocalObjectUrl)}" alt="${name}">`;
@@ -2782,6 +2839,13 @@ function renderPEGuidePanel(panel) {
             ${buildPEGuideNotesMarkup()}
         </div>
     `;
+
+    const copySelectionButton = panel.querySelector('[data-pe-resource-action="copy-guide-selection"]');
+    copySelectionButton?.addEventListener("pointerdown", capturePEGuideLocalPdfSelection);
+    copySelectionButton?.addEventListener("click", event => {
+        event.stopPropagation();
+        void copyPEGuideSelection();
+    });
 
     if (peGuideLocalFile && /(?:^application\/pdf$|\.pdf$)/i.test(`${peGuideLocalFile.type || ""}|${peGuideLocalFile.name || ""}`)) {
         requestAnimationFrame(() => { void renderPEGuideLocalPdf(panel, peGuideLocalFile.sourceFile, localPdfRenderToken); });
@@ -2939,7 +3003,7 @@ async function loadPEGuideLocalFile(file) {
 }
 
 async function copyPEGuideSelection() {
-    let selectedText = String(window.getSelection?.()?.toString() || "").trim();
+    let selectedText = String(window.getSelection?.()?.toString() || "").trim() || peGuideLocalPdfSelectedText;
     if (!selectedText) {
         try {
             const frame = document.querySelector("#pe-resource-guide .pe-guide-pdf-frame");
@@ -2951,10 +3015,21 @@ async function copyPEGuideSelection() {
         return;
     }
     try {
+        if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
         await navigator.clipboard.writeText(selectedText);
-        setPEGuideNoteFeedback("Selected text copied");
+        setPEGuideNoteFeedback("Selected text copied · paste it into Notes");
     } catch (error) {
-        setPEGuideNoteFeedback("Press Ctrl+C or Copy to copy the selection");
+        const fallback = document.createElement("textarea");
+        fallback.value = selectedText;
+        fallback.setAttribute("readonly", "");
+        fallback.style.position = "fixed";
+        fallback.style.opacity = "0";
+        document.body.appendChild(fallback);
+        fallback.select();
+        let copied = false;
+        try { copied = document.execCommand("copy"); } catch (fallbackError) {}
+        fallback.remove();
+        setPEGuideNoteFeedback(copied ? "Selected text copied · paste it into Notes" : "Press Ctrl+C or Copy to copy the selection");
     }
 }
 

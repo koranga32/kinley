@@ -2531,14 +2531,21 @@
         .pe-guide-material > img { cursor: zoom-in; }
         .pe-guide-pdf-frame,
         .pe-guide-local-frame { width: 100%; min-height: 100%; flex: 1 0 100%; border: 0; background: #fff; }
-        .pe-guide-local-pdf { width: 100%; min-height: 100%; display: grid; align-content: start; justify-items: center; gap: 12px; padding: 8px; background: #292e36; touch-action: pan-x pan-y pinch-zoom; }
+        .pe-guide-local-pdf { width: 100%; min-height: 100%; display: grid; align-content: start; justify-items: center; gap: 12px; padding: 8px; background: #292e36; touch-action: pan-x pan-y pinch-zoom; outline: none; }
+        .pe-guide-local-pdf:focus-visible { box-shadow: inset 0 0 0 2px #60a5fa; }
         .pe-guide-local-pdf-status { padding: 22px; color: #aeb4c0; text-align: center; }
-        .pe-guide-local-pdf-page { position: relative; flex: none; overflow: hidden; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.28); }
+        .pe-guide-local-pdf-page { position: relative; flex: none; overflow: hidden; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.28); zoom: var(--pe-local-pdf-zoom, 1); }
         .pe-guide-local-pdf-page canvas { position: absolute; inset: 0; display: block; }
-        .pe-guide-local-pdf-text-layer { position: absolute; inset: 0; overflow: hidden; line-height: 1; text-align: initial; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; z-index: 2; }
-        .pe-guide-local-pdf-text-layer :is(span, br) { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0 0; }
-        .pe-guide-local-pdf-text-layer span.markedContent { top: 0; height: 0; }
+        .pe-guide-local-pdf-text-layer { --min-font-size: 1; --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size)); --min-font-size-inv: calc(1 / var(--min-font-size)); position: absolute; inset: 0; overflow: clip; color-scheme: only light; opacity: 1; line-height: 1; letter-spacing: normal; word-spacing: normal; text-align: initial; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; caret-color: CanvasText; user-select: text; -webkit-user-select: text; pointer-events: auto; z-index: 2; }
+        .pe-guide-local-pdf-text-layer :is(span, br) { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0 0; user-select: text; -webkit-user-select: text; }
+        .pe-guide-local-pdf-text-layer > :not(.markedContent),
+        .pe-guide-local-pdf-text-layer .markedContent span:not(.markedContent) { --font-height: 0; --scale-x: 1; --rotate: 0deg; z-index: 1; font-size: calc(var(--text-scale-factor) * var(--font-height)); transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+        .pe-guide-local-pdf-text-layer .markedContent { display: contents; }
+        .pe-guide-local-pdf-text-layer span[role="img"] { cursor: default; user-select: none; -webkit-user-select: none; }
+        .pe-guide-local-pdf-text-layer .endOfContent { position: absolute; inset: 100% 0 0; display: block; cursor: default; user-select: none; -webkit-user-select: none; }
+        .pe-guide-local-pdf-text-layer.selecting .endOfContent { top: 0; }
         .pe-guide-local-pdf-text-layer ::selection { background: rgba(37,99,235,0.42); }
+        .pe-guide-local-pdf-text-layer br::selection { background: transparent; }
         .pe-guide-local-text { min-width: 100%; margin: 0; padding: 16px; white-space: pre-wrap; overflow-wrap: anywhere; color: #e8ebf1; font: inherit; line-height: 1.55; }
         .pe-guide-placeholder { min-height: 180px; display: grid; place-content: center; gap: 8px; color: #aeb4c0; text-align: center; }
         .pe-guide-placeholder i { font-size: 28px; }
