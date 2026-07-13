@@ -53,14 +53,6 @@ let peGuideCarouselIndex = 0;
 let peGuideSelected = false;
 let peFormulaTopic = "";
 let peFormulaQuestionIndex = 0;
-let pePdfJsPromise = null;
-let pePdfRenderToken = 0;
-let pePdfLoadingTask = null;
-let pePdfRenderTask = null;
-let pePdfDocument = null;
-let pePdfObserver = null;
-let pePdfRenderQueue = Promise.resolve();
-let pePdfActiveRenderTasks = new Set();
 let peGuideLocalFile = null;
 let peGuideLocalObjectUrl = "";
 let peGuideNoteWorkingHtml = "";
@@ -121,8 +113,7 @@ const IMAGE_ZOOM_SELECTOR = [
     "#peo-graph-img",
     ".q-image",
     ".pe-question-image",
-    ".pe-guide-material > img",
-    ".pe-pdf-page canvas"
+    ".pe-guide-material > img"
 ].join(",");
 let imageZoomLastTap = { target: null, time: 0 };
 
@@ -2325,7 +2316,6 @@ async function openPEPortal() {
     // Reset to Home panel and a collapsed sidebar every time PE is opened.
     // On desktop the hover handlers will expand it when the cursor enters.
     clearActivePEPracticeMemory();
-    cancelPEPdfWork();
     resetPEGuideLocalFile();
     peGuideNoteWorkingHtml = "";
     peGuideNoteLoaded = false;
@@ -2370,7 +2360,6 @@ async function openPEPortal() {
 }
 
 function closePEPortal() {
-    cancelPEPdfWork();
     resetPEGuideLocalFile();
     peGuideNoteWorkingHtml = "";
     peGuideNoteLoaded = false;
@@ -2542,179 +2531,6 @@ function safeResourceUrl(value) {
     return /^https:\/\/[^\s]+$/i.test(source) ? source : "";
 }
 
-function loadPEPdfJs() {
-    if (!pePdfJsPromise) {
-        pePdfJsPromise = import("/vendor/pdfjs/pdf.min.mjs").then(pdfjs => {
-            pdfjs.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/pdf.worker.min.mjs";
-            return pdfjs;
-        });
-    }
-    return pePdfJsPromise;
-}
-
-function cancelPEPdfWork() {
-    pePdfRenderToken += 1;
-    pePdfObserver?.disconnect();
-    pePdfObserver = null;
-    pePdfActiveRenderTasks.forEach(task => {
-        try { task.cancel(); } catch (error) {}
-    });
-    pePdfActiveRenderTasks.clear();
-    try { pePdfRenderTask?.cancel(); } catch (error) {}
-    const loadingTask = pePdfLoadingTask;
-    const pdfDocument = pePdfDocument;
-    pePdfRenderTask = null;
-    pePdfLoadingTask = null;
-    pePdfDocument = null;
-    pePdfRenderQueue = Promise.resolve();
-    try { void loadingTask?.destroy().catch(() => {}); } catch (error) {}
-    try { void pdfDocument?.destroy().catch(() => {}); } catch (error) {}
-}
-
-function resetPEPdfPagePlaceholder(pageWrap) {
-    const canvas = pageWrap.querySelector("canvas");
-    if (canvas) {
-        canvas.width = 1;
-        canvas.height = 1;
-    }
-    pageWrap.replaceChildren();
-    const placeholder = document.createElement("span");
-    placeholder.className = "pe-pdf-page-placeholder";
-    placeholder.textContent = `Page ${pageWrap.dataset.pageNumber}`;
-    pageWrap.appendChild(placeholder);
-    pageWrap.dataset.pdfState = "idle";
-}
-
-function getPEPdfOutputScale(viewport) {
-    const mobile = window.matchMedia?.("(max-width: 768px)")?.matches ?? window.innerWidth <= 768;
-    const deviceScale = Math.max(1, window.devicePixelRatio || 1);
-    const scaleLimit = mobile ? 1.25 : 1.5;
-    const pixelLimit = mobile ? 4_000_000 : 8_000_000;
-    const desiredScale = Math.min(scaleLimit, deviceScale);
-    const desiredPixels = viewport.width * viewport.height * desiredScale * desiredScale;
-    if (desiredPixels <= pixelLimit) return desiredScale;
-    return Math.max(1, Math.sqrt(pixelLimit / (viewport.width * viewport.height)));
-}
-
-async function renderPEPdfPage(pdf, container, pageWrap, renderToken) {
-    if (
-        renderToken !== pePdfRenderToken ||
-        !container.isConnected ||
-        pageWrap.dataset.pdfNear !== "true" ||
-        pageWrap.dataset.pdfState !== "queued"
-    ) {
-        if (pageWrap.isConnected) pageWrap.dataset.pdfState = "idle";
-        return;
-    }
-
-    pageWrap.dataset.pdfState = "rendering";
-    const pageNumber = Number(pageWrap.dataset.pageNumber);
-    let page;
-    let renderTask;
-    try {
-        page = await pdf.getPage(pageNumber);
-        if (renderToken !== pePdfRenderToken || pageWrap.dataset.pdfNear !== "true") {
-            page.cleanup();
-            pageWrap.dataset.pdfState = "idle";
-            return;
-        }
-        const baseViewport = page.getViewport({ scale: 1 });
-        const availableWidth = Math.max(280, container.clientWidth - 20);
-        const scale = Math.min(1.5, availableWidth / baseViewport.width);
-        const viewport = page.getViewport({ scale });
-        const outputScale = getPEPdfOutputScale(viewport);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
-        canvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
-        canvas.setAttribute("aria-label", `PDF page ${pageNumber} of ${pdf.numPages}`);
-        pageWrap.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
-        pageWrap.replaceChildren(canvas);
-        renderTask = page.render({
-            canvasContext: canvas.getContext("2d", { alpha: false }),
-            viewport,
-            transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0]
-        });
-        pePdfRenderTask = renderTask;
-        pePdfActiveRenderTasks.add(renderTask);
-        await renderTask.promise;
-        if (renderToken !== pePdfRenderToken || pageWrap.dataset.pdfNear !== "true") {
-            resetPEPdfPagePlaceholder(pageWrap);
-            return;
-        }
-        pageWrap.dataset.pdfState = "rendered";
-    } catch (error) {
-        if (renderToken === pePdfRenderToken && pageWrap.isConnected && error?.name !== "RenderingCancelledException") {
-            console.error(`PE guide PDF page ${pageNumber} failed`, error);
-            resetPEPdfPagePlaceholder(pageWrap);
-        }
-    } finally {
-        if (renderTask) pePdfActiveRenderTasks.delete(renderTask);
-        if (pePdfRenderTask === renderTask) pePdfRenderTask = null;
-        try { page?.cleanup(); } catch (error) {}
-    }
-}
-
-async function renderPEGuidePdf(panel, guideId, fallbackPreview, renderToken) {
-    const container = panel?.querySelector("[data-pe-pdf-viewer]");
-    if (!container || !guideId) return;
-    try {
-        const pdfjs = await loadPEPdfJs();
-        if (renderToken !== pePdfRenderToken || !container.isConnected) return;
-        const loadingTask = pdfjs.getDocument({ url: `/api/pe-resource-pdf?id=${encodeURIComponent(guideId)}` });
-        pePdfLoadingTask = loadingTask;
-        const pdf = await loadingTask.promise;
-        if (renderToken !== pePdfRenderToken || !container.isConnected) {
-            await pdf.destroy();
-            return;
-        }
-        pePdfLoadingTask = null;
-        pePdfDocument = pdf;
-        container.innerHTML = "";
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-            const pageWrap = document.createElement("div");
-            pageWrap.className = "pe-pdf-page";
-            pageWrap.dataset.pageNumber = String(pageNumber);
-            pageWrap.dataset.pdfState = "idle";
-            pageWrap.dataset.pdfNear = "false";
-            resetPEPdfPagePlaceholder(pageWrap);
-            container.appendChild(pageWrap);
-        }
-
-        const scrollRoot = container.closest(".pe-guide-material");
-        if (typeof IntersectionObserver === "function") {
-            pePdfObserver = new IntersectionObserver(entries => {
-                entries.forEach(entry => {
-                    const pageWrap = entry.target;
-                    pageWrap.dataset.pdfNear = entry.isIntersecting ? "true" : "false";
-                    if (entry.isIntersecting && pageWrap.dataset.pdfState === "idle") {
-                        pageWrap.dataset.pdfState = "queued";
-                        pePdfRenderQueue = pePdfRenderQueue
-                            .then(() => renderPEPdfPage(pdf, container, pageWrap, renderToken))
-                            .catch(error => console.error("PE PDF render queue failed", error));
-                    } else if (!entry.isIntersecting && pageWrap.dataset.pdfState === "rendered") {
-                        resetPEPdfPagePlaceholder(pageWrap);
-                    }
-                });
-            }, { root: scrollRoot, rootMargin: "700px 0px", threshold: 0.01 });
-            container.querySelectorAll(".pe-pdf-page").forEach(pageWrap => pePdfObserver.observe(pageWrap));
-        } else {
-            container.querySelectorAll(".pe-pdf-page:nth-child(-n+2)").forEach(pageWrap => {
-                pageWrap.dataset.pdfNear = "true";
-                pageWrap.dataset.pdfState = "queued";
-                pePdfRenderQueue = pePdfRenderQueue.then(() => renderPEPdfPage(pdf, container, pageWrap, renderToken));
-            });
-        }
-    } catch (error) {
-        if (renderToken !== pePdfRenderToken || !container.isConnected) return;
-        console.error("PE guide PDF rendering failed", error);
-        container.innerHTML = fallbackPreview
-            ? `<img src="${escapeHTML(fallbackPreview)}" alt="Guide preview" loading="lazy"><p class="pe-pdf-error">The PDF preview could not load. Click the heading to open the document.</p>`
-            : '<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><div>The PDF preview could not load. Click the heading to open the document.</div></div>';
-    }
-}
-
 function resetPEGuideLocalFile() {
     if (peGuideLocalObjectUrl) URL.revokeObjectURL(peGuideLocalObjectUrl);
     peGuideLocalObjectUrl = "";
@@ -2820,8 +2636,6 @@ function renderPEGuidePanel(panel) {
     const renderKey = JSON.stringify([initialPreview, guide?.id || "", guide?.title || "", documentUrl, websiteUrl, preview, readingContent, localName, peGuideLocalObjectUrl, ...guideListSignature]);
     if (panel.dataset.peGuideRenderKey === renderKey && panel.querySelector(".pe-guide-library")) return;
 
-    cancelPEPdfWork();
-    const renderToken = ++pePdfRenderToken;
     panel.dataset.peGuideRenderKey = renderKey;
 
     let headingMarkup = '<h3 class="pe-guide-heading-static">Select a reading material</h3>';
@@ -2835,8 +2649,12 @@ function renderPEGuidePanel(panel) {
         materialMarkup = buildPEGuideLocalMaterial();
         metaText = "Temporary browser view only · not uploaded or saved to the backend";
     } else if (guide) {
+        const guideId = String(guide.id || "");
+        const pdfPreviewUrl = documentIsPdf && /^\d+$/.test(guideId)
+            ? `/api/pe-resource-pdf?id=${encodeURIComponent(guideId)}#page=1&view=FitH&toolbar=0&navpanes=0`
+            : "";
         const guideMaterial = `
-            ${documentIsPdf ? '<div class="pe-pdf-viewer" data-pe-pdf-viewer><div class="pe-pdf-loading">Loading PDF…</div></div>' : displayImage ? `<img src="${escapeHTML(displayImage)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : `<div class="pe-guide-placeholder"><i class="bi ${websiteUrl && !documentUrl ? "bi-link-45deg" : "bi-file-earmark-text"}" aria-hidden="true"></i><div>${websiteUrl && !documentUrl ? "Website preview" : "Document preview"}</div></div>`}
+            ${pdfPreviewUrl ? `<iframe class="pe-guide-pdf-frame" src="${escapeHTML(pdfPreviewUrl)}" title="${escapeHTML(guide.title || "Guide PDF")}" loading="eager"></iframe>` : displayImage ? `<img src="${escapeHTML(displayImage)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : `<div class="pe-guide-placeholder"><i class="bi ${websiteUrl && !documentUrl ? "bi-link-45deg" : "bi-file-earmark-text"}" aria-hidden="true"></i><div>${websiteUrl && !documentUrl ? "Website preview" : "Document preview"}</div></div>`}
             ${readingContent ? `<div class="pe-guide-reading-content">${escapeHTML(readingContent).replace(/\n/g, "<br>")}</div>` : ""}
         `;
         headingMarkup = guideLinkUrl
@@ -2865,9 +2683,6 @@ function renderPEGuidePanel(panel) {
         </div>
     `;
 
-    if (guide && documentIsPdf && peActiveResourceTab === "guide" && !peGuideLocalFile) {
-        requestAnimationFrame(() => { void renderPEGuidePdf(panel, String(guide.id || ""), preview, renderToken); });
-    }
 }
 
 function handlePEHomeDashboardClick(event) {
@@ -3023,12 +2838,12 @@ async function copyPEGuideSelection() {
     let selectedText = String(window.getSelection?.()?.toString() || "").trim();
     if (!selectedText) {
         try {
-            const frame = document.querySelector("#pe-resource-guide .pe-guide-local-frame");
+            const frame = document.querySelector("#pe-resource-guide .pe-guide-local-frame, #pe-resource-guide .pe-guide-pdf-frame");
             selectedText = String(frame?.contentWindow?.getSelection?.()?.toString() || "").trim();
         } catch (error) {}
     }
     if (!selectedText) {
-        setPEGuideNoteFeedback(document.querySelector("#pe-resource-guide .pe-guide-local-frame") ? "Select text inside the PDF and use Copy or Ctrl+C" : "Select document text first");
+        setPEGuideNoteFeedback(document.querySelector("#pe-resource-guide .pe-guide-local-frame, #pe-resource-guide .pe-guide-pdf-frame") ? "Select text inside the PDF and use Copy or Ctrl+C" : "Select document text first");
         return;
     }
     try {

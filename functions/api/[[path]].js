@@ -204,7 +204,11 @@ async function handlePEResourcePdf(context) {
             "Content-Type": "application/pdf",
             "Cache-Control": "public, max-age=300, s-maxage=1800, stale-while-revalidate=600",
             "Content-Disposition": "inline",
-            "X-Content-Type-Options": "nosniff"
+            "Content-Security-Policy": "frame-ancestors 'self'",
+            "Cross-Origin-Resource-Policy": "same-origin",
+            "Referrer-Policy": "no-referrer",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "SAMEORIGIN"
         }
     });
 }
