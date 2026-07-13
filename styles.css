@@ -2567,16 +2567,17 @@
         .pe-formula-topic-item.active { border-color: #60a5fa; background: #1f4fa5; }
         .pe-formula-topic-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .pe-formula-topic-item small { margin-left: auto; color: #aeb4c0; font-size: 10px; }
-        .pe-guide-file-tools { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding-top: 6px; border-top: 1px solid #383d46; }
+        .pe-guide-file-tools { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; padding-top: 3px; border-top: 1px solid #383d46; }
         .pe-guide-file-picker,
-        .pe-guide-uploaded-file { min-width: 0; min-height: 44px; padding: 7px 9px; border: 1px solid #4a5260; border-radius: 6px; background: #1f232b; color: #e8ebf1; }
+        .pe-guide-uploaded-file { min-width: 0; min-height: 32px; padding: 3px 7px; border: 1px solid #4a5260; border-radius: 6px; background: #1f232b; color: #e8ebf1; }
         .pe-guide-file-picker { display: grid; place-items: center; cursor: pointer; font-size: 11px; font-weight: 700; }
         .pe-guide-file-picker:hover { border-color: #60a5fa; }
         .pe-guide-file-picker input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
-        .pe-guide-uploaded-file { display: grid; align-content: center; gap: 1px; }
+        .pe-guide-uploaded-file { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 5px; }
         .pe-guide-uploaded-file span,
         .pe-guide-uploaded-file small { color: #aeb4c0; font-size: 9px; }
         .pe-guide-uploaded-file strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+        .pe-guide-uploaded-file small { display: none; }
         .pe-formula-current { min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid #4a5260; border-radius: 8px; background: #1f232b; }
         .pe-formula-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; color: #e8ebf1; }
         .pe-formula-header > strong { font-size: 12px; }
