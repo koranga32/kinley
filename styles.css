@@ -2611,6 +2611,31 @@
         .pe-note-export-menu summary::-webkit-details-marker { display: none; }
         .pe-note-export-options { position: absolute; z-index: 5; left: 0; bottom: calc(100% + 4px); display: grid; gap: 4px; min-width: 74px; padding: 5px; border: 1px solid #4a5260; border-radius: 6px; background: #1f232b; box-shadow: 0 8px 20px rgba(0,0,0,0.28); }
 
+        @media (min-width: 901px) {
+            .pe-content:has(#pe-home-panel.active #pe-resource-guide:not([hidden])) {
+                padding: 16px 12px 16px 8px;
+            }
+
+            #pe-home-panel.active:has(#pe-resource-guide:not([hidden])) {
+                width: 100%;
+                max-width: none;
+                margin-left: 0;
+                margin-right: 0;
+            }
+
+            #pe-home-panel.active:has(#pe-resource-guide:not([hidden])) .pe-home-dashboard-section {
+                width: 100%;
+                max-width: none;
+                margin-left: 0;
+                margin-right: 0;
+            }
+
+            #pe-resource-guide .pe-guide-library {
+                grid-template-columns: minmax(170px, 0.62fr) minmax(0, 2.55fr) minmax(280px, 1.15fr);
+                gap: 10px;
+            }
+        }
+
         .pe-filter-bar {
             display: flex;
             align-items: center;
