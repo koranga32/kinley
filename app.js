@@ -51,7 +51,6 @@ let peHomeDashboardLoadedAt = 0;
 let peActiveResourceTab = "guide";
 let peGuideCarouselIndex = 0;
 let peGuideSelected = false;
-let peGuideCarouselTimer = null;
 let peFormulaTopic = "";
 let peFormulaQuestionIndex = 0;
 let pePdfJsPromise = null;
@@ -62,6 +61,10 @@ let pePdfDocument = null;
 let pePdfObserver = null;
 let pePdfRenderQueue = Promise.resolve();
 let pePdfActiveRenderTasks = new Set();
+let peGuideLocalFile = null;
+let peGuideLocalObjectUrl = "";
+let peGuideNoteWorkingHtml = "";
+let peGuideNoteLoaded = false;
 let cafStateLoaded = false;
 let cafStatePromise = null;
 let submitInProgress = false;
@@ -96,8 +99,9 @@ function bindStaticUiEvents() {
 
     document.getElementById("pe-home-search")?.addEventListener("input", renderPEHomeGrid);
     document.getElementById("pe-home-panel")?.addEventListener("click", handlePEHomeDashboardClick);
-    document.getElementById("pe-home-panel")?.addEventListener("change", handlePENoteToolbarChange);
-    document.getElementById("pe-home-panel")?.addEventListener("paste", handlePESelfNotePaste);
+    document.getElementById("pe-home-panel")?.addEventListener("change", handlePEGuideControlChange);
+    document.getElementById("pe-home-panel")?.addEventListener("input", handlePEGuideNoteInput);
+    document.getElementById("pe-home-panel")?.addEventListener("paste", handlePEGuideNotePaste);
     document.getElementById("caf-bhutan-box")?.addEventListener("click", () => cafSelectRegion("Bhutan"));
     document.getElementById("caf-intl-box")?.addEventListener("click", () => cafSelectRegion("International"));
     document.getElementById("caf-category-dropdown")?.addEventListener("change", () => cafFilterData());
@@ -1209,10 +1213,6 @@ function clearPETopicQuestionsFromMemory(peType, topic) {
 }
 
 function clearActivePEPracticeMemory() {
-    if (peGuideCarouselTimer) {
-        clearInterval(peGuideCarouselTimer);
-        peGuideCarouselTimer = null;
-    }
     if (peActiveTopic) {
         clearPETopicQuestionsFromMemory(peActiveTopic.peType, peActiveTopic.topic);
     }
@@ -2326,6 +2326,9 @@ async function openPEPortal() {
     // On desktop the hover handlers will expand it when the cursor enters.
     clearActivePEPracticeMemory();
     cancelPEPdfWork();
+    resetPEGuideLocalFile();
+    peGuideNoteWorkingHtml = "";
+    peGuideNoteLoaded = false;
     peGuideSelected = false;
     peGuideCarouselIndex = 0;
     const guidePanel = document.getElementById("pe-resource-guide");
@@ -2368,6 +2371,9 @@ async function openPEPortal() {
 
 function closePEPortal() {
     cancelPEPdfWork();
+    resetPEGuideLocalFile();
+    peGuideNoteWorkingHtml = "";
+    peGuideNoteLoaded = false;
     document.getElementById("pe-view").style.display = "none";
     document.getElementById("setup-view").style.display = "block";
     document.getElementById("setup-options").style.display = setupContinued ? "grid" : "none";
@@ -2455,15 +2461,13 @@ function renderPEResourceTabs() {
     });
     const panels = {
         formula: document.getElementById("pe-resource-formula"),
-        guide: document.getElementById("pe-resource-guide"),
-        note: document.getElementById("pe-resource-note")
+        guide: document.getElementById("pe-resource-guide")
     };
     Object.entries(panels).forEach(([name, panel]) => {
         if (panel) panel.hidden = name !== peActiveResourceTab;
     });
     if (peActiveResourceTab === "formula") renderPEFormulaPanel(panels.formula);
     else if (peActiveResourceTab === "guide") renderPEGuidePanel(panels.guide);
-    else if (peActiveResourceTab === "note") renderPESelfNotePanel(panels.note);
 }
 
 function getPEFormulaTopics() {
@@ -2711,136 +2715,158 @@ async function renderPEGuidePdf(panel, guideId, fallbackPreview, renderToken) {
     }
 }
 
+function resetPEGuideLocalFile() {
+    if (peGuideLocalObjectUrl) URL.revokeObjectURL(peGuideLocalObjectUrl);
+    peGuideLocalObjectUrl = "";
+    peGuideLocalFile = null;
+}
+
+function capturePEGuideNoteWorkingDraft(panel = document.getElementById("pe-resource-guide")) {
+    const editor = panel?.querySelector("#pe-guide-note-editor");
+    if (editor) peGuideNoteWorkingHtml = sanitizePEGuideNoteHtml(editor.innerHTML);
+}
+
+function loadPEGuideNoteWorkingDraft() {
+    if (peGuideNoteLoaded) return;
+    peGuideNoteLoaded = true;
+    try { peGuideNoteWorkingHtml = sanitizePEGuideNoteHtml(sessionStorage.getItem(PE_NOTE_DRAFT_KEY) || ""); } catch (error) {}
+}
+
+function buildPEGuideReadingList(guides) {
+    if (!guides.length) return '<p class="pe-empty-msg">Published guides will appear here.</p>';
+    return `<ol class="pe-guide-reading-list">${guides.map((item, index) => {
+        const hasDocument = Boolean(safeResourceUrl(item.document_url));
+        const hasWebsite = Boolean(safeResourceUrl(item.website_url));
+        const materialType = hasDocument ? "Document" : hasWebsite ? "Website" : "Preview only";
+        const active = !peGuideLocalFile && peGuideSelected && index === peGuideCarouselIndex;
+        return `<li><button type="button" class="pe-guide-reading-item${active ? " active" : ""}" data-pe-resource-action="select-guide" data-guide-index="${index}" aria-pressed="${active}"><strong>${escapeHTML(item.title || `Guide ${index + 1}`)}</strong><small>${materialType}</small></button></li>`;
+    }).join("")}</ol>`;
+}
+
+function buildPEGuideNotesMarkup() {
+    loadPEGuideNoteWorkingDraft();
+    return `
+        <section class="pe-guide-notes" aria-label="Guide notes">
+            <div class="pe-guide-notes-heading">
+                <h3>Notes</h3>
+                <div class="pe-guide-note-actions">
+                    <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="save-guide-note">Save</button>
+                    <button type="button" class="pe-di-graph-btn" data-pe-resource-action="read-guide-note">Read Aloud</button>
+                </div>
+            </div>
+            <div class="pe-note-toolbar" aria-label="Text formatting">
+                <button type="button" class="pe-note-tool" data-note-command="bold" aria-label="Bold"><strong>B</strong></button>
+                <button type="button" class="pe-note-tool" data-note-command="italic" aria-label="Italic"><em>I</em></button>
+                <button type="button" class="pe-note-tool" data-note-command="underline" aria-label="Underline"><u>U</u></button>
+                <select class="pe-note-select pe-note-size" data-note-size aria-label="Font size"><option value="2">Small</option><option value="3" selected>Normal</option><option value="5">Large</option></select>
+                <input type="color" class="pe-note-color" data-note-color value="#f5f7fb" aria-label="Text color">
+                <select class="pe-note-select" data-note-alignment aria-label="Paragraph alignment"><option value="">Alignment</option><option value="justifyLeft">Align left</option><option value="justifyCenter">Align center</option><option value="justifyRight">Align right</option><option value="justifyFull">Justify</option></select>
+                <button type="button" class="pe-note-tool" data-note-command="insertUnorderedList" aria-label="Bulleted list"><strong>•</strong></button>
+                <button type="button" class="pe-note-tool" data-note-command="insertOrderedList" aria-label="Numbered list"><strong>1.</strong></button>
+            </div>
+            <div class="pe-guide-note-secondary-actions">
+                <button type="button" class="pe-di-graph-btn" data-pe-resource-action="load-guide-note">Load Saved</button>
+                <button type="button" class="pe-di-graph-btn" data-pe-resource-action="clear-guide-note">Clear Notes</button>
+            </div>
+            <div class="pe-note-editor" id="pe-guide-note-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Write notes while reading…">${peGuideNoteWorkingHtml}</div>
+            <details class="pe-note-export-menu">
+                <summary class="pe-di-graph-btn">Export</summary>
+                <div class="pe-note-export-options">
+                    <button type="button" class="pe-di-graph-btn" data-pe-resource-action="export-guide-note-pdf">PDF</button>
+                    <button type="button" class="pe-di-graph-btn" data-pe-resource-action="export-guide-note-doc">DOC</button>
+                </div>
+            </details>
+            <span class="pe-resource-feedback" data-note-feedback aria-live="polite"></span>
+        </section>
+    `;
+}
+
+function buildPEGuideLocalMaterial() {
+    if (!peGuideLocalFile || !peGuideLocalObjectUrl) return "";
+    const file = peGuideLocalFile;
+    const name = escapeHTML(file.name || "Temporary file");
+    const type = String(file.type || "").toLowerCase();
+    const extension = String(file.name || "").split(".").pop()?.toLowerCase() || "";
+    if (type === "application/pdf" || extension === "pdf") {
+        return `<iframe class="pe-guide-local-frame" src="${escapeHTML(peGuideLocalObjectUrl)}#page=1&view=FitH&toolbar=0" title="${name}"></iframe>`;
+    }
+    if (type.startsWith("image/") || /^(?:jpg|jpeg|png|webp|gif)$/.test(extension)) {
+        return `<img src="${escapeHTML(peGuideLocalObjectUrl)}" alt="${name}">`;
+    }
+    if (extension === "txt" && typeof file.previewText === "string") {
+        return `<pre class="pe-guide-local-text">${escapeHTML(file.previewText)}</pre>`;
+    }
+    return `<div class="pe-guide-placeholder"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><div><strong>${name}</strong><br>Browser preview and selectable text are available for PDF, image, and text files. Word document preview depends on browser support.</div></div>`;
+}
+
 function renderPEGuidePanel(panel) {
     if (!panel) return;
+    capturePEGuideNoteWorkingDraft(panel);
     const guides = peResourcesCatalog.filter(item => item.kind === "guide");
-    if (peGuideCarouselTimer) {
-        clearInterval(peGuideCarouselTimer);
-        peGuideCarouselTimer = null;
-    }
-    if (!guides.length) {
-        cancelPEPdfWork();
-        panel.dataset.peGuideRenderKey = "";
-        panel.innerHTML = '<div class="pe-empty-msg">Published guides will appear here.</div>';
-        return;
-    }
-    if (!peGuideSelected) {
-        const previewGuide = guides.find(item => safeMediaURL(item.preview_url, "image")) || guides[0];
-        const preview = safeMediaURL(previewGuide?.preview_url, "image");
-        const renderKey = `unselected:${preview}`;
-        if (panel.dataset.peGuideRenderKey === renderKey && panel.querySelector(".pe-guide-library")) return;
-        cancelPEPdfWork();
-        panel.dataset.peGuideRenderKey = renderKey;
-        panel.innerHTML = `
-            <div class="pe-guide-library">
-                <div class="pe-guide-current">
-                    <h3 class="pe-guide-heading-static">Select a reading material</h3>
-                    <div class="pe-guide-material">
-                        ${preview ? `<img src="${escapeHTML(preview)}" alt="Guide preview" loading="eager">` : '<div class="pe-guide-placeholder"><i class="bi bi-book" aria-hidden="true"></i><div>Select a reading material to view its content.</div></div>'}
-                    </div>
-                    <p class="pe-guide-meta">Choose an item from Reading Materials</p>
-                </div>
-                <aside class="pe-guide-reading" aria-label="Reading materials">
-                    <h3>Reading Materials</h3>
-                    <div class="pe-guide-reading-list">
-                        ${guides.map((item, index) => {
-                            const hasDocument = Boolean(safeResourceUrl(item.document_url));
-                            const hasWebsite = Boolean(safeResourceUrl(item.website_url));
-                            const materialType = hasDocument ? "Document" : hasWebsite ? "Website" : "Preview only";
-                            const icon = hasDocument ? "bi-file-earmark-text" : hasWebsite ? "bi-link-45deg" : "bi-book";
-                            return `<button type="button" class="pe-guide-reading-item" data-pe-resource-action="select-guide" data-guide-index="${index}" aria-pressed="false"><i class="bi ${icon}" aria-hidden="true"></i><span><strong>${escapeHTML(item.title || `Guide ${index + 1}`)}</strong><small>${materialType}</small></span></button>`;
-                        }).join("")}
-                    </div>
-                </aside>
-            </div>`;
-        return;
-    }
-    peGuideCarouselIndex %= guides.length;
-    const guide = guides[peGuideCarouselIndex];
-    const documentUrl = safeResourceUrl(guide.document_url);
-    const websiteUrl = safeResourceUrl(guide.website_url);
+    if (guides.length) peGuideCarouselIndex = Math.max(0, Math.min(peGuideCarouselIndex, guides.length - 1));
+    const guide = peGuideSelected && guides.length ? guides[peGuideCarouselIndex] : null;
+    const previewGuide = guides.find(item => safeMediaURL(item.preview_url, "image")) || guides[0];
+    const initialPreview = safeMediaURL(previewGuide?.preview_url, "image");
+    const documentUrl = safeResourceUrl(guide?.document_url);
+    const websiteUrl = safeResourceUrl(guide?.website_url);
     const guideLinkUrl = documentUrl || websiteUrl;
-    const guideLinkLabel = documentUrl ? "Open supporting document" : "Open external website";
-    const preview = safeMediaURL(guide.preview_url, "image");
+    const preview = safeMediaURL(guide?.preview_url, "image");
     const documentIsImage = /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(documentUrl);
     const documentIsPdf = /\.pdf(?:$|[?#])/i.test(documentUrl);
-    const embeddedType = documentUrl ? "Document" : websiteUrl ? "Website" : "Preview";
     const displayImage = documentIsImage ? documentUrl : preview;
-    const readingContent = String(guide.content || "").trim();
-    const renderKey = JSON.stringify([
-        guide.id || "",
-        guide.title || "",
-        documentUrl,
-        websiteUrl,
-        preview,
-        readingContent
-    ]);
+    const readingContent = String(guide?.content || "").trim();
+    const localName = peGuideLocalFile?.name || "";
+    const guideListSignature = guides.map(item => [item.id || "", item.title || "", item.document_url || "", item.website_url || ""]).flat();
+    const renderKey = JSON.stringify([initialPreview, guide?.id || "", guide?.title || "", documentUrl, websiteUrl, preview, readingContent, localName, peGuideLocalObjectUrl, ...guideListSignature]);
     if (panel.dataset.peGuideRenderKey === renderKey && panel.querySelector(".pe-guide-library")) return;
+
     cancelPEPdfWork();
     const renderToken = ++pePdfRenderToken;
     panel.dataset.peGuideRenderKey = renderKey;
-    const guideMaterial = `
-        ${documentIsPdf ? '<div class="pe-pdf-viewer" data-pe-pdf-viewer><div class="pe-pdf-loading">Loading PDF…</div></div>' : displayImage ? `<img src="${escapeHTML(displayImage)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : `<div class="pe-guide-placeholder"><i class="bi ${websiteUrl && !documentUrl ? "bi-link-45deg" : "bi-file-earmark-text"}" aria-hidden="true"></i><div>${websiteUrl && !documentUrl ? "Website preview" : "Document preview"}</div></div>`}
-        ${readingContent ? `<div class="pe-guide-reading-content">${escapeHTML(readingContent).replace(/\n/g, "<br>")}</div>` : ""}
-    `;
+
+    let headingMarkup = '<h3 class="pe-guide-heading-static">Select a reading material</h3>';
+    let materialMarkup = initialPreview
+        ? `<img src="${escapeHTML(initialPreview)}" alt="Guide preview" loading="eager">`
+        : '<div class="pe-guide-placeholder"><i class="bi bi-book" aria-hidden="true"></i><div>Select a reading material or choose a temporary file.</div></div>';
+    let metaText = "Choose an item from Reading Materials or a temporary file";
+
+    if (peGuideLocalFile) {
+        headingMarkup = `<button type="button" class="pe-guide-heading" data-pe-resource-action="open-local-guide">${escapeHTML(peGuideLocalFile.name || "Temporary file")} <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></button>`;
+        materialMarkup = buildPEGuideLocalMaterial();
+        metaText = "Temporary browser view only · not uploaded or saved to the backend";
+    } else if (guide) {
+        const guideMaterial = `
+            ${documentIsPdf ? '<div class="pe-pdf-viewer" data-pe-pdf-viewer><div class="pe-pdf-loading">Loading PDF…</div></div>' : displayImage ? `<img src="${escapeHTML(displayImage)}" alt="${escapeHTML(guide.title || "Guide preview")}" loading="lazy">` : `<div class="pe-guide-placeholder"><i class="bi ${websiteUrl && !documentUrl ? "bi-link-45deg" : "bi-file-earmark-text"}" aria-hidden="true"></i><div>${websiteUrl && !documentUrl ? "Website preview" : "Document preview"}</div></div>`}
+            ${readingContent ? `<div class="pe-guide-reading-content">${escapeHTML(readingContent).replace(/\n/g, "<br>")}</div>` : ""}
+        `;
+        headingMarkup = guideLinkUrl
+            ? `<button type="button" class="pe-guide-heading" data-pe-resource-action="open-guide" data-guide-id="${escapeHTML(String(guide.id || ""))}">${escapeHTML(guide.title || "Guide")} <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></button>`
+            : `<h3 class="pe-guide-heading-static">${escapeHTML(guide.title || "Guide")}</h3>`;
+        materialMarkup = guideMaterial;
+        metaText = guideLinkUrl ? "Click the heading to open in a new tab" : "Preview only";
+    }
+
     panel.innerHTML = `
         <div class="pe-guide-library">
-            <div class="pe-guide-current">
-                ${guideLinkUrl ? `<button type="button" class="pe-guide-heading" data-pe-resource-action="open-guide" data-guide-id="${escapeHTML(String(guide.id || ""))}" title="${guideLinkLabel}">${escapeHTML(guide.title || "Guide")} <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></button>` : `<h3 class="pe-guide-heading-static">${escapeHTML(guide.title || "Guide")}</h3>`}
-                <div class="pe-guide-material">${guideMaterial}</div>
-                <p class="pe-guide-meta">${guideLinkUrl ? `${embeddedType} preview · click the heading to open in a new tab` : "Preview only"}</p>
-            </div>
             <aside class="pe-guide-reading" aria-label="Reading materials">
                 <h3>Reading Materials</h3>
-                <div class="pe-guide-reading-list">
-                    ${guides.map((item, index) => {
-                        const hasDocument = Boolean(safeResourceUrl(item.document_url));
-                        const hasWebsite = Boolean(safeResourceUrl(item.website_url));
-                        const materialType = hasDocument ? "Document" : hasWebsite ? "Website" : "Preview only";
-                        const icon = hasDocument ? "bi-file-earmark-text" : hasWebsite ? "bi-link-45deg" : "bi-book";
-                        return `
-                            <button type="button" class="pe-guide-reading-item${index === peGuideCarouselIndex ? " active" : ""}" data-pe-resource-action="select-guide" data-guide-index="${index}" aria-pressed="${index === peGuideCarouselIndex}">
-                                <i class="bi ${icon}" aria-hidden="true"></i>
-                                <span><strong>${escapeHTML(item.title || `Guide ${index + 1}`)}</strong><small>${materialType}</small></span>
-                            </button>
-                        `;
-                    }).join("")}
-                </div>
+                ${buildPEGuideReadingList(guides)}
             </aside>
+            <div class="pe-guide-current">
+                <div class="pe-guide-viewer-heading">${headingMarkup}<button type="button" class="pe-di-graph-btn" data-pe-resource-action="copy-guide-selection">Copy Selected</button></div>
+                <div class="pe-guide-material">${materialMarkup}</div>
+                <p class="pe-guide-meta">${escapeHTML(metaText)}</p>
+                <div class="pe-guide-file-tools">
+                    <label class="pe-guide-file-picker">Choose File<input type="file" data-pe-guide-file accept=".pdf,.doc,.docx,.txt,image/*"></label>
+                    <div class="pe-guide-uploaded-file"><span>Uploaded File</span><strong data-pe-guide-file-name>${escapeHTML(localName || "No file selected")}</strong><small>Temporary browser view only</small></div>
+                </div>
+            </div>
+            ${buildPEGuideNotesMarkup()}
         </div>
     `;
-    if (documentIsPdf && peActiveResourceTab === "guide") {
-        requestAnimationFrame(() => { void renderPEGuidePdf(panel, String(guide.id || ""), preview, renderToken); });
-    }
-}
 
-function renderPESelfNotePanel(panel) {
-    if (!panel) return;
-    if (panel.querySelector("#pe-note-editor")) return;
-    let draft = "";
-    try { draft = sessionStorage.getItem(PE_NOTE_DRAFT_KEY) || ""; } catch (e) {}
-    panel.innerHTML = `
-        <h3>NoteDown</h3>
-        <div class="pe-note-toolbar" aria-label="Text formatting">
-            <button type="button" class="pe-note-tool" data-note-command="bold" aria-label="Bold"><strong>B</strong></button>
-            <button type="button" class="pe-note-tool" data-note-command="italic" aria-label="Italic"><em>I</em></button>
-            <button type="button" class="pe-note-tool" data-note-command="underline" aria-label="Underline"><u>U</u></button>
-            <select class="pe-note-select pe-note-size" data-note-size aria-label="Font size"><option value="2">Small</option><option value="3" selected>Normal</option><option value="5">Large</option></select>
-            <select class="pe-note-select" data-note-alignment aria-label="Paragraph alignment"><option value="">Paragraph alignment</option><option value="justifyLeft">Align left</option><option value="justifyCenter">Align center</option><option value="justifyRight">Align right</option><option value="justifyFull">Justify</option></select>
-            <button type="button" class="pe-note-tool" data-note-command="insertUnorderedList" aria-label="Bulleted list"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
-        </div>
-        <div class="pe-note-editor" id="pe-note-editor" contenteditable="true" role="textbox" aria-multiline="true"></div>
-        <div class="pe-resource-actions">
-            <button type="button" class="pe-di-graph-btn" data-pe-resource-action="save-draft">Save draft</button>
-            <button type="button" class="pe-di-graph-btn primary" data-pe-resource-action="export-note">Export DOCX</button>
-            <span class="pe-resource-feedback" data-note-feedback aria-live="polite"></span>
-        </div>
-    `;
-    const editor = panel.querySelector("#pe-note-editor");
-    if (editor) {
-        const safeDraft = sanitizePESelfNoteHtml(draft);
-        if (safeDraft) editor.innerHTML = safeDraft;
-        else editor.textContent = "Write your notes here...";
+    if (guide && documentIsPdf && peActiveResourceTab === "guide" && !peGuideLocalFile) {
+        requestAnimationFrame(() => { void renderPEGuidePdf(panel, String(guide.id || ""), preview, renderToken); });
     }
 }
 
@@ -2855,7 +2881,7 @@ function handlePEHomeDashboardClick(event) {
     }
     const noteCommand = event.target.closest("[data-note-command]");
     if (noteCommand) {
-        document.getElementById("pe-note-editor")?.focus();
+        document.getElementById("pe-guide-note-editor")?.focus();
         document.execCommand(noteCommand.dataset.noteCommand || "", false, null);
         return;
     }
@@ -2876,8 +2902,11 @@ function handlePEHomeDashboardClick(event) {
         const index = Number(event.target.closest("[data-guide-index]")?.dataset.guideIndex);
         const guideCount = peResourcesCatalog.filter(item => item.kind === "guide").length;
         if (Number.isInteger(index) && index >= 0 && index < guideCount) {
+            resetPEGuideLocalFile();
             peGuideSelected = true;
             peGuideCarouselIndex = index;
+            const guidePanel = document.getElementById("pe-resource-guide");
+            if (guidePanel) guidePanel.dataset.peGuideRenderKey = "";
             renderPEGuidePanel(document.getElementById("pe-resource-guide"));
         }
     } else if (action === "open-guide") {
@@ -2885,25 +2914,41 @@ function handlePEHomeDashboardClick(event) {
         const guide = peResourcesCatalog.find(item => String(item.id || "") === guideId && item.kind === "guide");
         const targetUrl = safeResourceUrl(guide?.document_url) || safeResourceUrl(guide?.website_url);
         if (targetUrl) window.open(targetUrl, "_blank", "noopener,noreferrer");
+    } else if (action === "open-local-guide") {
+        if (peGuideLocalObjectUrl) window.open(peGuideLocalObjectUrl, "_blank", "noopener,noreferrer");
+    } else if (action === "copy-guide-selection") {
+        void copyPEGuideSelection();
     } else if (action === "check-formula") {
         const button = event.target.closest("[data-formula-id]");
         void checkPEFormulaAnswer(button?.dataset.formulaId || "", button);
-    } else if (action === "save-draft") {
-        const editor = document.getElementById("pe-note-editor");
-        try { sessionStorage.setItem(PE_NOTE_DRAFT_KEY, sanitizePESelfNoteHtml(editor?.innerHTML || "")); } catch (e) {}
-        const feedback = document.querySelector("[data-note-feedback]");
-        if (feedback) feedback.textContent = "Draft saved for this browser session";
-    } else if (action === "export-note") {
-        exportPESelfNoteDocx();
+    } else if (action === "save-guide-note") {
+        savePEGuideNote();
+    } else if (action === "load-guide-note") {
+        loadSavedPEGuideNote();
+    } else if (action === "clear-guide-note") {
+        clearPEGuideNote();
+    } else if (action === "read-guide-note") {
+        readPEGuideNoteAloud();
+    } else if (action === "export-guide-note-pdf") {
+        exportPEGuideNotePdf();
+    } else if (action === "export-guide-note-doc") {
+        exportPEGuideNoteDoc();
     }
 }
 
-function handlePENoteToolbarChange(event) {
-    const editor = document.getElementById("pe-note-editor");
-    if (!editor) return;
+async function handlePEGuideControlChange(event) {
+    if (event.target.matches("[data-pe-guide-file]")) {
+        await loadPEGuideLocalFile(event.target.files?.[0]);
+        return;
+    }
+    const editor = document.getElementById("pe-guide-note-editor");
+    if (!editor || !event.target.closest(".pe-guide-notes")) return;
     if (event.target.matches("[data-note-size]")) {
         editor.focus();
         document.execCommand("fontSize", false, event.target.value);
+    } else if (event.target.matches("[data-note-color]")) {
+        editor.focus();
+        document.execCommand("foreColor", false, event.target.value);
     } else if (event.target.matches("[data-note-alignment]")) {
         const command = event.target.value;
         if (!command) return;
@@ -2913,7 +2958,12 @@ function handlePENoteToolbarChange(event) {
     }
 }
 
-function sanitizePESelfNoteHtml(value) {
+function handlePEGuideNoteInput(event) {
+    if (!event.target.closest?.("#pe-guide-note-editor")) return;
+    peGuideNoteWorkingHtml = sanitizePEGuideNoteHtml(event.target.innerHTML || "");
+}
+
+function sanitizePEGuideNoteHtml(value) {
     const allowedTags = new Set(["b", "strong", "i", "em", "u", "ul", "ol", "li", "p", "div", "br", "font"]);
     const template = document.createElement("template");
     template.innerHTML = String(value || "");
@@ -2924,6 +2974,7 @@ function sanitizePESelfNoteHtml(value) {
         const target = allowedTags.has(tag) ? document.createElement(tag) : document.createDocumentFragment();
         if (target.nodeType === Node.ELEMENT_NODE) {
             if (tag === "font" && /^[1-7]$/.test(node.getAttribute("size") || "")) target.setAttribute("size", node.getAttribute("size"));
+            if (tag === "font" && /^(?:#[0-9a-f]{3,8}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\))$/i.test(node.getAttribute("color") || "")) target.setAttribute("color", node.getAttribute("color"));
             if ((tag === "div" || tag === "p") && /^(left|center|right|justify)$/.test(node.style.textAlign || "")) target.style.textAlign = node.style.textAlign;
         }
         [...node.childNodes].forEach(child => target.appendChild(sanitizeNode(child)));
@@ -2934,11 +2985,155 @@ function sanitizePESelfNoteHtml(value) {
     return container.innerHTML;
 }
 
-function handlePESelfNotePaste(event) {
-    if (!event.target.closest?.("#pe-note-editor")) return;
+function handlePEGuideNotePaste(event) {
+    if (!event.target.closest?.("#pe-guide-note-editor")) return;
     event.preventDefault();
     const text = event.clipboardData?.getData("text/plain") || "";
     document.execCommand("insertText", false, text);
+}
+
+function setPEGuideNoteFeedback(message) {
+    const feedback = document.querySelector("#pe-resource-guide [data-note-feedback]");
+    if (feedback) feedback.textContent = message;
+}
+
+async function loadPEGuideLocalFile(file) {
+    if (!file) return;
+    const extension = String(file.name || "").split(".").pop()?.toLowerCase() || "";
+    const allowedExtensions = new Set(["pdf", "doc", "docx", "txt", "jpg", "jpeg", "png", "webp", "gif"]);
+    if (!allowedExtensions.has(extension) || file.size > 25 * 1024 * 1024) {
+        setPEGuideNoteFeedback(file.size > 25 * 1024 * 1024 ? "File must be 25 MB or smaller" : "Choose a PDF, Word, text, or image file");
+        return;
+    }
+
+    resetPEGuideLocalFile();
+    peGuideLocalObjectUrl = URL.createObjectURL(file);
+    peGuideLocalFile = { name: file.name, type: file.type, size: file.size, previewText: "" };
+    if (extension === "txt") {
+        try { peGuideLocalFile.previewText = (await file.text()).slice(0, 2_000_000); } catch (error) {}
+    }
+    peGuideSelected = false;
+    const panel = document.getElementById("pe-resource-guide");
+    if (panel) panel.dataset.peGuideRenderKey = "";
+    renderPEGuidePanel(panel);
+    setPEGuideNoteFeedback("Temporary file opened in this browser only");
+}
+
+async function copyPEGuideSelection() {
+    let selectedText = String(window.getSelection?.()?.toString() || "").trim();
+    if (!selectedText) {
+        try {
+            const frame = document.querySelector("#pe-resource-guide .pe-guide-local-frame");
+            selectedText = String(frame?.contentWindow?.getSelection?.()?.toString() || "").trim();
+        } catch (error) {}
+    }
+    if (!selectedText) {
+        setPEGuideNoteFeedback(document.querySelector("#pe-resource-guide .pe-guide-local-frame") ? "Select text inside the PDF and use Copy or Ctrl+C" : "Select document text first");
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(selectedText);
+        setPEGuideNoteFeedback("Selected text copied");
+    } catch (error) {
+        setPEGuideNoteFeedback("Press Ctrl+C or Copy to copy the selection");
+    }
+}
+
+function savePEGuideNote() {
+    const editor = document.getElementById("pe-guide-note-editor");
+    peGuideNoteWorkingHtml = sanitizePEGuideNoteHtml(editor?.innerHTML || "");
+    try {
+        sessionStorage.setItem(PE_NOTE_DRAFT_KEY, peGuideNoteWorkingHtml);
+        setPEGuideNoteFeedback("Notes saved for this browser session");
+    } catch (error) {
+        setPEGuideNoteFeedback("Notes could not be saved");
+    }
+}
+
+function loadSavedPEGuideNote() {
+    const editor = document.getElementById("pe-guide-note-editor");
+    if (!editor) return;
+    try {
+        const saved = sanitizePEGuideNoteHtml(sessionStorage.getItem(PE_NOTE_DRAFT_KEY) || "");
+        editor.innerHTML = saved;
+        peGuideNoteWorkingHtml = saved;
+        setPEGuideNoteFeedback(saved ? "Saved notes restored" : "No saved notes yet");
+    } catch (error) {
+        setPEGuideNoteFeedback("Saved notes could not be loaded");
+    }
+}
+
+function clearPEGuideNote() {
+    const editor = document.getElementById("pe-guide-note-editor");
+    if (editor) editor.replaceChildren();
+    peGuideNoteWorkingHtml = "";
+    setPEGuideNoteFeedback("Notes cleared");
+}
+
+function readPEGuideNoteAloud() {
+    const text = String(document.getElementById("pe-guide-note-editor")?.innerText || "").replace(/\s+/g, " ").trim();
+    if (!text) {
+        setPEGuideNoteFeedback("Write a note before using Read Aloud");
+        return;
+    }
+    if (!("speechSynthesis" in window)) {
+        setPEGuideNoteFeedback("Read Aloud is not supported by this browser");
+        return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
+    setPEGuideNoteFeedback("Reading notes aloud");
+}
+
+function getPEGuideNoteExportHtml() {
+    const editor = document.getElementById("pe-guide-note-editor");
+    return sanitizePEGuideNoteHtml(editor?.innerHTML || "");
+}
+
+function closePEGuideExportMenu() {
+    const menu = document.querySelector("#pe-resource-guide .pe-note-export-menu");
+    if (menu) menu.open = false;
+}
+
+function exportPEGuideNoteDoc() {
+    const content = getPEGuideNoteExportHtml();
+    if (!String(document.getElementById("pe-guide-note-editor")?.innerText || "").trim()) {
+        setPEGuideNoteFeedback("Write a note before exporting");
+        return;
+    }
+    const documentHtml = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;line-height:1.6;margin:40px}ul,ol{padding-left:24px}</style></head><body>${content}</body></html>`;
+    const url = URL.createObjectURL(new Blob([documentHtml], { type: "application/msword" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "examportal-guide-notes.doc";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    closePEGuideExportMenu();
+    setPEGuideNoteFeedback("DOC exported");
+}
+
+function exportPEGuideNotePdf() {
+    const content = getPEGuideNoteExportHtml();
+    if (!String(document.getElementById("pe-guide-note-editor")?.innerText || "").trim()) {
+        setPEGuideNoteFeedback("Write a note before exporting");
+        return;
+    }
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) {
+        setPEGuideNoteFeedback("Allow pop-ups to export PDF");
+        return;
+    }
+    printWindow.opener = null;
+    printWindow.addEventListener("load", () => { printWindow.focus(); printWindow.print(); }, { once: true });
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Guide Notes</title><style>@page{margin:20mm}body{font-family:Arial,sans-serif;line-height:1.6}ul,ol{padding-left:24px}</style></head><body>${content}</body></html>`);
+    printWindow.document.close();
+    closePEGuideExportMenu();
+    setPEGuideNoteFeedback("Choose Save as PDF in the print dialog");
 }
 
 async function checkPEFormulaAnswer(id, trigger) {
@@ -2956,126 +3151,6 @@ async function checkPEFormulaAnswer(id, trigger) {
     } catch (error) {
         if (feedback) feedback.textContent = "Could not check answer";
     }
-}
-
-function xmlEscape(value) {
-    return String(value || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]);
-}
-
-function crc32(bytes) {
-    let crc = 0xffffffff;
-    for (const byte of bytes) {
-        crc ^= byte;
-        for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
-    }
-    return (crc ^ 0xffffffff) >>> 0;
-}
-
-function buildStoredZip(files) {
-    const encoder = new TextEncoder();
-    const chunks = [];
-    const central = [];
-    let offset = 0;
-    const write16 = value => Uint8Array.of(value & 255, (value >>> 8) & 255);
-    const write32 = value => Uint8Array.of(value & 255, (value >>> 8) & 255, (value >>> 16) & 255, (value >>> 24) & 255);
-    for (const [name, body] of files) {
-        const nameBytes = encoder.encode(name);
-        const bodyBytes = encoder.encode(body);
-        const crc = crc32(bodyBytes);
-        const local = [write32(0x04034b50), write16(20), write16(0), write16(0), write16(0), write16(0), write32(crc), write32(bodyBytes.length), write32(bodyBytes.length), write16(nameBytes.length), write16(0), nameBytes, bodyBytes];
-        chunks.push(...local);
-        central.push(write32(0x02014b50), write16(20), write16(20), write16(0), write16(0), write16(0), write16(0), write32(crc), write32(bodyBytes.length), write32(bodyBytes.length), write16(nameBytes.length), write16(0), write16(0), write16(0), write16(0), write32(0), write32(offset), nameBytes);
-        offset += local.reduce((total, part) => total + part.length, 0);
-    }
-    const centralSize = central.reduce((total, part) => total + part.length, 0);
-    const end = [write32(0x06054b50), write16(0), write16(0), write16(files.length), write16(files.length), write32(centralSize), write32(offset), write16(0)];
-    return new Blob([...chunks, ...central, ...end], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-}
-
-function buildDocxParagraphs(editor) {
-    const paragraphs = [{ runs: [], alignment: "" }];
-    const current = () => paragraphs[paragraphs.length - 1];
-    const finish = alignment => {
-        if (!current().runs.length) return;
-        if (alignment) current().alignment = alignment;
-        paragraphs.push({ runs: [], alignment: "" });
-    };
-    const addText = (value, format) => {
-        const parts = String(value || "").replace(/\r/g, "").split("\n");
-        parts.forEach((part, index) => {
-            if (part) current().runs.push({ text: part, format });
-            if (index < parts.length - 1) finish();
-        });
-    };
-    const visit = (node, format = {}, alignment = "") => {
-        if (node.nodeType === Node.TEXT_NODE) {
-            addText(node.nodeValue, format);
-            return;
-        }
-        if (node.nodeType !== Node.ELEMENT_NODE) return;
-        const tag = node.tagName.toLowerCase();
-        if (tag === "br") {
-            finish(alignment);
-            return;
-        }
-        const fontSizeMap = { "1": 16, "2": 20, "3": 24, "4": 28, "5": 36, "6": 48, "7": 72 };
-        const nextFormat = {
-            bold: format.bold || tag === "b" || tag === "strong",
-            italic: format.italic || tag === "i" || tag === "em",
-            underline: format.underline || tag === "u",
-            size: tag === "font" ? fontSizeMap[node.getAttribute("size") || ""] || format.size : format.size
-        };
-        const nextAlignment = (tag === "p" || tag === "div") && /^(left|center|right|justify)$/.test(node.style.textAlign || "")
-            ? node.style.textAlign
-            : alignment;
-        if (tag === "ul" || tag === "ol") {
-            [...node.children].forEach((item, index) => {
-                if (item.tagName?.toLowerCase() !== "li") return;
-                addText(tag === "ol" ? `${index + 1}. ` : "• ", nextFormat);
-                [...item.childNodes].forEach(child => visit(child, nextFormat, nextAlignment));
-                finish(nextAlignment);
-            });
-            return;
-        }
-        [...node.childNodes].forEach(child => visit(child, nextFormat, nextAlignment));
-        if (tag === "p" || tag === "div") finish(nextAlignment);
-    };
-    [...editor.childNodes].forEach(node => visit(node));
-    return paragraphs.filter(paragraph => paragraph.runs.length).map(paragraph => {
-        const alignmentValue = paragraph.alignment === "justify" ? "both" : paragraph.alignment;
-        const paragraphProperties = alignmentValue ? `<w:pPr><w:jc w:val="${alignmentValue}"/></w:pPr>` : "";
-        return `<w:p>${paragraphProperties}${paragraph.runs.map(run => {
-        const properties = run.format.bold || run.format.italic || run.format.underline || run.format.size
-            ? `<w:rPr>${run.format.bold ? "<w:b/>" : ""}${run.format.italic ? "<w:i/>" : ""}${run.format.underline ? '<w:u w:val="single"/>' : ""}${run.format.size ? `<w:sz w:val="${run.format.size}"/><w:szCs w:val="${run.format.size}"/>` : ""}</w:rPr>`
-            : "";
-        return `<w:r>${properties}<w:t xml:space="preserve">${xmlEscape(run.text)}</w:t></w:r>`;
-        }).join("")}</w:p>`;
-    }).join("");
-}
-
-function exportPESelfNoteDocx() {
-    const editor = document.getElementById("pe-note-editor");
-    const text = String(editor?.innerText || "").trim();
-    const feedback = document.querySelector("[data-note-feedback]");
-    if (!text) {
-        if (feedback) feedback.textContent = "Write a note before exporting";
-        return;
-    }
-    const paragraphs = buildDocxParagraphs(editor);
-    const files = [
-        ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
-        ["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
-        ["word/document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs}<w:sectPr/></w:body></w:document>`]
-    ];
-    const url = URL.createObjectURL(buildStoredZip(files));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "examportal-notedown.docx";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    if (feedback) feedback.textContent = "DOCX exported";
 }
 
 function renderPEHomeGrid() {
