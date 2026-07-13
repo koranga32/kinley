@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://examportal-dil.pages.dev/sitemap.xml
