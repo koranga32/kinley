@@ -3989,11 +3989,34 @@ function bindPESolutionToggles(container) {
     });
 }
 
-function lockPEOptions(qId) {
+function lockPEOptions(qId, chosenIndex) {
     document.querySelectorAll(`#${qId}-options .pe-option`).forEach(btn => {
+        const isSelected = Number(btn.dataset.peAnswerOpt) === chosenIndex;
         btn.classList.add("pe-locked");
-        btn.disabled = true;
+        btn.classList.toggle("pe-selected", isSelected);
+        btn.disabled = !isSelected;
+        if (isSelected) {
+            btn.dataset.peAnswerSelected = "true";
+            btn.setAttribute("aria-pressed", "true");
+            btn.setAttribute("title", "Click again to reset answer");
+        }
     });
+}
+
+function resetPEQuestionAnswer(qId) {
+    document.querySelectorAll(`#${qId}-options .pe-option`).forEach(button => {
+        button.disabled = false;
+        button.classList.remove("pe-locked", "pe-selected", "pe-correct", "pe-incorrect");
+        delete button.dataset.peAnswerSelected;
+        button.removeAttribute("aria-pressed");
+        button.removeAttribute("title");
+    });
+    const feedback = document.getElementById(`${qId}-feedback`);
+    if (feedback) {
+        feedback.textContent = "";
+        feedback.className = "pe-feedback-msg";
+    }
+    togglePESolution(qId, false);
 }
 
 function setPEQuestionLoading(qId, loading) {
@@ -4003,6 +4026,11 @@ function setPEQuestionLoading(qId, loading) {
 }
 
 async function answerPEQuestion(qId, chosenIndex) {
+    const chosenBtn = document.getElementById(`${qId}-opt-${chosenIndex}`);
+    if (chosenBtn?.dataset.peAnswerSelected === "true") {
+        resetPEQuestionAnswer(qId);
+        return;
+    }
     setPEQuestionLoading(qId, true);
     let result;
     try {
@@ -4021,8 +4049,7 @@ async function answerPEQuestion(qId, chosenIndex) {
         showToast(`Could not check answer: ${error.message}`, "error");
         return;
     }
-    lockPEOptions(qId);
-    const chosenBtn = document.getElementById(`${qId}-opt-${chosenIndex}`);
+    lockPEOptions(qId, chosenIndex);
     const feedback = document.getElementById(`${qId}-feedback`);
     const solutionText = document.getElementById(`${qId}-solution`)?.querySelector(".pe-solution-text");
     const serverExplanation = typeof result.explanation === "string" ? result.explanation.trim() : "";
@@ -4033,10 +4060,10 @@ async function answerPEQuestion(qId, chosenIndex) {
 
     if (result.correct === true) {
         chosenBtn?.classList.add("pe-correct");
-        if (feedback) { feedback.textContent = "✓ Correct!"; feedback.className = "pe-feedback-msg correct"; }
+        if (feedback) { feedback.textContent = "✓ Correct! Click this answer again to reset."; feedback.className = "pe-feedback-msg correct"; }
     } else {
         chosenBtn?.classList.add("pe-incorrect");
-        if (feedback) { feedback.textContent = "✕ Not quite."; feedback.className = "pe-feedback-msg incorrect"; }
+        if (feedback) { feedback.textContent = "✕ Not quite. Click this answer again to reset."; feedback.className = "pe-feedback-msg incorrect"; }
     }
 }
 

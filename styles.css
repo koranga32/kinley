@@ -4123,6 +4123,16 @@
 
         .pe-option.pe-locked { cursor: default; }
 
+        .pe-option.pe-locked.pe-selected {
+            cursor: pointer;
+        }
+
+        .pe-option.pe-locked.pe-selected:hover,
+        .pe-option.pe-locked.pe-selected:focus-visible {
+            filter: brightness(1.08);
+            transform: translateY(-1px);
+        }
+
         .pe-question-actions {
             display: flex;
             gap: 10px;
