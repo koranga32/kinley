@@ -4177,7 +4177,96 @@
             color: #c9ccd2;
             font-size: 13.5px;
             line-height: 1.6;
+        }
+
+        .pe-solution-copy {
             white-space: pre-wrap;
+        }
+
+        .pe-solution-inline-link {
+            color: #7dd3fc;
+            overflow-wrap: anywhere;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .pe-solution-resources {
+            border-top: 1px solid #ffffff1f;
+            margin-top: 14px;
+            padding-top: 12px;
+        }
+
+        .pe-solution-resources-label {
+            color: #8f96a3;
+            font-size: 10.5px;
+            font-weight: 800;
+            letter-spacing: 0.09em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .pe-solution-resource {
+            align-items: center;
+            background: #292d35;
+            border: 1px solid #3a3f49;
+            border-radius: 8px;
+            color: #eef0f3;
+            display: flex;
+            gap: 10px;
+            margin-top: 7px;
+            min-width: 0;
+            padding: 10px 11px;
+            text-decoration: none;
+            transition: border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .pe-solution-resource:hover,
+        .pe-solution-resource:focus-visible {
+            background: #30353e;
+            border-color: var(--clr, #4caf50);
+        }
+
+        .pe-solution-resource-icon {
+            align-items: center;
+            background: #3a414b;
+            border-radius: 7px;
+            color: #8ee3af;
+            display: flex;
+            flex: 0 0 32px;
+            font-size: 13px;
+            height: 32px;
+            justify-content: center;
+        }
+
+        .pe-solution-resource.youtube .pe-solution-resource-icon {
+            background: #4a3032;
+            color: #ff8a8a;
+        }
+
+        .pe-solution-resource-copy {
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .pe-solution-resource-copy strong {
+            color: #f4f5f6;
+            font-size: 12.5px;
+        }
+
+        .pe-solution-resource-copy span {
+            color: #9ca3ae;
+            font-size: 11px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pe-solution-resource-arrow {
+            color: #8f96a3;
+            flex: 0 0 auto;
+            font-size: 14px;
         }
 
         @keyframes peSlideDown {

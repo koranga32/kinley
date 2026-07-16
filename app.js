@@ -3690,7 +3690,7 @@ async function answerPEWrittenQuestion(qId) {
     const feedback = document.getElementById(`${qId}-feedback`);
     const solutionText = document.getElementById(`${qId}-solution`)?.querySelector(".pe-solution-text");
     const serverExplanation = typeof result.explanation === "string" ? result.explanation.trim() : "";
-    if (serverExplanation && solutionText) solutionText.textContent = serverExplanation;
+    if (serverExplanation && solutionText) solutionText.innerHTML = renderPEExplanation(serverExplanation);
     togglePESolution(qId, true);
     if (result.correct === true) {
         if (feedback) { feedback.textContent = "Correct!"; feedback.className = "pe-feedback-msg correct"; }
@@ -3889,7 +3889,7 @@ function renderPEDIQuestion() {
                 </div>
                 <div class="pe-solution-box accent-purple" id="${qId}-solution">
                     <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
-                    <div class="pe-solution-text">${escapePEHtml(q.explanation || "No explanation has been added yet.")}</div>
+                    <div class="pe-solution-text">${renderPEExplanation(q.explanation || "No explanation has been added yet.")}</div>
                 </div>
             </div>
         `;
@@ -3938,7 +3938,7 @@ function renderPEQuestionList() {
         const explanationHtml = `
             <div class="pe-solution-box ${accentClass}" id="${qId}-solution">
                 <div class="pe-solution-title">💡 Solution &amp; Explanation</div>
-                <div class="pe-solution-text">${escapePEHtml(q.explanation || "No explanation has been added yet.")}</div>
+                <div class="pe-solution-text">${renderPEExplanation(q.explanation || "No explanation has been added yet.")}</div>
             </div>
         `;
 
@@ -4027,7 +4027,7 @@ async function answerPEQuestion(qId, chosenIndex) {
     const solutionText = document.getElementById(`${qId}-solution`)?.querySelector(".pe-solution-text");
     const serverExplanation = typeof result.explanation === "string" ? result.explanation.trim() : "";
     if (serverExplanation && solutionText) {
-        solutionText.textContent = serverExplanation;
+        solutionText.innerHTML = renderPEExplanation(serverExplanation);
     }
     togglePESolution(qId, true);
 
@@ -4042,6 +4042,78 @@ async function answerPEQuestion(qId, chosenIndex) {
 
 function escapePEHtml(text) {
     return escapeHTML(text);
+}
+
+function safeExplanationURL(value) {
+    try {
+        const parsed = new URL(String(value || "").trim());
+        return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.href : "";
+    } catch (_) {
+        return "";
+    }
+}
+
+function explanationLinkDetails(url) {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.replace(/^www\./i, "");
+    const isYouTube = /(^|\.)youtube\.com$/i.test(hostname) || /(^|\.)youtu\.be$/i.test(hostname);
+    return {
+        icon: isYouTube ? "▶" : "↗",
+        kind: isYouTube ? "youtube" : "website",
+        title: isYouTube ? "Watch solution video" : "Open supporting website"
+    };
+}
+
+function renderInlineExplanationLinks(line) {
+    const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+    let html = "";
+    let previousIndex = 0;
+    let match;
+    while ((match = urlPattern.exec(line)) !== null) {
+        html += escapeHTML(line.slice(previousIndex, match.index));
+        const safeURL = safeExplanationURL(match[0]);
+        html += safeURL
+            ? `<a class="pe-solution-inline-link" href="${escapeHTML(safeURL)}" target="_blank" rel="noopener noreferrer">${escapeHTML(match[0])}</a>`
+            : escapeHTML(match[0]);
+        previousIndex = match.index + match[0].length;
+    }
+    return html + escapeHTML(line.slice(previousIndex));
+}
+
+function renderPEExplanation(text) {
+    const resourceURLs = [];
+    const seenURLs = new Set();
+    const renderedLines = String(text || "").split(/\r?\n/).map(line => {
+        const trimmed = line.trim();
+        const safeURL = /^https?:\/\/[^\s<>"']+$/i.test(trimmed) ? safeExplanationURL(trimmed) : "";
+        if (safeURL) {
+            if (!seenURLs.has(safeURL)) {
+                seenURLs.add(safeURL);
+                resourceURLs.push(safeURL);
+            }
+            return "";
+        }
+        return renderInlineExplanationLinks(line);
+    });
+
+    while (renderedLines.length && !renderedLines[0]) renderedLines.shift();
+    while (renderedLines.length && !renderedLines[renderedLines.length - 1]) renderedLines.pop();
+    const copyHTML = renderedLines.join("\n");
+    const resourcesHTML = resourceURLs.map(url => {
+        const details = explanationLinkDetails(url);
+        return `
+            <a class="pe-solution-resource ${details.kind}" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">
+                <span class="pe-solution-resource-icon" aria-hidden="true">${details.icon}</span>
+                <span class="pe-solution-resource-copy">
+                    <strong>${details.title}</strong>
+                    <span>${escapeHTML(url.replace(/^https?:\/\//i, ""))}</span>
+                </span>
+                <span class="pe-solution-resource-arrow" aria-hidden="true">↗</span>
+            </a>
+        `;
+    }).join("");
+
+    return `${copyHTML ? `<div class="pe-solution-copy">${copyHTML}</div>` : ""}${resourcesHTML ? `<div class="pe-solution-resources"><div class="pe-solution-resources-label">Helpful resources</div>${resourcesHTML}</div>` : ""}`;
 }
 
 function accentClassFromColor(color) {
