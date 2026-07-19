@@ -3756,10 +3756,13 @@
             object-fit: contain;
             object-position: center;
             border-radius: 4px;
+            opacity: 1;
+            transition: opacity 0.16s ease-out;
         }
 
         .pe-di-chart-wrap img.is-loading {
-            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
         }
 
         .pe-di-set-title {
@@ -3772,10 +3775,17 @@
 
         .pe-di-graph-controls {
             margin-top: 6px;
+            min-height: 40px;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 5px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .pe-di-chart-wrap img {
+                transition: none;
+            }
         }
 
         .pe-di-graph-count {

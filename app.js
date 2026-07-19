@@ -3574,6 +3574,7 @@ async function openPEDIViewer(setName) {
     document.getElementById("pe-di-viewer-screen").classList.add("active");
 
     document.getElementById("pe-di-set-title").textContent = setName;
+    renderPEDIGraphControls(0);
     document.getElementById("pe-di-questions-container").innerHTML = '<div class="pe-empty-msg">Loading questions…</div>';
 
     let setQuestions = [];
