@@ -1260,10 +1260,9 @@ async function prefetchPEDISetGraph(setName) {
             // question's media so each newly uploaded chart can begin its own
             // group instead of silently inheriting the first chart forever.
             await fetchSelectedQuestionMedia(setQuestions);
-            const firstGraph = setQuestions
-                .map(question => safeMediaURL(question.imageCode, "image"))
-                .find(Boolean) || "";
-            if (firstGraph && peDIActiveSet === normalizedSetName) showPEDIChart(firstGraph);
+            // Finish graph grouping before the visible chart is assigned.
+            // This keeps the final navigation controls and chart frame from
+            // changing size after an early image has already been painted.
             await preparePEDIGraphFingerprints(normalizedSetName);
             const audioQuestions = setQuestions.filter(q => q.audioCode).slice(0, 2);
             if (audioQuestions.length) {
