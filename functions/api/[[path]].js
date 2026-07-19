@@ -122,13 +122,14 @@ async function handleQuestions(context) {
         if (!peType || peType.length > 80 || !topic || topic.length > 160) {
             return apiError(400, "invalid_pe_topic", "A valid PE type and topic are required.");
         }
+        const isDataInterpretation = peType === "Data Interpretation";
         const fields = "id,category,question,optionA,optionB,optionC,optionD";
         const categories = [`__PE__::${peType}::${topic}`];
         if (peType === "BCSC(main)") categories.push(`__PE__::Mock::${topic}`);
         const responses = await Promise.all(categories.map(category => {
             const params = new URLSearchParams({
                 select: fields,
-                order: "id.asc"
+                order: isDataInterpretation ? "sort_order.asc,id.asc" : "id.asc"
             });
             params.set("category", `eq.${category}`);
             return supabaseServerRequest(context.env, `Exam?${params.toString()}`);
@@ -140,7 +141,7 @@ async function handleQuestions(context) {
                 question: stored.question,
                 answer_type: stored.answerType
             };
-        }), 200, PUBLIC_CACHE_SHORT);
+        }), 200, isDataInterpretation ? {} : PUBLIC_CACHE_SHORT);
     }
     if (view === "media") {
         const ids = validateMediaIds(url.searchParams.get("ids"));
