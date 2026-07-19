@@ -1242,10 +1242,9 @@ function clearActivePEPracticeMemory() {
     pePracticeQuestionsByDomId.clear();
     const topicContainer = document.getElementById("pe-questions-container");
     const diContainer = document.getElementById("pe-di-questions-container");
-    const diChart = document.getElementById("pe-di-chart-img");
     if (topicContainer) topicContainer.innerHTML = "";
     if (diContainer) diContainer.innerHTML = "";
-    if (diChart) diChart.removeAttribute("src");
+    showPEDIChart("");
 }
 
 async function prefetchPEDISetGraph(setName) {
@@ -3575,7 +3574,6 @@ async function openPEDIViewer(setName) {
     document.querySelectorAll(".pe-content .pe-section").forEach(s => s.classList.remove("active"));
     document.getElementById("pe-di-viewer-screen").classList.add("active");
 
-    const chartImg = document.getElementById("pe-di-chart-img");
     document.getElementById("pe-di-set-title").textContent = setName;
     document.getElementById("pe-di-questions-container").innerHTML = '<div class="pe-empty-msg">Loading questions…</div>';
 
@@ -3595,11 +3593,6 @@ async function openPEDIViewer(setName) {
     if (peDIActiveSet !== setName) return;
     renderPEDIQuestion();
 
-    const firstCachedGraph = setQuestions
-        .map(question => safeMediaURL(question.imageCode, "image"))
-        .find(Boolean) || "";
-    if (firstCachedGraph) chartImg.src = firstCachedGraph;
-    else chartImg.removeAttribute("src");
     if (!setQuestions.length) return;
     void prefetchPEDISetGraph(setName).then(() => {
         if (peDIActiveSet !== setName) return;
@@ -3790,12 +3783,56 @@ function buildPEDIQuestionGroups(setQuestions) {
     }));
 }
 
+let peDIChartRequestId = 0;
+
 function showPEDIChart(graphSource) {
     const chartImg = document.getElementById("pe-di-chart-img");
     if (!chartImg) return;
     graphSource = String(graphSource || "").trim();
-    if (graphSource && chartImg.src !== graphSource) chartImg.src = graphSource;
-    else if (!graphSource) chartImg.removeAttribute("src");
+    const currentSource = String(chartImg.getAttribute("src") || "").trim();
+
+    if (!graphSource) {
+        peDIChartRequestId += 1;
+        chartImg.onload = null;
+        chartImg.onerror = null;
+        chartImg.classList.remove("is-loading");
+        chartImg.removeAttribute("aria-busy");
+        chartImg.removeAttribute("src");
+        return;
+    }
+
+    if (currentSource === graphSource) {
+        if (chartImg.classList.contains("is-loading")) return;
+        if (chartImg.complete && chartImg.naturalWidth > 0) {
+            chartImg.classList.remove("is-loading");
+            chartImg.removeAttribute("aria-busy");
+        }
+        return;
+    }
+
+    const requestId = ++peDIChartRequestId;
+    chartImg.classList.add("is-loading");
+    chartImg.setAttribute("aria-busy", "true");
+    chartImg.onload = () => {
+        const reveal = () => {
+            if (requestId !== peDIChartRequestId) return;
+            chartImg.onload = null;
+            chartImg.onerror = null;
+            chartImg.classList.remove("is-loading");
+            chartImg.removeAttribute("aria-busy");
+        };
+        if (typeof chartImg.decode === "function") chartImg.decode().catch(() => {}).finally(reveal);
+        else reveal();
+    };
+    chartImg.onerror = () => {
+        if (requestId !== peDIChartRequestId) return;
+        chartImg.onload = null;
+        chartImg.onerror = null;
+        chartImg.classList.remove("is-loading");
+        chartImg.removeAttribute("aria-busy");
+        chartImg.removeAttribute("src");
+    };
+    chartImg.src = graphSource;
 }
 
 function ensurePEDIGraphControls() {
