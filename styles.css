@@ -2906,6 +2906,10 @@
             text-align: left;
         }
 
+        .caf-date-category-button {
+            font-size: 11px;
+        }
+
         .caf-date-year-button:hover,
         .caf-date-year-item.is-active > .caf-date-year-row .caf-date-year-button,
         .caf-date-category-button:hover,
@@ -2928,7 +2932,10 @@
             left: calc(100% + 6px);
             z-index: 90;
             width: min(260px, calc(100vw - 28px));
+            max-height: min(320px, calc(100vh - 140px));
             padding: 5px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
             border: 1px solid rgba(15,27,53,0.16);
             border-radius: 8px;
             background: rgba(255,255,255,0.98);
@@ -3236,9 +3243,10 @@
             }
 
             .caf-date-year-item.is-active .caf-date-category-menu {
-                max-height: 320px;
+                max-height: min(320px, calc(100vh - 240px));
                 margin-top: 3px;
                 padding: 5px;
+                overflow-y: auto;
                 border-width: 1px;
                 transform: translateY(0);
             }
