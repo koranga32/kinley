@@ -106,7 +106,7 @@ function bindStaticUiEvents() {
     document.addEventListener("selectionchange", capturePEGuideLocalPdfSelection);
     document.getElementById("caf-bhutan-box")?.addEventListener("click", () => cafSelectRegion("Bhutan"));
     document.getElementById("caf-intl-box")?.addEventListener("click", () => cafSelectRegion("International"));
-    document.getElementById("caf-category-dropdown")?.addEventListener("change", () => cafFilterData());
+    cafBindDateDropdownEvents();
     document.getElementById("caf-slide-left")?.addEventListener("click", () => cafChangePage(-1));
     document.getElementById("caf-slide-right")?.addEventListener("click", () => cafChangePage(1));
     document.getElementById("pe-mock-search")?.addEventListener("input", renderPEMockGrid);
@@ -1931,33 +1931,43 @@ async function submitContactForm() {
 
 // ─── CURRENT AFFAIR FLASHCARD WALL MODULE ──────────────
 
-const cafSubcategories = {
-    Bhutan: ["Sports", "Authors & Book", "Art & Culture", "Environment", "Politics", "Technology", "Awards & Honor", "Person"],
-    International: ["Person", "Authors & Books", "Awards & Honor", "Sports"]
-};
-
 const cafSeedNotes = [];
 
 let cafNotes = [];
 let cafSelectedScope = "Bhutan";
+let cafSelectedYear = null;
+let cafSelectedCategory = "";
 let cafFilteredItems = [];
 let cafActiveTimers = {};
+let cafDateDropdownBound = false;
 
-function cafCategoriesForScope(scope) {
-    const categories = [
-        ...(cafSubcategories[scope] || []),
-        ...cafNotes
-            .filter(note => note.scope === scope)
-            .map(note => String(note.category || "").trim())
-            .filter(Boolean)
-    ];
+function cafYearFromDateStamp(value) {
+    const matches = String(value || "").match(/\b(?:19|20)\d{2}\b/g);
+    return matches?.length ? Number(matches[matches.length - 1]) : null;
+}
+
+function cafYearCountsForScope(scope) {
+    const counts = new Map();
+    cafNotes.forEach(note => {
+        if (note.scope !== scope) return;
+        const year = cafYearFromDateStamp(note.date);
+        if (year !== null) counts.set(year, (counts.get(year) || 0) + 1);
+    });
+    return [...counts.entries()].sort((first, second) => second[0] - first[0]);
+}
+
+function cafCategoriesForYear(scope, year) {
+    const categories = cafNotes
+        .filter(note => note.scope === scope && cafYearFromDateStamp(note.date) === year)
+        .map(note => String(note.category || "").trim())
+        .filter(Boolean);
     const seen = new Set();
     return categories.filter(category => {
         const key = category.toLocaleLowerCase();
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
-    });
+    }).sort((first, second) => first.localeCompare(second));
 }
 
 function cafNormalizeRows(rows) {
@@ -1998,33 +2008,206 @@ async function caLoadState({ render = true, force = false } = {}) {
 }
 
 function caRenderAll() {
-    cafUpdateDropdownOptions(cafSelectedScope);
+    cafRenderDateDropdown();
     cafFilterData(false);
     renderDailyQuoteTicker();
 }
 
-function cafUpdateDropdownOptions(scope) {
-    const dropdown = document.getElementById("caf-category-dropdown");
-    if (!dropdown) return;
-    const previous = dropdown.value;
-    const categoriesForScope = cafCategoriesForScope(scope);
-    dropdown.innerHTML = categoriesForScope.map(cat => `<option value="${escapePEHtml(cat)}">${escapePEHtml(cat)}</option>`).join("");
-    if (previous && categoriesForScope.includes(previous)) dropdown.value = previous;
+function cafSetActiveDateYear(item, { focusCategory = false } = {}) {
+    const menu = document.getElementById("caf-date-menu");
+    if (!menu || !item) return;
+    menu.querySelectorAll(".caf-date-year-item").forEach(candidate => {
+        candidate.classList.toggle("is-active", candidate === item);
+    });
+    menu.querySelectorAll(".caf-date-category-toggle").forEach(button => {
+        button.setAttribute("aria-expanded", String(button.closest(".caf-date-year-item") === item));
+    });
+    if (focusCategory) item.querySelector(".caf-date-category-button")?.focus();
+}
+
+function cafBindDateDropdownMenuItems() {
+    const menu = document.getElementById("caf-date-menu");
+    if (!menu) return;
+    menu.querySelectorAll(".caf-date-year-item").forEach(item => {
+        item.addEventListener("mouseenter", () => cafSetActiveDateYear(item));
+        item.addEventListener("focusin", event => {
+            if (event.target.classList.contains("caf-date-year-button")) cafSetActiveDateYear(item);
+        });
+    });
+    menu.querySelectorAll(".caf-date-year-button").forEach(button => {
+        button.addEventListener("click", () => {
+            cafSelectedYear = Number(button.dataset.cafYear);
+            cafSelectedCategory = "";
+            cafRenderDateDropdown();
+            cafCloseDateDropdown();
+            cafFilterData(true);
+        });
+    });
+    menu.querySelectorAll(".caf-date-category-toggle").forEach(button => {
+        button.addEventListener("click", event => {
+            event.stopPropagation();
+            const item = button.closest(".caf-date-year-item");
+            const shouldOpen = !item?.classList.contains("is-active");
+            if (shouldOpen) cafSetActiveDateYear(item);
+            else {
+                item.classList.remove("is-active");
+                button.setAttribute("aria-expanded", "false");
+            }
+        });
+    });
+    menu.querySelectorAll(".caf-date-category-button").forEach(button => {
+        button.addEventListener("click", () => {
+            cafSelectedYear = Number(button.dataset.cafYear);
+            cafSelectedCategory = button.dataset.cafCategory || "";
+            cafRenderDateDropdown();
+            cafCloseDateDropdown();
+            cafFilterData(true);
+        });
+    });
+}
+
+function cafRenderDateDropdown() {
+    const menu = document.getElementById("caf-date-menu");
+    const triggerLabel = document.getElementById("caf-date-trigger-label");
+    const label = document.getElementById("caf-dropdown-label");
+    if (!menu || !triggerLabel || !label) return;
+
+    const years = cafYearCountsForScope(cafSelectedScope);
+    if (cafSelectedYear !== null && !years.some(([year]) => year === cafSelectedYear)) {
+        cafSelectedYear = null;
+        cafSelectedCategory = "";
+    }
+    const selectedCategories = cafSelectedYear === null
+        ? []
+        : cafCategoriesForYear(cafSelectedScope, cafSelectedYear);
+    if (cafSelectedCategory && !selectedCategories.includes(cafSelectedCategory)) cafSelectedCategory = "";
+
+    label.textContent = `Select ${cafSelectedScope} Date:`;
+    triggerLabel.textContent = cafSelectedYear === null
+        ? "Dates"
+        : cafSelectedCategory
+            ? `${cafSelectedYear} · ${cafSelectedCategory}`
+            : String(cafSelectedYear);
+
+    menu.innerHTML = years.length ? years.map(([year, count]) => {
+        const categories = cafCategoriesForYear(cafSelectedScope, year);
+        const categoryButtons = categories.map(category => `
+            <button type="button" class="caf-date-category-button" role="menuitem" data-caf-year="${year}" data-caf-category="${escapePEHtml(category)}">${escapePEHtml(category)}</button>
+        `).join("");
+        const questionLabel = count === 1 ? "question" : "questions";
+        return `
+            <div class="caf-date-year-item" data-caf-year-item="${year}">
+                <div class="caf-date-year-row">
+                    <button type="button" class="caf-date-year-button" role="menuitem" data-caf-year="${year}">${year} — ${count} ${questionLabel}</button>
+                    <button type="button" class="caf-date-category-toggle" aria-label="Show categories for ${year}" aria-expanded="false"><span aria-hidden="true">›</span></button>
+                </div>
+                <div class="caf-date-category-menu" role="menu" aria-label="Categories for ${year}">${categoryButtons}</div>
+            </div>
+        `;
+    }).join("") : '<div class="caf-date-empty">No dated questions available.</div>';
+    cafBindDateDropdownMenuItems();
+}
+
+function cafOpenDateDropdown({ focusFirst = false } = {}) {
+    const menu = document.getElementById("caf-date-menu");
+    const trigger = document.getElementById("caf-date-trigger");
+    if (!menu || !trigger) return;
+    cafRenderDateDropdown();
+    menu.classList.add("open");
+    menu.setAttribute("aria-hidden", "false");
+    trigger.setAttribute("aria-expanded", "true");
+    if (focusFirst) menu.querySelector(".caf-date-year-button")?.focus();
+}
+
+function cafCloseDateDropdown({ restoreFocus = false } = {}) {
+    const menu = document.getElementById("caf-date-menu");
+    const trigger = document.getElementById("caf-date-trigger");
+    if (!menu || !trigger) return;
+    menu.classList.remove("open");
+    menu.setAttribute("aria-hidden", "true");
+    trigger.setAttribute("aria-expanded", "false");
+    menu.querySelectorAll(".caf-date-year-item").forEach(item => item.classList.remove("is-active"));
+    menu.querySelectorAll(".caf-date-category-toggle").forEach(button => button.setAttribute("aria-expanded", "false"));
+    if (restoreFocus) trigger.focus();
+}
+
+function cafHandleDateMenuKeydown(event) {
+    const menu = document.getElementById("caf-date-menu");
+    if (!menu) return;
+    const yearButtons = [...menu.querySelectorAll(".caf-date-year-button")];
+    const categoryButtons = [...menu.querySelectorAll(".caf-date-year-item.is-active .caf-date-category-button")];
+    const yearIndex = yearButtons.indexOf(document.activeElement);
+    const categoryIndex = categoryButtons.indexOf(document.activeElement);
+
+    if (event.key === "Escape") {
+        event.preventDefault();
+        cafCloseDateDropdown({ restoreFocus: true });
+    } else if (yearIndex >= 0 && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+        event.preventDefault();
+        const next = (yearIndex + (event.key === "ArrowDown" ? 1 : -1) + yearButtons.length) % yearButtons.length;
+        yearButtons[next].focus();
+    } else if (yearIndex >= 0 && event.key === "ArrowRight") {
+        event.preventDefault();
+        cafSetActiveDateYear(yearButtons[yearIndex].closest(".caf-date-year-item"), { focusCategory: true });
+    } else if (categoryIndex >= 0 && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+        event.preventDefault();
+        const next = (categoryIndex + (event.key === "ArrowDown" ? 1 : -1) + categoryButtons.length) % categoryButtons.length;
+        categoryButtons[next].focus();
+    } else if (categoryIndex >= 0 && event.key === "ArrowLeft") {
+        event.preventDefault();
+        document.activeElement.closest(".caf-date-year-item")?.querySelector(".caf-date-year-button")?.focus();
+    }
+}
+
+function cafBindDateDropdownEvents() {
+    if (cafDateDropdownBound) return;
+    const dropdown = document.getElementById("caf-date-dropdown");
+    const trigger = document.getElementById("caf-date-trigger");
+    const menu = document.getElementById("caf-date-menu");
+    if (!dropdown || !trigger || !menu) return;
+    cafDateDropdownBound = true;
+    trigger.addEventListener("click", () => {
+        if (menu.classList.contains("open")) cafCloseDateDropdown();
+        else cafOpenDateDropdown();
+    });
+    trigger.addEventListener("keydown", event => {
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            cafOpenDateDropdown({ focusFirst: true });
+        }
+    });
+    menu.addEventListener("keydown", cafHandleDateMenuKeydown);
+    document.addEventListener("click", event => {
+        if (!dropdown.contains(event.target)) cafCloseDateDropdown();
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && menu.classList.contains("open")) {
+            cafCloseDateDropdown({ restoreFocus: true });
+        }
+    });
+    cafRenderDateDropdown();
 }
 
 function cafSelectRegion(region) {
+    const scopeChanged = cafSelectedScope !== region;
     cafSelectedScope = region;
+    if (scopeChanged) {
+        cafSelectedYear = null;
+        cafSelectedCategory = "";
+    }
     document.getElementById("caf-bhutan-box")?.classList.toggle("active", region === "Bhutan");
     document.getElementById("caf-intl-box")?.classList.toggle("active", region === "International");
-    const label = document.getElementById("caf-dropdown-label");
-    if (label) label.textContent = `Select ${region} Category:`;
-    cafUpdateDropdownOptions(region);
+    cafCloseDateDropdown();
+    cafRenderDateDropdown();
     cafFilterData(true);
 }
 
 function cafFilterData(resetPage = true) {
-    const selectedCategory = document.getElementById("caf-category-dropdown")?.value || cafCategoriesForScope(cafSelectedScope)[0] || "";
-    cafFilteredItems = shuffleArray(cafNotes.filter(note => note.scope === cafSelectedScope && note.category === selectedCategory));
+    cafFilteredItems = shuffleArray(cafNotes.filter(note =>
+        note.scope === cafSelectedScope &&
+        (cafSelectedYear === null || cafYearFromDateStamp(note.date) === cafSelectedYear) &&
+        (!cafSelectedCategory || note.category === cafSelectedCategory)
+    ));
     cafClearAllTimers();
     cafRenderPageGrid();
     if (resetPage) document.getElementById("caf-note-wall")?.scrollTo({ left: 0, top: 0 });
