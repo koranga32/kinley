@@ -3270,11 +3270,19 @@
             .caf-date-trigger { font-size: 11px; }
             .caf-date-dropdown { width: min(100%, 190px); }
             .caf-date-trigger { padding: 5px 8px; }
-            .caf-date-menu { width: 190px; }
+            .caf-date-menu { width: 100%; }
             .caf-year-category-menu {
-                top: calc(100% + 2px);
-                left: 8px;
-                width: min(230px, calc(100vw - 54px));
+                position: static;
+                display: none;
+                width: 100%;
+                max-height: min(42vh, 300px);
+                margin: 2px 0 4px;
+                overflow-y: auto;
+                transform: none;
+            }
+            .caf-year-item.categories-open .caf-year-category-menu {
+                display: block;
+                transform: none;
             }
             .caf-carousel-wrapper { padding: 0; }
             .caf-page-indicator { font-size: 11px; padding: 4px 10px; margin-bottom: 6px; }
