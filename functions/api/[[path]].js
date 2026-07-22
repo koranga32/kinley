@@ -139,7 +139,8 @@ async function handleQuestions(context) {
             return {
                 ...row,
                 question: stored.question,
-                answer_type: stored.answerType
+                answer_type: stored.answerType,
+                no_graph: stored.noGraph
             };
         }), 200, isDataInterpretation ? {} : PUBLIC_CACHE_SHORT);
     }
@@ -389,7 +390,8 @@ function decodeStoredQuestion(raw) {
         question,
         explanation,
         answerType: metadata?.answer_type === "written" ? "written" : "multiple_choice",
-        writtenAnswer: metadata?.answer_type === "written" ? String(metadata.written_answer || "") : ""
+        writtenAnswer: metadata?.answer_type === "written" ? String(metadata.written_answer || "") : "",
+        noGraph: metadata?.no_graph === true
     };
 }
 
