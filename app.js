@@ -1969,7 +1969,7 @@ function cafCategoriesForScope(scope) {
 }
 
 function cafYearFromDate(value) {
-    const match = String(value || "").trim().match(/^(\d{4})/);
+    const match = String(value || "").match(/\b((?:19|20)\d{2})\b/);
     return match ? match[1] : "";
 }
 
