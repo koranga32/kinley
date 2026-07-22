@@ -3958,7 +3958,10 @@ function buildPEDIQuestionGroups(setQuestions) {
             activeGraphKey = uploadedGraphKey;
         }
         if (!groups.length || groups[groups.length - 1].isStandalone || startsNewGraph) {
-            groups.push({ graphSource: activeGraph, isStandalone: !activeGraph, questions: [] });
+            // A missing image here can be temporary while graph media is still
+            // being prefetched. Only the explicit noGraph branch above may
+            // switch the public viewer to the standalone full-width layout.
+            groups.push({ graphSource: activeGraph, isStandalone: false, questions: [] });
         }
         groups[groups.length - 1].questions.push(question);
     });
