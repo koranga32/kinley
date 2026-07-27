@@ -4930,25 +4930,16 @@
             width: min(680px, 100%);
             max-width: 680px;
             max-height: calc(100dvh - 32px);
-            padding: 22px 24px 20px;
+            padding: 18px 24px 20px;
             overflow: hidden;
         }
 
-        .terms-modal-heading .modal-icon {
-            width: 42px;
-            height: 42px;
-            margin-bottom: 8px;
-            color: #ffffff;
-            font-family: Georgia, "Times New Roman", serif;
-            font-size: 22px;
-        }
-
         .terms-modal-heading .modal-title {
-            margin-bottom: 3px;
+            margin: 0 0 5px;
         }
 
         .terms-modal-heading .modal-subtitle {
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .terms-reader {
@@ -5052,11 +5043,7 @@
         @media (max-width: 560px) {
             .terms-modal-box {
                 max-height: calc(100dvh - 18px);
-                padding: 15px 14px 13px;
-            }
-
-            .terms-modal-heading .modal-icon {
-                display: none;
+                padding: 14px 14px 13px;
             }
 
             .terms-modal-heading .modal-title {
