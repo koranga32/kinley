@@ -12,6 +12,8 @@ import {
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const QUESTION_WINDOW_SIZE = 5;
+const MAX_EXAM_QUESTIONS = 120;
+const MAX_EXAM_SESSION_BYTES = 1750000;
 const QUESTION_POOL_CACHE_SECONDS = 120;
 const questionPoolMemoryCache = new Map();
 const PUBLIC_CACHE_SHORT = {
@@ -23,22 +25,22 @@ const PUBLIC_CACHE_MEDIA = {
 const MEDIA_BUCKET = "exam-media";
 
 const POLICIES = {
-    health: { windowMs: MINUTE, ipLimit: 30, sessionLimit: 30 },
-    questions: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
-    "pe-resources": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
-    "pe-resource-pdf": { windowMs: MINUTE, ipLimit: 45, sessionLimit: 60 },
+    health: { windowMs: MINUTE, sessionLimit: 30, mode: "session" },
+    questions: { windowMs: MINUTE, sessionLimit: 90, mode: "session" },
+    "pe-resources": { windowMs: MINUTE, sessionLimit: 90, mode: "session" },
+    "pe-resource-pdf": { windowMs: MINUTE, sessionLimit: 60, mode: "session" },
     "pe-resource-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 90 },
-    "pe-di-graph": { windowMs: MINUTE, ipLimit: 2400, sessionLimit: 240 },
-    "exam-start": { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
-    "exam-question": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 180 },
+    "pe-di-graph": { windowMs: MINUTE, sessionLimit: 240, mode: "session" },
+    "exam-start": { windowMs: 10 * MINUTE, ipLimit: 600, sessionLimit: 30 },
+    "exam-question": { windowMs: MINUTE, sessionLimit: 180, mode: "session" },
     "question-solution": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 90 },
-    "pe-online-questions": { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
-    "pe-online-start": { windowMs: 10 * MINUTE, ipLimit: 30, sessionLimit: 20 },
-    "pe-online-question": { windowMs: MINUTE, ipLimit: 120, sessionLimit: 180 },
-    flashcards: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
+    "pe-online-questions": { windowMs: MINUTE, sessionLimit: 90, mode: "session" },
+    "pe-online-start": { windowMs: 10 * MINUTE, ipLimit: 600, sessionLimit: 20 },
+    "pe-online-question": { windowMs: MINUTE, sessionLimit: 180, mode: "session" },
+    flashcards: { windowMs: MINUTE, sessionLimit: 90, mode: "session" },
     "flashcard-answer": { windowMs: MINUTE, ipLimit: 90, sessionLimit: 60 },
-    quotes: { windowMs: MINUTE, ipLimit: 60, sessionLimit: 90 },
-    responses: { windowMs: 10 * MINUTE, ipLimit: 40, sessionLimit: 30 },
+    quotes: { windowMs: MINUTE, sessionLimit: 90, mode: "session" },
+    responses: { windowMs: 10 * MINUTE, ipLimit: 600, sessionLimit: 30 },
     contact: { windowMs: HOUR, ipLimit: 3, sessionLimit: 2 }
 };
 
@@ -400,6 +402,7 @@ function publicQuestionText(raw) {
 }
 
 let examSessionSchemaReady = false;
+let responseOutboxSchemaReady = false;
 
 async function ensureExamSessionSchema(db) {
     if (examSessionSchemaReady) return;
@@ -416,6 +419,24 @@ async function ensureExamSessionSchema(db) {
         on exam_sessions (expires_at)
     `).run();
     examSessionSchemaReady = true;
+}
+
+async function ensureResponseOutboxSchema(db) {
+    if (responseOutboxSchemaReady) return;
+    await db.prepare(`
+        create table if not exists exam_response_outbox (
+            id text primary key,
+            payload text not null,
+            attempts integer not null default 0,
+            created_at integer not null,
+            last_attempt_at integer
+        )
+    `).run();
+    await db.prepare(`
+        create index if not exists exam_response_outbox_created_idx
+        on exam_response_outbox (created_at)
+    `).run();
+    responseOutboxSchemaReady = true;
 }
 
 async function sendTransactionalEmail(context, email) {
@@ -534,7 +555,9 @@ async function handlePEDIGraph(context) {
             "Content-Type": contentType,
             "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
             "X-ExamPortal-Server-Cache": "di-graph",
-            "X-Content-Type-Options": "nosniff"
+            "X-Content-Type-Options": "nosniff",
+            "Cross-Origin-Resource-Policy": "same-origin",
+            "Referrer-Policy": "no-referrer"
         }
     });
     if (cache) {
@@ -571,6 +594,23 @@ function buildSecureQuestions(rows, idPrefix = "") {
     return prepared;
 }
 
+function buildCompactExamSession(prepared) {
+    const items = [];
+    let payloadBytes = 32;
+    for (const preparedItem of (prepared || []).slice(0, MAX_EXAM_QUESTIONS)) {
+        const item = {
+            ...preparedItem.publicQuestion,
+            correctIndex: preparedItem.gradingItem.correctIndex
+        };
+        const itemBytes = new TextEncoder().encode(JSON.stringify(item)).byteLength + 1;
+        if (items.length && payloadBytes + itemBytes > MAX_EXAM_SESSION_BYTES) break;
+        if (payloadBytes + itemBytes > MAX_EXAM_SESSION_BYTES) continue;
+        items.push(item);
+        payloadBytes += itemBytes;
+    }
+    return { version: 3, items };
+}
+
 async function storeRichExamSession(db, payload) {
     await ensureExamSessionSchema(db);
     const sessionId = crypto.randomUUID();
@@ -588,6 +628,23 @@ function normalizeStoredExamSession(payload) {
             version: 1,
             publicQuestions: [],
             gradingItems: parsed
+        };
+    }
+    if (Array.isArray(parsed?.items)) {
+        return {
+            version: Number(parsed.version || 3),
+            publicQuestions: parsed.items.map(item => ({
+                id: item.id,
+                category: item.category,
+                question: item.question,
+                options: item.options
+            })),
+            gradingItems: parsed.items.map(item => ({
+                id: item.id,
+                question: item.question,
+                options: item.options,
+                correctIndex: item.correctIndex
+            }))
         };
     }
     return {
@@ -657,12 +714,10 @@ async function handleExamStart(context) {
     ));
     const prepared = buildSecureQuestions(shuffled(rows || []));
     if (!prepared.length) return apiError(404, "no_questions", "No valid questions were found in this category.");
-    const publicQuestions = prepared.map(item => item.publicQuestion);
-    const sessionId = await storeRichExamSession(context.env.RATE_LIMIT_DB, {
-        version: 2,
-        publicQuestions,
-        gradingItems: prepared.map(item => item.gradingItem)
-    });
+    const sessionPayload = buildCompactExamSession(prepared);
+    const publicQuestions = normalizeStoredExamSession(sessionPayload).publicQuestions;
+    if (!publicQuestions.length) return apiError(413, "exam_too_large", "Questions in this category are too large to start safely.");
+    const sessionId = await storeRichExamSession(context.env.RATE_LIMIT_DB, sessionPayload);
     const initialWindow = buildQuestionWindow(publicQuestions, 0, QUESTION_WINDOW_SIZE);
     return json({
         ok: true,
@@ -715,12 +770,10 @@ async function handlePEOnlineStart(context) {
     const selected = selectPEOnlineRows(rows || []);
     const prepared = buildSecureQuestions(selected, "peo:");
     if (!prepared.length) return apiError(404, "no_questions", "No valid PE Online questions were found.");
-    const publicQuestions = prepared.map(item => item.publicQuestion);
-    const sessionId = await storeRichExamSession(context.env.RATE_LIMIT_DB, {
-        version: 2,
-        publicQuestions,
-        gradingItems: prepared.map(item => item.gradingItem)
-    });
+    const sessionPayload = buildCompactExamSession(prepared);
+    const publicQuestions = normalizeStoredExamSession(sessionPayload).publicQuestions;
+    if (!publicQuestions.length) return apiError(413, "exam_too_large", "PE Online questions are too large to start safely.");
+    const sessionId = await storeRichExamSession(context.env.RATE_LIMIT_DB, sessionPayload);
     return json({
         ok: true,
         session_id: sessionId,
@@ -788,6 +841,60 @@ async function handleQuotes(context) {
     ), 200, PUBLIC_CACHE_SHORT);
 }
 
+async function queueExamResponse(db, payload) {
+    await ensureResponseOutboxSchema(db);
+    const id = crypto.randomUUID();
+    await db.prepare(`
+        insert into exam_response_outbox (id, payload, attempts, created_at, last_attempt_at)
+        values (?1, ?2, 0, ?3, null)
+    `).bind(id, JSON.stringify(payload), Date.now()).run();
+    return id;
+}
+
+async function deliverQueuedExamResponse(context, id, payload) {
+    try {
+        await supabaseServerRequest(context.env, "Response", {
+            method: "POST",
+            body: payload,
+            prefer: "return=minimal"
+        });
+        await context.env.RATE_LIMIT_DB.prepare(
+            "delete from exam_response_outbox where id = ?1"
+        ).bind(id).run();
+        return true;
+    } catch (error) {
+        await context.env.RATE_LIMIT_DB.prepare(`
+            update exam_response_outbox
+            set attempts = attempts + 1, last_attempt_at = ?1
+            where id = ?2
+        `).bind(Date.now(), id).run().catch(() => {});
+        console.error("Exam response history delivery deferred:", error);
+        return false;
+    }
+}
+
+async function flushQueuedExamResponses(context, excludedId) {
+    await ensureResponseOutboxSchema(context.env.RATE_LIMIT_DB);
+    const rows = await context.env.RATE_LIMIT_DB.prepare(`
+        select id, payload from exam_response_outbox
+        where id <> ?1
+        order by created_at asc
+        limit 3
+    `).bind(excludedId || "").all();
+    for (const row of rows?.results || []) {
+        let payload;
+        try {
+            payload = JSON.parse(row.payload);
+        } catch (error) {
+            await context.env.RATE_LIMIT_DB.prepare(
+                "delete from exam_response_outbox where id = ?1"
+            ).bind(row.id).run();
+            continue;
+        }
+        await deliverQueuedExamResponse(context, row.id, payload);
+    }
+}
+
 async function handleResponses(context) {
     if (context.request.method !== "POST") return methodNotAllowed(["POST"]);
     const submission = validateGradedResponsePayload(await readJson(context.request, 512000));
@@ -799,6 +906,9 @@ async function handleResponses(context) {
     const normalized = normalizeStoredExamSession(session.payload);
     const items = normalized.gradingItems;
     if (items.length !== submission.selections.length) {
+        await context.env.RATE_LIMIT_DB.prepare(
+            "update exam_sessions set used_at = null where session_id = ?1"
+        ).bind(submission.session_id).run();
         return apiError(400, "invalid_selections", "Answer count does not match the exam session.");
     }
     let correct = 0;
@@ -823,18 +933,25 @@ async function handleResponses(context) {
             status: grading[index].status
         }))
     };
-    const saveResponse = supabaseServerRequest(context.env, "Response", {
-        method: "POST",
-        body: payload,
-        prefer: "return=minimal"
-    }).catch(error => {
-        console.error("Exam response history save failed:", error);
+    let outboxId;
+    try {
+        outboxId = await queueExamResponse(context.env.RATE_LIMIT_DB, payload);
+    } catch (error) {
+        await context.env.RATE_LIMIT_DB.prepare(
+            "update exam_sessions set used_at = null where session_id = ?1"
+        ).bind(submission.session_id).run().catch(() => {});
+        throw error;
+    }
+    const historySaved = await deliverQueuedExamResponse(context, outboxId, payload);
+    const backlogFlush = flushQueuedExamResponses(context, outboxId).catch(error => {
+        console.error("Exam response outbox flush failed:", error);
     });
-    if (typeof context.waitUntil === "function") context.waitUntil(saveResponse);
-    else await saveResponse;
+    if (typeof context.waitUntil === "function") context.waitUntil(backlogFlush);
+    else await backlogFlush;
     return json({
         ok: true,
-        save_queued: true,
+        history_saved: historySaved,
+        history_pending: !historySaved,
         result: {
             correct,
             wrong,
@@ -842,7 +959,7 @@ async function handleResponses(context) {
             total: items.length,
             grading
         }
-    }, 201);
+    }, historySaved ? 201 : 202);
 }
 
 async function handleContact(context) {

@@ -39,19 +39,29 @@ export async function enforceRateLimits(context, routeName, sessionId, policy) {
         return apiError(503, "security_not_configured", "Security service is not configured yet.");
     }
 
-    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     const now = Date.now();
     const windowStart = Math.floor(now / policy.windowMs) * policy.windowMs;
     const retrySeconds = Math.max(1, Math.ceil((windowStart + policy.windowMs - now) / 1000));
-    const [ipHash, sessionHash] = await Promise.all([
-        sha256(`${env.RATE_LIMIT_SALT}:ip:${ip}`),
-        sha256(`${env.RATE_LIMIT_SALT}:session:${sessionId}`)
-    ]);
-
-    const [ipCount, sessionCount] = await Promise.all([
-        incrementWindow(env.RATE_LIMIT_DB, `${routeName}:ip:${ipHash}`, windowStart),
-        incrementWindow(env.RATE_LIMIT_DB, `${routeName}:session:${sessionHash}`, windowStart)
-    ]);
+    let sessionCount;
+    let ipCount = 0;
+    if (policy.mode === "session") {
+        const sessionHash = await sha256(`${env.RATE_LIMIT_SALT}:session:${sessionId}`);
+        sessionCount = await incrementWindow(
+            env.RATE_LIMIT_DB,
+            `${routeName}:session:${sessionHash}`,
+            windowStart
+        );
+    } else {
+        const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+        const [ipHash, sessionHash] = await Promise.all([
+            sha256(`${env.RATE_LIMIT_SALT}:ip:${ip}`),
+            sha256(`${env.RATE_LIMIT_SALT}:session:${sessionId}`)
+        ]);
+        [ipCount, sessionCount] = await Promise.all([
+            incrementWindow(env.RATE_LIMIT_DB, `${routeName}:ip:${ipHash}`, windowStart),
+            incrementWindow(env.RATE_LIMIT_DB, `${routeName}:session:${sessionHash}`, windowStart)
+        ]);
+    }
 
     if (Math.random() < 0.01) {
         context.waitUntil(
@@ -62,10 +72,14 @@ export async function enforceRateLimits(context, routeName, sessionId, policy) {
         );
     }
 
-    if (ipCount > policy.ipLimit || sessionCount > policy.sessionLimit) {
+    const ipExceeded = policy.mode !== "session" && ipCount > policy.ipLimit;
+    if (ipExceeded || sessionCount > policy.sessionLimit) {
+        const effectiveLimit = policy.mode === "session"
+            ? policy.sessionLimit
+            : Math.min(policy.ipLimit, policy.sessionLimit);
         return apiError(429, "rate_limited", "Too many requests. Please wait and try again.", {
             "Retry-After": String(retrySeconds),
-            "X-RateLimit-Limit": String(Math.min(policy.ipLimit, policy.sessionLimit)),
+            "X-RateLimit-Limit": String(effectiveLimit),
             "X-RateLimit-Remaining": "0"
         });
     }
@@ -81,4 +95,3 @@ export function rejectCrossSiteRequest(request) {
     }
     return null;
 }
-

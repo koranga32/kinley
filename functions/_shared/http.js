@@ -1,7 +1,13 @@
 const JSON_HEADERS = {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff"
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "Content-Security-Policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "X-Robots-Tag": "noindex, nofollow"
 };
 
 export function json(data, status = 200, extraHeaders = {}) {
@@ -68,4 +74,3 @@ export function handleError(error) {
     console.error("ExamPortal API error", error);
     return apiError(500, "internal_error", "The request could not be completed.");
 }
-

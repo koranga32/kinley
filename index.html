@@ -51,6 +51,75 @@
 
 
 
+    <div class="modal-backdrop" id="terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title">
+        <div class="modal-box terms-modal-box">
+            <div class="terms-modal-heading">
+                <div class="modal-icon" aria-hidden="true">§</div>
+                <div class="modal-title" id="terms-modal-title">Terms of Reference</div>
+                <p class="modal-subtitle">Please read and agree before continuing to ExamPortal.</p>
+            </div>
+
+            <div class="terms-reader" id="terms-reader" tabindex="0" aria-label="Terms of Reference">
+                <section class="terms-section">
+                    <h3>1. Purpose</h3>
+                    <p>ExamPortal provides free educational practice materials, past-paper resources, current-affairs content and online test features. It is intended for learning and exam preparation only.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>2. Public access</h3>
+                    <p>The public website currently does not require users to create an account. The name entered on the opening screen is used only to personalize the current website experience unless the website clearly states otherwise.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>3. Free services and possible future charges</h3>
+                    <p>All services are currently free. Some optional services may become paid in the future, but this is not guaranteed. Any charge will be clearly disclosed before a user chooses a paid service.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>4. Scam and impersonation warning</h3>
+                    <p>ExamPortal does not authorize anyone to collect payment or promise jobs, selection, placement, training or guaranteed examination results in its name. Do not share passwords, one-time passwords, banking details or other sensitive information with anyone claiming to represent ExamPortal. Suspicious requests may be verified by emailing <a href="mailto:kindorji@gmail.com">kindorji@gmail.com</a>.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>5. Accuracy and educational use</h3>
+                    <p>Reasonable effort is made to keep content useful and accurate, but mistakes, incomplete information or outdated material may occur. ExamPortal does not guarantee any score, selection, employment or other outcome.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>6. Past papers and third-party material</h3>
+                    <p>Past papers, references and other third-party materials remain the property of their respective owners. They are provided for educational and practice purposes. Please contact the website owner if any material should be reviewed or removed.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>7. Acceptable use</h3>
+                    <p>Users must not misuse the website, interfere with its operation, attempt unauthorized access, copy or redistribute content unlawfully, or use ExamPortal's name to deceive or harm others.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>8. Privacy and contact information</h3>
+                    <p>Information submitted through the Contact Us form is used to respond to the message and operate the service. Users should avoid submitting unnecessary sensitive personal information.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>9. Availability and external links</h3>
+                    <p>The website may be changed, interrupted or unavailable from time to time. External links and third-party services are outside ExamPortal's control and are used at the user's discretion.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>10. Limitation of responsibility</h3>
+                    <p>To the extent permitted by applicable law, the website owner is not responsible for loss arising from reliance on educational content, service interruption, third-party conduct or misuse of the ExamPortal name.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>11. Changes and governing law</h3>
+                    <p>These terms may be updated when the website or its services change. Use of ExamPortal is governed by the applicable laws and regulations of the Kingdom of Bhutan.</p>
+                </section>
+                <section class="terms-section">
+                    <h3>12. Website owner</h3>
+                    <p>ExamPortal is owned by Kinley Dorji. Questions about these terms or reports of scams and impersonation may be sent to <a href="mailto:kindorji@gmail.com">kindorji@gmail.com</a>.</p>
+                </section>
+            </div>
+
+            <div class="terms-footer">
+                <label class="terms-agreement" for="terms-agree">
+                    <input type="checkbox" id="terms-agree">
+                    <span>I have read and agree to the Terms of Reference.</span>
+                </label>
+                <button type="button" class="btn-modal-auth terms-continue-btn" id="terms-continue-btn" disabled>Agree and Continue</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-backdrop" id="contact-modal">
         <div class="modal-box contact-modal-box">
             <div class="modal-icon">✉</div>
@@ -301,38 +370,38 @@
                 <div class="pe-menu-toggle" id="pe-menu-toggle"></div>
                 <ul class="pe-list" id="pe-list">
                     <li class="pe-list-item accent-red active" data-target="pe-home-panel">
-                        <a href="#pe-home-panel">
-                            <span class="pe-icon"><i class="bi bi-house"></i></span>
+                        <a href="#pe-home-panel" aria-label="Home">
+                            <span class="pe-icon"><i class="bi bi-house" aria-hidden="true"></i></span>
                             <span class="pe-text">Home</span>
                         </a>
                     </li>
                     <li class="pe-list-item accent-sky" data-target="pe-current-affair-panel">
-                        <a href="#pe-current-affair-panel">
-                            <span class="pe-icon"><i class="bi bi-newspaper"></i></span>
+                        <a href="#pe-current-affair-panel" aria-label="Current Affair">
+                            <span class="pe-icon"><i class="bi bi-newspaper" aria-hidden="true"></i></span>
                             <span class="pe-text">Current Affair</span>
                         </a>
                     </li>
                     <li class="pe-list-item accent-cyan" data-target="pe-mock-panel">
-                        <a href="#pe-mock-panel">
-                            <span class="pe-icon"><i class="bi bi-journal-check"></i></span>
+                        <a href="#pe-mock-panel" aria-label="BCSC main">
+                            <span class="pe-icon"><i class="bi bi-journal-check" aria-hidden="true"></i></span>
                             <span class="pe-text">BCSC(main)</span>
                         </a>
                     </li>
                     <li class="pe-list-item accent-green" data-target="pe-past-panel">
-                        <a href="#pe-past-panel">
-                            <span class="pe-icon"><i class="bi bi-file-earmark-pdf"></i></span>
+                        <a href="#pe-past-panel" aria-label="PE past paper">
+                            <span class="pe-icon"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i></span>
                             <span class="pe-text">PE past paper</span>
                         </a>
                     </li>
                     <li class="pe-list-item accent-purple" data-target="pe-di-panel">
-                        <a href="#pe-di-panel">
-                            <span class="pe-icon"><i class="bi bi-bar-chart-line"></i></span>
+                        <a href="#pe-di-panel" aria-label="Data Interpretation">
+                            <span class="pe-icon"><i class="bi bi-bar-chart-line" aria-hidden="true"></i></span>
                             <span class="pe-text">Data Interpretation</span>
                         </a>
                     </li>
                     <li class="pe-list-item accent-orange" data-target="pe-online-panel">
-                        <a href="#pe-online-panel">
-                            <span class="pe-icon"><i class="bi bi-laptop"></i></span>
+                        <a href="#pe-online-panel" aria-label="Online Test">
+                            <span class="pe-icon"><i class="bi bi-laptop" aria-hidden="true"></i></span>
                             <span class="pe-text">Online Test</span>
                         </a>
                     </li>

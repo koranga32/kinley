@@ -23,6 +23,7 @@ let databaseLoadPromise = null;
 let examCatalogReady = false;
 let examCategoryCounts = new Map();
 let setupContinued = false;
+let termsAcceptedForCurrentEntry = false;
 let examPreparing = false;
 let dailyQuotes = [];
 let dailyQuoteTickerIndex = 0;
@@ -80,6 +81,8 @@ function bindStaticUiEvents() {
         submitContactForm();
     });
     document.getElementById("contact-modal-close-btn")?.addEventListener("click", closeContactModal);
+    document.getElementById("terms-agree")?.addEventListener("change", handleTermsAgreementChange);
+    document.getElementById("terms-continue-btn")?.addEventListener("click", acceptTermsAndContinue);
 
     document.getElementById("theme-toggle-btn")?.addEventListener("click", toggleThemeMode);
     document.getElementById("contact-btn")?.addEventListener("click", openContactModal);
@@ -1289,37 +1292,81 @@ function handleCategorySelectionChange() {
 }
 
 // ─── EXAM START ───────────────────────────────────────
+function openTermsModal() {
+    const modal = document.getElementById("terms-modal");
+    const agreement = document.getElementById("terms-agree");
+    const continueBtn = document.getElementById("terms-continue-btn");
+    if (!modal || !agreement || !continueBtn) return;
+
+    agreement.checked = false;
+    continueBtn.disabled = true;
+    modal.classList.add("open");
+    document.body.classList.add("terms-modal-open");
+    window.setTimeout(() => document.getElementById("terms-reader")?.focus(), 0);
+}
+
+function closeTermsModal() {
+    document.getElementById("terms-modal")?.classList.remove("open");
+    document.body.classList.remove("terms-modal-open");
+}
+
+function handleTermsAgreementChange(event) {
+    const continueBtn = document.getElementById("terms-continue-btn");
+    if (continueBtn) continueBtn.disabled = !event.currentTarget.checked;
+}
+
+async function acceptTermsAndContinue() {
+    const agreement = document.getElementById("terms-agree");
+    const continueBtn = document.getElementById("terms-continue-btn");
+    if (!agreement?.checked || examPreparing) return;
+
+    termsAcceptedForCurrentEntry = true;
+    if (continueBtn) continueBtn.disabled = true;
+    closeTermsModal();
+    await continueInitialSetup();
+}
+
+async function continueInitialSetup() {
+    if (examPreparing) return;
+
+    examPreparing = true;
+    showLoading(true, "Connecting...");
+    setLoaderProgress(10);
+    const btn = document.getElementById("start-btn");
+    btn.disabled = true;
+    const loaded = examCatalogReady || await loadExamCatalog();
+    if (!loaded || !categories.length) {
+        examPreparing = false;
+        showLoading(false);
+        btn.disabled = false;
+        btn.innerHTML = "<span>Try Again</span> →";
+        return;
+    }
+    try {
+        showLoading(true, "Connecting...");
+    } finally {
+        setupContinued = true;
+        document.getElementById("setup-options").style.display = "grid";
+        btn.innerHTML = "<span>Begin Examination</span> →";
+        btn.disabled = false;
+        setPostContinueActionButtons();
+        document.getElementById("category-select").focus();
+        examPreparing = false;
+        showLoading(false);
+    }
+}
+
 async function startExam() {
     if (examPreparing) return;
     const name = document.getElementById("student-name").value.trim();
     if (!name) { showToast("Please enter your full name.", "error"); return; }
 
     if (!examCatalogReady || !setupContinued) {
-        examPreparing = true;
-        showLoading(true, "Connecting...");
-        setLoaderProgress(10);
-        const btn = document.getElementById("start-btn");
-        btn.disabled = true;
-        const loaded = examCatalogReady || await loadExamCatalog();
-        if (!loaded || !categories.length) {
-            examPreparing = false;
-            showLoading(false);
-            btn.disabled = false;
-            btn.innerHTML = "<span>Try Again</span> →";
+        if (!termsAcceptedForCurrentEntry) {
+            openTermsModal();
             return;
         }
-        try {
-            showLoading(true, "Connecting...");
-        } finally {
-            setupContinued = true;
-            document.getElementById("setup-options").style.display = "grid";
-            btn.innerHTML = "<span>Begin Examination</span> →";
-            btn.disabled = false;
-            setPostContinueActionButtons();
-            document.getElementById("category-select").focus();
-            examPreparing = false;
-            showLoading(false);
-        }
+        await continueInitialSetup();
         return;
     }
 
@@ -1741,6 +1788,7 @@ async function submitExam() {
     showLoading(true, "Processing results and saving to cloud…");
 
     let gradedResult;
+    let resultHistoryPending = false;
     try {
         const response = await apiRequest("responses", {
             method: "POST",
@@ -1753,6 +1801,7 @@ async function submitExam() {
             }
         });
         gradedResult = response.result;
+        resultHistoryPending = response.history_pending === true;
     } catch (e) {
         console.error("Submit error:", e);
         if (activeCategoryLabel === "PE Online Test") {
@@ -1831,7 +1880,12 @@ async function submitExam() {
     document.getElementById("results-view").style.display = "";
     document.getElementById("results-view").classList.add("show");
     showLoading(false);
-    showToast("Exam graded and saved securely.", "success");
+    showToast(
+        resultHistoryPending
+            ? "Exam graded. Result history is queued securely and will retry automatically."
+            : "Exam graded and saved securely.",
+        resultHistoryPending ? "info" : "success"
+    );
 
     // Animate ring after render
     setTimeout(() => { ring.style.strokeDashoffset = offset; }, 300);
