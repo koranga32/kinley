@@ -6,6 +6,8 @@ const DB_TIMEOUT_MS = 60000;
 const API_TIMEOUT_MS = 20000;
 const DB_CACHE_KEY = "supabase_exam_catalog_v3_counts_only";
 const LEGACY_QUESTION_CACHE_KEYS = ["supabase_exam_pool_v2_no_answers"];
+const TERMS_ACCEPTANCE_VERSION = "2026-07-27";
+const PUBLIC_ENTRY_STORAGE_KEY = "examportal_public_entry_v1";
 const SECONDS_PER_QUESTION = 30;
 const PE_BCSC_MAIN_TYPE = "BCSC(main)";
 
@@ -253,8 +255,12 @@ function closeImageZoom() {
         if (copyrightEl) copyrightEl.textContent = `© ${new Date().getFullYear()}`;
         renderDailyQuoteTicker();
         warmPublicStartupData();
-        setEntryActionButtons();
-	    document.getElementById("student-name").focus();
+        if (restoreSavedPublicEntry()) {
+            void continueInitialSetup();
+        } else {
+            setEntryActionButtons();
+	        document.getElementById("student-name").focus();
+        }
 	}
 
     function warmPublicStartupData() {
@@ -1292,6 +1298,37 @@ function handleCategorySelectionChange() {
 }
 
 // ─── EXAM START ───────────────────────────────────────
+function savePublicEntry(name) {
+    try {
+        localStorage.setItem(PUBLIC_ENTRY_STORAGE_KEY, JSON.stringify({
+            termsVersion: TERMS_ACCEPTANCE_VERSION,
+            name: String(name || "").trim()
+        }));
+    } catch (error) {
+        // Private browsing or browser privacy settings can block storage.
+    }
+}
+
+function restoreSavedPublicEntry() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(PUBLIC_ENTRY_STORAGE_KEY) || "null");
+        const savedName = String(saved?.name || "").trim();
+        if (saved?.termsVersion !== TERMS_ACCEPTANCE_VERSION || !savedName) return false;
+
+        termsAcceptedForCurrentEntry = true;
+        setupContinued = true;
+        document.getElementById("student-name").value = savedName;
+        document.getElementById("setup-options").style.display = "grid";
+        const startBtn = document.getElementById("start-btn");
+        startBtn.innerHTML = "<span>Begin Examination</span> →";
+        startBtn.disabled = true;
+        setPostContinueActionButtons();
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
 function openTermsModal() {
     const modal = document.getElementById("terms-modal");
     const agreement = document.getElementById("terms-agree");
@@ -1321,6 +1358,7 @@ async function acceptTermsAndContinue() {
     if (!agreement?.checked || examPreparing) return;
 
     termsAcceptedForCurrentEntry = true;
+    savePublicEntry(document.getElementById("student-name").value);
     if (continueBtn) continueBtn.disabled = true;
     closeTermsModal();
     await continueInitialSetup();
